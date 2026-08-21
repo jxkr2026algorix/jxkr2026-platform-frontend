@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="SALGIL resident and field team wireframe">
+  <title>SALGIL Field</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-gov.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="../salgil-ops-web/index.html" aria-label="SALGIL operations home"><img src="../assets/salgil-logo.svg" alt="SALGIL"></a>
+    <span>Cheongsong response exercise</span>
+  </header>
+
+  <main>
+    <div class="role-switch" role="group" aria-label="User role">
+      <span>View as</span>
+      <button data-role="resident" aria-pressed="true">Resident</button>
+      <button data-role="patrol" aria-pressed="false">Field team</button>
+    </div>
+
+    <section class="role-view is-active" data-role-panel="resident">
+      <nav class="mode-switch" aria-label="Demo state">
+        <button data-mode="normal" aria-pressed="true">Normal</button>
+        <button data-mode="alert" aria-pressed="false">Alert</button>
+        <button data-mode="route" aria-pressed="false">Route</button>
+      </nav>
+
+      <section class="resident-mode is-active" data-mode-panel="normal">
+        <div class="status-card safe-status">
+          <span class="status-label">Current status</span>
+          <h1>You’re safe for now</h1>
+          <p>No active alerts near you. We’ll tell you clearly if that changes.</p>
+        </div>
+        <button class="button primary full-width" id="start-safety-check">Start safety check</button>
+
+        <section class="preparedness" aria-labelledby="preparedness-title">
+          <div class="section-heading plain"><div><h2 id="preparedness-title">Preparedness</h2><p>Household plan progress</p></div><strong>72%</strong></div>
+          <div class="progress-track" role="progressbar" aria-label="Preparedness progress" aria-valuenow="72" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+          <p>Two steps left: confirm medicine and a family meeting point.</p>
+        </section>
+
+        <section class="home-section" aria-labelledby="quick-actions-title">
+          <h2 id="quick-actions-title">Quick actions</h2>
+          <div class="quick-actions">
+            <button data-quick-action="route"><span>Find shelter</span><small>Open the assigned safe route</small></button>
+            <button data-quick-action="emergency"><span>Call emergency</span><small>Connect to 119</small></button>
+            <button data-quick-action="share"><span>Share location</span><small>Send to a trusted contact</small></button>
+            <button data-quick-action="checklist"><span>View checklist</span><small>Review five essential items</small></button>
+          </div>
+        </section>
+
+        <section class="home-section" aria-labelledby="family-title">
+          <h2 id="family-title">Family & contacts</h2>
+          <ul class="contact-list"><li><span>Mom</span><strong class="safe-text">Safe</strong></li><li><span>Dad</span><strong>Not checked in</strong></li><li><span>Minji</span><strong class="safe-text">Safe</strong></li></ul>
+        </section>
+      </section>
+
+      <section class="resident-mode" data-mode-panel="alert">
+        <div class="status-card alert-status" role="alert">
+          <span class="status-label">Flood warning nearby</span>
+          <p>Issued Aug 22, 2026 at 14:12</p>
+          <h1>Move to higher ground now</h1>
+          <p>Water is rising near Sangchon. Use the assigned north route and avoid County Road 12.</p>
+        </div>
+        <button class="button primary full-width" id="show-safe-route">Show safe route</button>
+        <div class="secondary-actions" aria-label="Emergency actions">
+          <button class="button emergency" data-alert-action="call">Call 119</button>
+          <button class="button secondary" data-alert-action="share">Share my location</button>
+          <button class="button secondary" data-alert-action="checklist">Open checklist</button>
+        </div>
+      </section>
+
+      <section class="resident-mode" data-mode-panel="route">
+        <div class="route-summary"><span>Nearest safe shelter</span><h1>Jinbo Sports Center</h1><p id="route-status">7 min by vehicle · north bypass open</p></div>
+        <div class="sticky-action"><button class="button primary full-width" id="evacuation-action">Start evacuation</button></div>
+        <section class="route-surface" aria-labelledby="route-title">
+          <div class="section-heading"><div><h2 id="route-title">Safe route</h2><p>Follow the green route</p></div><span>Open</span></div>
+          <div class="route-map" role="img" aria-label="Safe route from current location through the community hall to Jinbo Sports Center">
+            <svg class="route-path-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="10,75 45,42 60,21"/></svg>
+            <span class="route-point current">Current location</span>
+            <span class="route-point meeting">Community hall<br><small>Vehicle pickup</small></span>
+            <span class="route-point shelter">Jinbo Sports Center<br><small>Capacity 112</small></span>
+            <span class="route-block">County Road 12 closed</span>
+          </div>
+          <ol class="route-steps">
+            <li><span>1</span><div><strong>Move to the community hall</strong><small>350 m · support vehicle waiting</small></div></li>
+            <li><span>2</span><div><strong>Use the north bypass</strong><small>County Road 12 is closed.</small></div></li>
+            <li><span>3</span><div><strong>Check in at the shelter</strong><small>Give your name to the entrance team.</small></div></li>
+          </ol>
+        </section>
+        <section class="contact-box"><h2>Need help moving?</h2><p>Request a vehicle, medical help, or an escort.</p><button class="button secondary" id="request-help">Request support</button></section>
+      </section>
+      <div class="feedback" id="resident-feedback" aria-live="polite" hidden></div>
+    </section>
+
+    <section class="role-view" data-role-panel="patrol">
+      <div class="page-heading">
+        <p>Field team 2</p>
+        <h1>Field verification</h1>
+        <p>Check unreachable households first, then report access conditions.</p>
+      </div>
+
+      <section class="task-surface">
+        <div class="section-heading"><div><h2>Check unreachable households</h2><p>Priority 1 · assigned at 14:16</p></div><span id="patrol-status">Ready</span></div>
+        <dl>
+          <div><dt>Location</dt><dd>Sangchon 214-3 area</dd></div>
+          <div><dt>Scope</dt><dd>2 households</dd></div>
+          <div><dt>Complete when</dt><dd>Household and access states are reported</dd></div>
+        </dl>
+        <button class="button primary" id="start-task">Start task</button>
+      </section>
+
+      <section class="report-surface" id="field-report" hidden>
+        <div class="section-heading"><div><h2>Field report</h2><p>Send the condition first; media can follow.</p></div></div>
+        <form id="field-report-form">
+          <label>Report type<select><option>Access blocked</option><option>Household status</option><option>Support required</option></select></label>
+          <label>Location<input value="Sangchon access junction" required></label>
+          <label>Field notes<textarea required>Debris blocks vehicle access at the junction.</textarea></label>
+          <label class="check"><input type="checkbox" required><span>I verified the immediate area is safe.</span></label>
+          <button class="button primary" type="submit">Send to operations</button>
+        </form>
+      </section>
+      <div class="feedback critical" id="patrol-feedback" role="alert" hidden></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
