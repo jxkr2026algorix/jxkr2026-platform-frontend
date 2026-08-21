@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SALGIL multi-hazard evacuation operations wireframe">
+  <title>SALGIL Operations</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-gov.min.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="side-nav">
+      <a class="brand" href="#situation" aria-label="SALGIL operations home">
+        <img src="../assets/salgil-logo.svg" alt="SALGIL">
+        <small>Evacuation operations</small>
+      </a>
+      <nav aria-label="Main views">
+        <button class="nav-item is-current" data-view="situation" aria-current="page">Situation</button>
+        <button class="nav-item" data-view="plan">Evacuation plan</button>
+        <button class="nav-item" data-view="contact">Contact status</button>
+        <button class="nav-item" data-view="patrol">Field tasks</button>
+      </nav>
+      <div class="side-footer">
+        <span class="mode-label">Exercise mode</span>
+        <p>Cheongsong multi-hazard response</p>
+        <a href="../salgil-field-web/index.html">Open field view</a>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="context-bar">
+        <button class="mobile-menu" id="mobile-menu" aria-expanded="false" aria-controls="mobile-nav">Views</button>
+        <div>
+          <strong class="context-title context-title-long">Cheongsong Emergency Operations Center</strong>
+          <strong class="context-title context-title-short">Cheongsong EOC</strong>
+          <span>Updated Aug 22, 2026 at 14:10</span>
+        </div>
+        <div class="context-actions">
+          <span class="sync-state">Data up to date</span>
+          <button class="button secondary" id="reset-demo">Reset exercise</button>
+        </div>
+      </header>
+
+      <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile views" hidden>
+        <button data-view="situation" aria-current="page">Situation</button>
+        <button data-view="plan">Plan</button>
+        <button data-view="contact">Contacts</button>
+        <button data-view="patrol">Field</button>
+      </nav>
+
+      <main id="main-content" tabindex="-1">
+        <section class="view map-view is-active" data-view-panel="situation">
+          <div class="spatial-heading">
+            <div>
+              <p class="breadcrumb">Incident 2026-0822-01 · Level 2 response</p>
+              <h1>Cheongsong operational map</h1>
+              <p>Multi-hazard exposure, evacuation routes, shelters, and field resources.</p>
+            </div>
+            <div class="spatial-actions">
+              <span class="state-text is-approved"><i></i>Live operating picture</span>
+              <button class="button primary" data-go="plan">Review evacuation plan</button>
+            </div>
+          </div>
+
+          <section class="spatial-workspace" aria-label="Cheongsong spatial operations workspace">
+            <aside class="layer-rail" aria-label="Map layers and community priority">
+              <div class="rail-section">
+                <p class="rail-kicker">Map layers</p>
+                <fieldset class="layer-list">
+                  <legend class="sr-only">Visible map layers</legend>
+                  <label><input type="checkbox" data-map-layer="communities" checked><span>Communities</span><b>4</b></label>
+                  <label><input type="checkbox" data-map-layer="hazards" checked><span>Hazard exposure</span><b>3</b></label>
+                  <label><input type="checkbox" data-map-layer="routes" checked><span>Evacuation routes</span><b id="route-count">2</b></label>
+                  <label><input type="checkbox" data-map-layer="shelters" checked><span>Shelters</span><b>2</b></label>
+                  <label><input type="checkbox" data-map-layer="teams" checked><span>Field teams</span><b>3</b></label>
+                  <label><input type="checkbox" data-map-layer="constraints" checked><span>Access constraints</span><b id="road-count">1</b></label>
+                </fieldset>
+              </div>
+              <div class="rail-section priority-section">
+                <div class="rail-title"><p class="rail-kicker">Community priority</p><span>86 residents</span></div>
+                <div class="spatial-village-list" role="listbox" aria-label="Community priority">
+                  <button class="spatial-village selected" role="option" aria-selected="true" data-village="Sangchon"><span>01</span><span><strong>Sangchon</strong><small>Slope failure · evacuate</small></span><b>34</b></button>
+                  <button class="spatial-village" role="option" aria-selected="false" data-village="Wolwe"><span>02</span><span><strong>Wolwe</strong><small>Wildfire · prepare</small></span><b>27</b></button>
+                  <button class="spatial-village" role="option" aria-selected="false" data-village="Bunam"><span>03</span><span><strong>Bunam</strong><small>Access disruption · monitor</small></span><b>15</b></button>
+                  <button class="spatial-village" role="option" aria-selected="false" data-village="Juwangsan"><span>04</span><span><strong>Juwangsan</strong><small>Power outage · monitor</small></span><b>10</b></button>
+                </div>
+              </div>
+            </aside>
+
+            <div class="map-stage">
+              <div class="map-command-bar" aria-label="Map status">
+                <div><strong>Operational area</strong><span>Cheongsong-gun · Aug 22, 14:10</span></div>
+                <div class="map-stat-cluster"><span><b>4</b> communities</span><span><b>112</b> shelter capacity</span></div>
+              </div>
+              <div id="operations-map" aria-label="Interactive map of Cheongsong communities, hazards, routes, shelters, and field teams"></div>
+              <div class="map-fallback" id="map-fallback" role="status" hidden>
+                <strong>Basemap unavailable</strong><span>Layer controls and operational details remain available.</span>
+              </div>
+              <div class="map-revision-banner" id="map-revision-banner" role="status" hidden>
+                <strong>Route revised</strong><span>North bypass · new access closure</span>
+              </div>
+              <section class="operations-timeline" aria-label="Latest operational events">
+                <div class="timeline-heading"><span>Latest events</span><button class="button text" type="button">View log</button></div>
+                <ol>
+                  <li><time id="timeline-latest-time">14:10</time><span id="timeline-latest-event">County Road 12 closure verified</span></li>
+                  <li><time>14:06</time><span>Wildfire watch added near Wolwe</span></li>
+                  <li><time>13:58</time><span>Sangchon moved to evacuation priority 1</span></li>
+                </ol>
+              </section>
+            </div>
+
+            <aside class="object-inspector" id="village-detail" aria-live="polite" aria-label="Selected community details">
+              <div class="inspector-heading"><span>Selected community</span><strong id="detail-community">Sangchon</strong><small id="detail-status">Evacuate now</small></div>
+              <dl class="inspector-data">
+                <div><dt>Residents</dt><dd id="detail-residents">34</dd></div>
+                <div><dt>Primary hazard</dt><dd id="detail-hazard">Slope failure risk</dd></div>
+                <div><dt>Support needs</dt><dd id="detail-support">12 mobility needs</dd></div>
+                <div><dt>Assigned shelter</dt><dd id="detail-shelter">Jinbo Sports Center</dd></div>
+                <div><dt>Transport</dt><dd id="detail-transport">Bus 1 · ambulance</dd></div>
+                <div><dt>Last update</dt><dd id="detail-update">14:08 · sensor fusion</dd></div>
+              </dl>
+              <div class="inspector-note"><span>Decision basis</span><p id="detail-note">Exposure and mobility needs place Sangchon first. The eastern approach is blocked.</p></div>
+              <button class="button primary inspector-action" data-go="plan">Review assignment</button>
+              <button class="button secondary inspector-action" type="button" id="center-selection">Center on map</button>
+            </aside>
+          </section>
+        </section>
+
+        <section class="view" data-view-panel="plan">
+          <div class="page-heading">
+            <div><p class="breadcrumb">Incident 2026-0822-01</p><h1>Review evacuation plan</h1><p>Confirm the recommended order, transport, and shelter assignment before approval.</p></div>
+            <span class="state-text" id="plan-state"><i></i>Awaiting approval</span>
+          </div>
+          <section class="work-surface">
+            <div class="panel-heading"><div><h2>Community assignments</h2><p>Draft based on exposure, transport, and access constraints.</p></div><button class="button secondary" data-go="situation">View situation</button></div>
+            <div class="table-wrap">
+              <table class="plan-table">
+                <thead><tr><th>Order</th><th>Community</th><th>Residents</th><th>Shelter</th><th>Transport</th><th>Basis</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td><strong>Sangchon</strong></td><td>34</td><td>Jinbo Sports Center</td><td id="route-cell">Bus 1 · ambulance</td><td id="route-reason">Slope risk · mobility needs</td></tr>
+                  <tr><td>2</td><td><strong>Wolwe</strong></td><td>27</td><td>Jinbo Sports Center</td><td>Bus 1</td><td>Wildfire approach</td></tr>
+                  <tr><td>3</td><td><strong>Bunam</strong></td><td>15</td><td>Bunam Community Center</td><td>Van</td><td>Alternate access route</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="decision-bar">
+              <div><strong>Approval enables contact with 76 residents.</strong><span>Owner: Operations lead Jisoo Kim</span></div>
+              <button class="button primary" id="approve-plan">Approve plan</button>
+            </div>
+          </section>
+          <div class="feedback" id="approval-feedback" aria-live="polite" hidden></div>
+        </section>
+
+        <section class="view" data-view-panel="contact">
+          <div class="page-heading">
+            <div><p class="breadcrumb" id="contact-eyebrow">Plan approval required</p><h1>Resident contact status</h1><p>Review automated responses and hand unreachable households to field teams.</p></div>
+            <button class="button primary" id="start-contact">Start contact</button>
+          </div>
+          <section class="summary-strip compact" aria-label="Contact result summary">
+            <div><span>Total</span><strong>76</strong></div><div><span>Evacuating</span><strong id="safe-count">0</strong></div><div><span>Support requested</span><strong id="help-count">0</strong></div><div><span>Unreachable</span><strong id="no-answer-count">0</strong></div>
+          </section>
+          <section class="work-surface">
+            <div class="panel-heading"><div><h2>Contact roster</h2><p>Exercise responses appear after contact begins.</p></div><span class="state-text" id="contact-state"><i></i>Awaiting approval</span></div>
+            <div class="table-wrap">
+              <table class="contact-table">
+                <thead><tr><th>Community</th><th>Households</th><th>Channel</th><th>Response</th><th>Follow-up</th></tr></thead>
+                <tbody id="contact-rows">
+                  <tr><td>Sangchon</td><td>12 households</td><td>Call · SMS</td><td data-result>Queued</td><td data-action>Approve evacuation plan</td></tr>
+                  <tr><td>Wolwe</td><td>9 households</td><td>Call · SMS</td><td data-result>Queued</td><td data-action>Approve evacuation plan</td></tr>
+                  <tr><td>Bunam</td><td>5 households</td><td>Call</td><td data-result>Queued</td><td data-action>Approve evacuation plan</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <div class="feedback" id="contact-feedback" aria-live="polite" hidden></div>
+        </section>
+
+        <section class="view" data-view-panel="patrol">
+          <div class="page-heading">
+            <div><p class="breadcrumb">Field handoff</p><h1>Field tasks</h1><p>Verify unreachable households and access constraints on site.</p></div>
+            <a class="button secondary" href="../salgil-field-web/index.html#patrol">Open field view</a>
+          </div>
+          <section class="work-surface patrol-layout">
+            <div class="task-list">
+              <div class="panel-heading"><div><h2>Task queue</h2><p>Highest priority first</p></div></div>
+              <div class="task-row selected"><span><strong>Check unreachable households</strong><small>Field team 2 · Sangchon · 2 households</small></span><b id="house-task-state">Unassigned</b></div>
+              <div class="task-row"><span><strong>Verify County Road 12 closure</strong><small>Road team 1</small></span><b>In review</b></div>
+            </div>
+            <div class="task-detail" id="task-detail">
+              <span class="detail-label">Selected task</span><h2>Check unreachable households</h2><p>Verify two households, evacuation status, and any transport or medical support needs.</p>
+              <dl><div><dt>Location</dt><dd>Sangchon 214-3 area</dd></div><div><dt>Owner</dt><dd>Field team 2</dd></div><div><dt>Complete when</dt><dd>Both household states are reported</dd></div></dl>
+              <button class="button primary" id="open-report">Add field report</button>
+            </div>
+          </section>
+
+          <section class="report-panel" id="report-panel" hidden>
+            <div class="panel-heading"><div><h2>Field report</h2><p>Access changes trigger route review and plan reapproval.</p></div><button class="button text" id="close-report">Close</button></div>
+            <form id="report-form">
+              <label>Report type<select id="report-type"><option>Access blocked</option><option>Household status</option><option>Support required</option></select></label>
+              <label>Location<input value="Sangchon access junction" required></label>
+              <label class="full">Field notes<textarea required>Debris blocks vehicle access at the junction.</textarea></label>
+              <button class="button primary" type="submit">Submit report</button>
+            </form>
+          </section>
+          <div class="feedback critical" id="replan-feedback" role="alert" hidden></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
