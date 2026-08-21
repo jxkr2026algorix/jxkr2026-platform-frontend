@@ -1,0 +1,40 @@
+:root {
+  color: #171719;
+  background: #ffffff;
+  font-family:
+    "Pretendard GOV Variable", "Pretendard GOV", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100dvh;
+}
+
+main {
+  width: min(520px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 72px 0;
+}
+
+main > p:first-child {
+  color: #3366ff;
+  font-weight: 700;
+}
+
+h1 {
+  margin: 8px 0 12px;
+  font-size: clamp(2rem, 11vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+p {
+  color: #5c6068;
+}
