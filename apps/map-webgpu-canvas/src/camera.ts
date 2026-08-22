@@ -79,9 +79,9 @@ export class OrbitCamera {
   }
 
   setMode(mode: CameraMode): void {
-    if (mode === "tilted" && this.mode !== "tilted" && this.flatBlend > 0.6) {
-      this.yaw = this.yawGoal - Math.PI * 1.25;
-    }
+    // Entering 3D used to wind the yaw back a full turn and sweep around.
+    // It read as a lurch rather than a transition, so the tilt now happens
+    // in place and the heading is left where the operator had it.
     this.mode = mode;
     this.flatGoal = mode === "flat" ? 1 : 0;
     // Distance is deliberately preserved across the switch, so 2D and 3D stay
@@ -236,7 +236,11 @@ export class OrbitCamera {
         event.preventDefault();
         if (!this.navigable) return;
         this.onUserInteraction?.();
-        this.zoomBy(Math.exp(event.deltaY * 0.0012));
+        // macOS reports trackpad pinch as a ctrl-modified wheel with small
+        // deltas, and a two-finger drag as a plain wheel with large ones.
+        // Both should zoom, so each gets the gain that makes it feel 1:1.
+        const gain = event.ctrlKey ? 0.012 : 0.0032;
+        this.zoomBy(Math.exp(clamp(event.deltaY * gain, -0.4, 0.4)));
       },
       { signal },
     );
@@ -308,9 +312,11 @@ export class OrbitCamera {
     this.distanceGoal = Math.min(this.distanceGoal, maxDistance);
     this.distance = Math.min(this.distance, maxDistance);
 
-    this.flatBlend = damp(this.flatBlend, this.flatGoal, 3.2, dt);
+    // One rate for everything that moves during a mode change, so the tilt,
+    // the heading, and the zoom arrive together instead of in three stages.
+    this.flatBlend = damp(this.flatBlend, this.flatGoal, 2.6, dt);
     this.yaw = damp(this.yaw, this.yawGoal, 2.6, dt);
-    this.distance = damp(this.distance, this.distanceGoal, 5, dt);
+    this.distance = damp(this.distance, this.distanceGoal, 2.6, dt);
 
     // Keep the visible area inside the map: in flat mode the margin equals
     // the half-extent of the viewport, so dragging stops at the map edge

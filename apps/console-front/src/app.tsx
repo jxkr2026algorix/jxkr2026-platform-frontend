@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import { Navigate, NavLink, Route, Routes } from "react-router";
 import { AssistantDrawer } from "./components/AssistantDrawer";
-import { DEFAULT_DISTRICT_CODE } from "./domain";
 import { SituationPage } from "./pages/situation-page";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
@@ -155,10 +154,8 @@ export function App() {
     map.send({ type: "map:sim-control", payload: { action: "reset" } });
     map.send({ type: "map:set-scenario", payload: { scenario: "clear" } });
     map.send({ type: "map:set-view", payload: { mode: "flat" } });
-    map.send({
-      type: "map:focus-district",
-      payload: { code: DEFAULT_DISTRICT_CODE },
-    });
+    // The district stays: reset clears the incident, not where the operator
+    // is looking.
   };
 
   const createTrainingEvent = (type: DisasterType): Promise<PlatformEvent> =>

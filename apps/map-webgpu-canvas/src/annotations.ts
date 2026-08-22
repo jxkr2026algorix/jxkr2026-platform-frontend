@@ -46,6 +46,8 @@ export type ZoneActivateHandler = (zone: {
   hazard: string | undefined;
   /** Predicted origin in normalized map coordinates. */
   at: Projected;
+  /** Extent of the zone in normalized coordinates, for framing it. */
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }) => void;
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -254,11 +256,21 @@ export class MapAnnotations {
         chip.setAttribute("role", "button");
         chip.setAttribute("tabindex", "0");
         chip.title = "Run the simulation from this predicted origin";
+        const bounds = points.reduce(
+          (box, point) => ({
+            minX: Math.min(box.minX, point.x),
+            minY: Math.min(box.minY, point.y),
+            maxX: Math.max(box.maxX, point.x),
+            maxY: Math.max(box.maxY, point.y),
+          }),
+          { minX: 1, minY: 1, maxX: 0, maxY: 0 },
+        );
         const activate = () =>
           this.onActivateZone?.({
             id: zone.id,
             hazard: zone.hazard,
             at: origin,
+            bounds,
           });
         chip.addEventListener("click", activate);
         chip.addEventListener("keydown", (event) => {
@@ -395,9 +407,13 @@ export class MapAnnotations {
       return;
     }
     chip.hidden = false;
-    // The independent `translate` property, not `transform`: an inline
-    // transform would override the stylesheet's hover and press states.
-    chip.style.translate = `${at.x.toFixed(1)}px ${at.y.toFixed(1)}px`;
+    // Position and scale live in one inline transform. Splitting them across
+    // `translate` and `transform` left the chips pinned to the screen instead
+    // of tracking the map; the hover scale comes through a custom property so
+    // the stylesheet never has to fight this write.
+    chip.style.transform =
+      `translate(-50%, -50%) translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px)` +
+      ` scale(var(--chip-scale, 1))`;
   }
 
   /** Project one normalized point, or null if it is behind the camera. */

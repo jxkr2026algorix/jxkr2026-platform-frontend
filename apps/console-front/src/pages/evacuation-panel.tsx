@@ -1,5 +1,6 @@
 import {
   cameraForBbox,
+  DISTRICTS,
   districtByCode,
 } from "@salgil/map-webgpu-canvas/districts";
 import type { DashboardCommand } from "@salgil/map-webgpu-canvas/protocol";
@@ -71,6 +72,18 @@ function closureRing(
       lon: lon + Math.cos(angle) * lonDegrees,
     };
   });
+}
+
+/** The 시/군 whose bounding box contains a point, if any. */
+function districtAt(lat: number, lon: number): string | null {
+  const hit = DISTRICTS.find(
+    (district) =>
+      lon >= district.bbox[0] &&
+      lon <= district.bbox[2] &&
+      lat >= district.bbox[1] &&
+      lat <= district.bbox[3],
+  );
+  return hit?.code ?? null;
 }
 
 const formatMinutes = (value: number | null | undefined): string =>
@@ -263,6 +276,12 @@ export function EvacuationPanel({
     setError("");
     setPreview(true);
     setPlan(DEMO_ROUTE_PLAN);
+    // Move the selector to the district the sample sits in, so the rail and
+    // the map agree about where the operator is looking.
+    const home = districtAt(36.5012, 129.0332);
+    if (home && home !== districtCode) {
+      onMapCommand({ type: "map:focus-district", payload: { code: home } });
+    }
     // The alert banner reads the platform event, so the preview raises one
     // too — otherwise the map fills in while the dashboard stays silent.
     onPreviewEvent(DEMO_EVENT);

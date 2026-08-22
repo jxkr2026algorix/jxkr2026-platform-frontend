@@ -344,8 +344,11 @@ export async function loadBasemap(
     8,
     13,
   );
-  const TILE_BUDGET = 300;
-  for (const zoomOffset of [4, 3, 2, 1]) {
+  // Raised from 300: at 16:9 the province needs 484 tiles to reach zoom 11
+  // instead of settling for zoom 10, which is the difference between 61 m and
+  // 123 m per pixel on the drape. Tiles are cached, so the cost is paid once.
+  const TILE_BUDGET = 500;
+  for (const zoomOffset of [5, 4, 3, 2, 1]) {
     const zoom = clamp(baseZoom + zoomOffset, 10, 16);
     const mpp = metersPerPixel(centerLat, zoom);
     const pxSize = sizeMeters / mpp;
@@ -358,7 +361,7 @@ export async function loadBasemap(
         lonToGlobalPx(centerLon, zoom) - pxSize / 2,
         latToGlobalPx(centerLat, zoom) - pxSize / 2,
         pxSize,
-        Math.min(4096, Math.round(pxSize)),
+        Math.min(8192, Math.round(pxSize)),
       );
     } catch {
       // Try the next coarser zoom.
@@ -703,8 +706,10 @@ export async function loadDetailPatch(
   urlFor: (z: number, x: number, y: number) => string,
   options?: CompositeOptions,
 ): Promise<DetailPatch | null> {
-  const TILE_BUDGET = 110;
-  for (let zoom = 17; zoom >= 12; zoom--) {
+  // The patch is what fills the screen once the camera is close, so it gets
+  // the larger share of the budget and reaches two zoom levels further in.
+  const TILE_BUDGET = 320;
+  for (let zoom = 19; zoom >= 12; zoom--) {
     const mpp = metersPerPixel(centerLat, zoom);
     const pxSize = sizeMeters / mpp;
     const tilesAcross = Math.floor(pxSize / TILE) + 1;
@@ -718,7 +723,7 @@ export async function loadDetailPatch(
         minX,
         minY,
         pxSize,
-        Math.min(2048, Math.round(pxSize)),
+        Math.min(4096, Math.round(pxSize)),
         options,
       );
       return {

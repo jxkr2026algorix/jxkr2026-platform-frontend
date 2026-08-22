@@ -223,6 +223,7 @@ function activateZone(zone: {
   id: string;
   hazard: string | undefined;
   at: { x: number; y: number };
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
 }): void {
   if (!engine) return;
   const hazard = HAZARD_TO_TRIGGER[zone.hazard ?? ""];
@@ -230,6 +231,18 @@ function activateZone(zone: {
     showStatus("No simulation is available for this hazard.", 3000);
     return;
   }
+  // Frame the zone before running it: the operator pressed the alert to look
+  // at that place, and a simulation they cannot see is not worth starting.
+  const world = currentRegion.sizeMeters;
+  const span =
+    Math.max(
+      zone.bounds.maxX - zone.bounds.minX,
+      zone.bounds.maxY - zone.bounds.minY,
+    ) * world;
+  engine.setCamera(
+    zone.at,
+    (span * 1.9) / (2 * Math.tan((20 * Math.PI) / 180)),
+  );
   engine.setScenario(hazard === "flood" ? "flood" : hazard);
   engine.triggerAt(hazard, zone.at.x, zone.at.y);
   engine.simControl("play");

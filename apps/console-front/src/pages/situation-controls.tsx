@@ -24,10 +24,14 @@ interface SituationControlsProps {
   readonly onReset: () => void;
 }
 
-const viewLabels: Record<ViewMode, string> = {
+/**
+ * Only the two the operator chooses between. "auto" still exists in the
+ * protocol, but exposing it meant a hazard button could silently flip the
+ * view mode out from under a deliberate 2D/3D choice.
+ */
+const viewLabels: Record<Exclude<ViewMode, "auto">, string> = {
   flat: "2D",
   tilted: "3D",
-  auto: "Auto",
 };
 
 const basemapLabels: Record<BasemapStyle, string> = {
@@ -69,8 +73,11 @@ export function SituationControls({
         <div className="map-display-controls">
           <fieldset className="compact-controls">
             <legend>Map view</legend>
-            <motion.div className="segmented-track" layoutRoot>
-              {(["flat", "tilted", "auto"] as const).map((mode) => (
+            <motion.div
+              className="segmented-track segmented-track-two"
+              layoutRoot
+            >
+              {(["flat", "tilted"] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"

@@ -122,53 +122,103 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   let sc = G.layers.y;
   var zone = 0.0;
   var zoneColor = vec3f(0.0);
+  // Each hazard gets its own texture, because one hatch for all of them made
+  // every scenario look the same and none of them look urgent.
+  //   0 none  1 water contours  2 fire flicker  3 downslope streaks
+  //   4 shock rings  5 heat shimmer  6 cold stipple  7 drought crackle
+  var pat = 0u;
+  let t = G.camPos.w;
+  let ws = G.world.x;
   if (sc > 0.5 && sc < 2.5) {
     // Rain / flood: channels and valley floors that collect water.
     zone = smoothstep(0.25, 0.8, riskStatic.r);
-    zoneColor = vec3f(0.10, 0.36, 0.95);
+    zoneColor = vec3f(0.10, 0.42, 0.98);
+    pat = 1u;
   } else if (sc < 3.5) {
-    // Wildfire: only the densest dry fuel, kept subtle so the whole
-    // forest does not wash orange.
-    zone = smoothstep(0.55, 1.0, fire.r * (1.0 - fire.a)) * 0.6;
-    zoneColor = vec3f(1.0, 0.45, 0.05);
+    // Wildfire: the densest dry fuel, burning at the edge.
+    zone = smoothstep(0.45, 1.0, fire.r * (1.0 - fire.a));
+    zoneColor = vec3f(1.0, 0.42, 0.05);
+    pat = 2u;
   } else if (sc < 4.5) {
     // Landslide: steep faces, sharpened by live saturation.
     zone = smoothstep(0.3, 0.9, max(risk, riskStatic.g * clamp(G.sim.w * 1.4, 0.0, 1.0)));
-    zoneColor = vec3f(0.92, 0.15, 0.08);
+    zoneColor = vec3f(0.95, 0.16, 0.09);
+    pat = 3u;
   } else if (sc < 5.5) {
     // Typhoon: compound flood exposure.
     zone = smoothstep(0.25, 0.8, riskStatic.r);
-    zoneColor = vec3f(0.10, 0.36, 0.95);
+    zoneColor = vec3f(0.16, 0.34, 0.95);
+    pat = 1u;
   } else if (sc < 6.5) {
     // Earthquake: liquefaction-prone soft lowland soils.
     zone = smoothstep(0.3, 0.8, riskStatic.r) * (1.0 - smoothstep(0.15, 0.4, heightNorm));
-    zoneColor = vec3f(0.85, 0.45, 0.15);
+    zoneColor = vec3f(0.92, 0.48, 0.14);
+    pat = 4u;
   } else if (sc < 7.5) {
     // Tsunami: low-lying coastal strips.
     zone = 1.0 - smoothstep(0.015, 0.07, heightNorm);
-    zoneColor = vec3f(0.05, 0.55, 0.78);
+    zoneColor = vec3f(0.04, 0.60, 0.84);
+    pat = 1u;
   } else if (sc < 9.5) {
     // Nuclear / chemical: the plume itself is the overlay.
     zone = 0.0;
   } else if (sc < 10.5) {
     // Heatwave: flat lowland basins where heat pools.
-    zone = (1.0 - riskStatic.g) * (1.0 - smoothstep(0.18, 0.45, heightNorm)) * 0.8;
-    zoneColor = vec3f(0.98, 0.35, 0.08);
+    zone = (1.0 - riskStatic.g) * (1.0 - smoothstep(0.18, 0.45, heightNorm));
+    zoneColor = vec3f(1.0, 0.34, 0.06);
+    pat = 5u;
   } else if (sc < 11.5) {
     // Cold wave: exposed highlands.
     zone = smoothstep(0.35, 0.75, heightNorm);
-    zoneColor = vec3f(0.25, 0.45, 0.92);
+    zoneColor = vec3f(0.34, 0.56, 1.0);
+    pat = 6u;
   } else if (sc < 12.5) {
     // Heavy snow: mountain districts at risk of isolation.
-    zone = smoothstep(0.32, 0.68, heightNorm) * 0.8;
-    zoneColor = vec3f(0.35, 0.45, 0.68);
+    zone = smoothstep(0.32, 0.68, heightNorm);
+    zoneColor = vec3f(0.46, 0.58, 0.82);
+    pat = 6u;
   } else {
     // Drought: water-supply channels running dry.
     zone = smoothstep(0.25, 0.8, riskStatic.r);
-    zoneColor = vec3f(0.78, 0.56, 0.12);
+    zoneColor = vec3f(0.86, 0.60, 0.10);
+    pat = 7u;
   }
-  let hatch = 0.7 + 0.3 * step(0.5, fract((in.worldPos.x + in.worldPos.z) / (G.world.x * 0.005)));
-  albedo = mix(albedo, zoneColor, G.fx.w * zone * 0.42 * hatch);
+
+  // World-space coordinates in units that hold their look across a 2 km town
+  // view and a 300 km province view.
+  let wp = in.worldPos.xz / (ws * 0.004);
+  var tex = 1.0;
+  if (pat == 1u) {
+    // Water: contour bands drifting inward, so the area reads as filling.
+    tex = 0.55 + 0.45 * smoothstep(0.35, 0.75, fract(riskStatic.r * 9.0 - t * 0.22));
+  } else if (pat == 2u) {
+    // Fire: coarse cells flickering out of phase with each other.
+    let cell2 = floor(wp * 1.6);
+    tex = 0.45 + 0.75 * abs(sin(t * 3.4 + hash2f(vec2i(cell2)) * 31.0));
+  } else if (pat == 3u) {
+    // Landslide: streaks running down the fall line of the slope itself.
+    let down = normalize(vec2f(in.normal.x, in.normal.z) + vec2f(1e-4, 0.0));
+    tex = 0.45 + 0.55 * smoothstep(0.3, 0.7, fract(dot(wp, down) * 2.2 + t * 0.5));
+  } else if (pat == 4u) {
+    // Earthquake: rings expanding from the shaking, then settling.
+    tex = 0.5 + 0.5 * smoothstep(0.4, 0.9, fract(length(wp) * 0.7 - t * 0.6));
+  } else if (pat == 5u) {
+    // Heat: a slow shimmer with no hard edge anywhere in it.
+    tex = 0.62 + 0.38 * valueNoise2(wp * 1.3 + vec2f(t * 0.16, -t * 0.11));
+  } else if (pat == 6u) {
+    // Cold and snow: a still, fine stipple. Weather that does not move.
+    tex = 0.55 + 0.45 * step(0.62, valueNoise2(wp * 7.0));
+  } else if (pat == 7u) {
+    // Drought: a crackle, held still. Ridged noise gives the fracture lines.
+    tex = 0.45 + 0.55 * smoothstep(0.55, 0.85, 1.0 - abs(valueNoise2(wp * 3.4) - 0.5) * 2.0);
+  }
+
+  // A rim where the field crosses its threshold. Without an edge a hazard
+  // area fades into the terrain and reads as a stain rather than a boundary.
+  let rim = smoothstep(0.30, 0.52, zone) * (1.0 - smoothstep(0.52, 0.78, zone));
+  let live = G.fx.w * zone;
+  albedo = mix(albedo, zoneColor, live * 0.5 * tex);
+  albedo = mix(albedo, mix(zoneColor, vec3f(1.0), 0.35), G.fx.w * rim * 0.55);
 
   // Administrative 시/군 boundaries from the national dataset. Independent of
   // the hazard overlay: an operator navigating by district still needs the
