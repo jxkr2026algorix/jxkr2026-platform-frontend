@@ -310,8 +310,10 @@ fn fs(in: VSOut) -> @location(0) vec4f {
       // Inundation: shallow edges pale, the channel through it dark.
       fCol = mix(vec3f(0.30, 0.62, 0.86), vec3f(0.03, 0.16, 0.42), ramp);
     } else if (kind < 1.5) {
-      // Fire: the front is bright, the interior burnt.
-      fCol = mix(vec3f(0.95, 0.32, 0.06), vec3f(0.996, 0.85, 0.35), ramp);
+      // Bright at the front, charred behind it. The ramp runs from the edge
+      // inward, so the bright end has to be the low end — the other way round
+      // the burn scar glowed and the active fire line vanished into it.
+      fCol = mix(vec3f(1.0, 0.62, 0.10), vec3f(0.19, 0.08, 0.06), ramp);
     } else {
       // Landslide and everything else: a single warning ramp.
       fCol = mix(vec3f(0.92, 0.42, 0.20), vec3f(0.62, 0.06, 0.04), ramp);

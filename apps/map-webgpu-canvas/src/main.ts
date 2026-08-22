@@ -28,7 +28,12 @@ import {
 } from "./districts";
 import type { RegionBox } from "./geo";
 import { Engine, type HazardEvent } from "./gpu/engine";
-import { floodField, windowAround } from "./hazard-field-demo";
+import {
+  floodFieldAt,
+  loadWindowTerrain,
+  wildfireFieldAt,
+  windowAround,
+} from "./hazard-field-demo";
 import {
   type AnyPoint,
   clampRainfall,
@@ -261,31 +266,62 @@ function activateZone(zone: {
  * being built: compute the drainage-driven flood extent for a window around
  * the camera. Replaced wholesale once `map:set-hazard-field` is fed upstream.
  */
-async function computeFloodFieldAt(
+/** Horizons the interim player steps through, matching the platform's. */
+const DEMO_HORIZONS = [0, 15, 30, 60, 120] as const;
+
+let spreadTimer: number | null = null;
+
+function stopSpreadPlayback(): void {
+  if (spreadTimer !== null) {
+    clearInterval(spreadTimer);
+    spreadTimer = null;
+  }
+}
+
+/**
+ * Interim spread while the platform's stream is being wired up: compute the
+ * terrain once, then publish one frame per horizon on a timer. The frames are
+ * the same shape the backend sends, so the renderer cannot tell the
+ * difference — only the source changes.
+ */
+async function playLocalSpread(
+  hazard: "flood" | "wildfire",
   lat: number,
   lon: number,
   sizeMeters = 12000,
 ): Promise<boolean> {
   if (!engine || !geoRef) return false;
+  stopSpreadPlayback();
   const win = windowAround(lat, lon, Math.max(sizeMeters, 4000));
-  showStatus("Computing flood extent…", 0);
-  const field = await floodField(win, engine.rainfall || 60);
-  if (!field) {
+  showStatus("Computing spread…", 0);
+  const terrain = await loadWindowTerrain(win);
+  if (!terrain) {
     showStatus("Elevation for this area is unavailable.", 3000);
     return false;
   }
-  showStatus("Flood extent ready", 2000);
-  if (params.get("fieldstats") === "1") {
-    const sorted = Float32Array.from(field.values).sort();
-    const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))] ?? 0;
-    console.info(
-      "[field] " +
-        [0.5, 0.8, 0.9, 0.95, 0.98, 0.995, 0.999, 1]
-          .map((q) => `p${q * 100}=${at(q).toFixed(3)}`)
-          .join(" "),
-    );
-  }
-  return applyHazardField(field);
+  const origin = {
+    u: (lon - win.west) / (win.east - win.west),
+    v: (win.north - lat) / (win.north - win.south),
+  };
+  const frames = DEMO_HORIZONS.map((h) =>
+    hazard === "wildfire"
+      ? wildfireFieldAt(terrain, origin, { x: 1, y: 0.35 }, h)
+      : floodFieldAt(terrain, engine?.rainfall || 60, h),
+  );
+
+  let index = 0;
+  const step = () => {
+    const frame = frames[index];
+    if (frame) {
+      applyHazardField(frame);
+      showStatus(`+${frame.horizonMinutes} min`, 2200);
+    }
+    index = (index + 1) % frames.length;
+  };
+  step();
+  // Loops, so the operator can watch the progression without re-triggering.
+  spreadTimer = window.setInterval(step, 2200);
+  return true;
 }
 
 /** Field colour ramps, keyed off the hazard the recipe produced. */
@@ -432,6 +468,8 @@ function handleCommand(command: DashboardToMap): void {
       break;
     }
     case "map:set-hazard-field": {
+      // Platform frames end local playback — real data wins over the stand-in.
+      stopSpreadPlayback();
       if (!applyHazardField(command.payload.field)) {
         ack(false, "bad-field");
         return;
@@ -627,7 +665,9 @@ function wireEngine(target: Engine): void {
     });
     showStatus(`${HAZARD_LABELS[hazard]} area marked`, 2500);
     if (geo && (hazard === "flood" || hazard === "landslide")) {
-      void computeFloodFieldAt(geo.lat, geo.lon, radiusMeters * 2);
+      void playLocalSpread("flood", geo.lat, geo.lon, radiusMeters * 2);
+    } else if (geo && hazard === "wildfire") {
+      void playLocalSpread("wildfire", geo.lat, geo.lon, radiusMeters * 2);
     } else {
       engine?.triggerAt(hazard, at.x, at.y);
     }
@@ -784,13 +824,18 @@ async function main(): Promise<void> {
       toNormalized,
     );
     annotations.onActivateZone = activateZone;
-    if (params.get("demo") === "flood") {
+    const spreadDemo = params.get("demo");
+    if (spreadDemo === "flood" || spreadDemo === "wildfire") {
       // Give the terrain a moment to settle before the one-off computation.
       setTimeout(() => {
         if (!engine || !geoRef) return;
         const c = engine.cameraCenter;
         const at = mapPointToLatLon(c.x, c.y, geoRef);
-        void computeFloodFieldAt(at.lat, at.lon);
+        void playLocalSpread(
+          spreadDemo === "wildfire" ? "wildfire" : "flood",
+          at.lat,
+          at.lon,
+        );
       }, 400);
     }
     if (params.get("demo") === "annotations") {
