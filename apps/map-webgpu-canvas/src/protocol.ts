@@ -166,6 +166,35 @@ export interface MapRoute {
   color?: string;
 }
 
+/**
+ * One frame of a hazard field computed upstream.
+ *
+ * This mirrors the platform's `PredictionResult`: a row-major grid over a
+ * geographic bbox at a forecast horizon. Spread is the model's job, not the
+ * renderer's — the local simulation cannot resolve a stream channel when its
+ * cells are hundreds of metres across, and it has no business inventing
+ * hazard behaviour in the first place.
+ */
+export interface HazardField {
+  /** Hazard slug, e.g. "flood", "wildfire", "landslide". */
+  hazard: string;
+  /** [west, south, east, north] in degrees, the grid's own extent. */
+  bbox: [number, number, number, number];
+  width: number;
+  height: number;
+  /**
+   * Row-major values, `width * height` long, north row first. Units are the
+   * recipe's: metres of depth for flood extent, 0..1 otherwise.
+   */
+  values: number[] | Float32Array;
+  /** Forecast horizon this frame represents. */
+  horizonMinutes?: number;
+  /** Value at or above which the field is worth drawing. */
+  threshold?: number;
+  /** True when the upstream model answered in stub mode. */
+  isStub?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Envelope
 // ---------------------------------------------------------------------------
@@ -313,6 +342,15 @@ export type DashboardCommand =
       /** Toggle the 시/군 boundary overlay drawn from the national dataset. */
       type: "map:set-district-overlay";
       payload: { enabled: boolean };
+    }
+  | {
+      /**
+       * Replace the hazard field with an upstream-computed frame, or clear it
+       * with `null`. This is how spread reaches the map: the renderer draws
+       * the field it is given rather than simulating one.
+       */
+      type: "map:set-hazard-field";
+      payload: { field: HazardField | null };
     }
   | {
       type: "map:ping";
@@ -463,6 +501,7 @@ const COMMAND_TYPES: readonly string[] = [
   "map:focus-district",
   "map:set-district-overlay",
   "map:zoom",
+  "map:set-hazard-field",
   "map:ping",
 ];
 

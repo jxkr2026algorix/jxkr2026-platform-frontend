@@ -23,8 +23,31 @@ ${GLOBALS_WGSL}
 @group(0) @binding(7) var streetTex : texture_2d<f32>;
 @group(0) @binding(8) var detailTex : texture_2d<f32>;
 @group(0) @binding(9) var districtTex : texture_2d<f32>;
+@group(0) @binding(10) var fieldTex : texture_2d<f32>;
 ${GRID_WGSL}
 ${UTIL_WGSL}
+
+/**
+ * Bilinear read of the upstream hazard field, in its own grid space. Returns
+ * 0 outside the frame's bbox so the field never leaks past where the model
+ * actually computed something.
+ */
+fn hazardField(uv : vec2f) -> f32 {
+  let r = G.fieldRect;
+  if (r.z <= 0.0 || r.w <= 0.0) { return 0.0; }
+  let f = (uv - r.xy) / vec2f(r.z, r.w);
+  if (f.x < 0.0 || f.x > 1.0 || f.y < 0.0 || f.y > 1.0) { return 0.0; }
+  let dim = vec2f(textureDimensions(fieldTex, 0));
+  let p = clamp(f, vec2f(0.0), vec2f(1.0)) * (dim - vec2f(1.0));
+  let i0 = vec2i(floor(p));
+  let t = fract(p);
+  let mx = vec2i(i32(dim.x) - 1, i32(dim.y) - 1);
+  let a = textureLoad(fieldTex, clamp(i0, vec2i(0), mx), 0).r;
+  let b = textureLoad(fieldTex, clamp(i0 + vec2i(1, 0), vec2i(0), mx), 0).r;
+  let c = textureLoad(fieldTex, clamp(i0 + vec2i(0, 1), vec2i(0), mx), 0).r;
+  let d = textureLoad(fieldTex, clamp(i0 + vec2i(1, 1), vec2i(0), mx), 0).r;
+  return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+}
 
 /** Bilinear read of the water depth grid. */
 fn waterBilinear(uv : vec2f) -> f32 {
@@ -259,6 +282,36 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   albedo = mix(albedo, zoneColor, live * 0.5 * tex);
   albedo = mix(albedo, mix(zoneColor, vec3f(1.0), 0.35), G.fx.w * rim * 0.55);
 
+  // Upstream hazard field. Drawn from the model's own grid rather than the
+  // local sim, so it resolves at whatever the recipe produced — a stream
+  // channel instead of a slab the size of a village.
+  let fieldV = hazardField(in.uv);
+  let fBlend = G.fieldMeta.x;
+  if (fBlend > 0.002 && fieldV > G.fieldMeta.z) {
+    let kind = G.fieldMeta.y;
+    let peak = max(G.fieldMeta.w, 1e-4);
+    // Normalized against the frame's own peak, so a shallow forecast still
+    // shows structure instead of rendering as one flat wash.
+    let norm = clamp((fieldV - G.fieldMeta.z) / max(peak - G.fieldMeta.z, 1e-4), 0.0, 1.0);
+    let ramp = pow(norm, 0.65);
+    var fCol = vec3f(0.0);
+    if (kind < 0.5) {
+      // Inundation: shallow edges pale, the channel through it dark.
+      fCol = mix(vec3f(0.30, 0.62, 0.86), vec3f(0.03, 0.16, 0.42), ramp);
+    } else if (kind < 1.5) {
+      // Fire: the front is bright, the interior burnt.
+      fCol = mix(vec3f(0.95, 0.32, 0.06), vec3f(0.996, 0.85, 0.35), ramp);
+    } else {
+      // Landslide and everything else: a single warning ramp.
+      fCol = mix(vec3f(0.92, 0.42, 0.20), vec3f(0.62, 0.06, 0.04), ramp);
+    }
+    // The long tail of near-threshold cells covers most of a catchment. Left
+    // visible it hazes the whole map; cut it and only the channels the water
+    // actually runs down are drawn, which is what makes the branching legible.
+    let onset = smoothstep(0.10, 0.34, norm);
+    albedo = mix(albedo, fCol, fBlend * onset * (0.55 + 0.42 * ramp));
+  }
+
   // Administrative 시/군 boundaries from the national dataset. Independent of
   // the hazard overlay: an operator navigating by district still needs the
   // outlines when the hazard layer is off.
@@ -467,6 +520,7 @@ export class SurfaceRenderer {
   private streetView!: GPUTextureView;
   private detailView!: GPUTextureView;
   private districtView!: GPUTextureView;
+  private fieldView!: GPUTextureView;
 
   constructor(
     device: GPUDevice,
@@ -477,6 +531,7 @@ export class SurfaceRenderer {
     satTex: GPUTexture,
     riskTex: GPUTexture,
     streetTex: GPUTexture,
+    fieldTex: GPUTexture,
     detailTex: GPUTexture,
     districtTex: GPUTexture,
     gridSize: number,
@@ -551,6 +606,7 @@ export class SurfaceRenderer {
     this.streetView = streetTex.createView();
     this.detailView = detailTex.createView();
     this.districtView = districtTex.createView();
+    this.fieldView = fieldTex.createView();
     this.buildTerrainBG = () =>
       device.createBindGroup({
         layout: this.terrain.getBindGroupLayout(0),
@@ -565,6 +621,7 @@ export class SurfaceRenderer {
           { binding: 7, resource: this.streetView },
           { binding: 8, resource: this.detailView },
           { binding: 9, resource: this.districtView },
+          { binding: 10, resource: this.fieldView },
         ],
       });
     this.terrainBG = this.buildTerrainBG();
@@ -606,6 +663,12 @@ export class SurfaceRenderer {
   /** Swap in the lazily loaded street basemap texture. */
   setStreetTexture(streetTex: GPUTexture): void {
     this.streetView = streetTex.createView();
+    this.terrainBG = this.buildTerrainBG();
+  }
+
+  /** Swap in a new upstream hazard-field frame. */
+  setFieldTexture(fieldTex: GPUTexture): void {
+    this.fieldView = fieldTex.createView();
     this.terrainBG = this.buildTerrainBG();
   }
 

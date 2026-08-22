@@ -19,6 +19,7 @@ import {
   cameraForBbox,
   districtByCode,
   latLonToMapPoint,
+  mapPointToLatLon,
   PROVINCE_BBOX,
   PROVINCE_CODE,
   PROVINCE_REGION,
@@ -27,10 +28,12 @@ import {
 } from "./districts";
 import type { RegionBox } from "./geo";
 import { Engine, type HazardEvent } from "./gpu/engine";
+import { floodField, windowAround } from "./hazard-field-demo";
 import {
   type AnyPoint,
   clampRainfall,
   type DashboardToMap,
+  type HazardField,
   MAX_RAINFALL_MM_PER_HOUR,
   type MapMarker,
   type MapRoute,
@@ -253,6 +256,69 @@ function activateZone(zone: {
   showStatus("Simulating from the predicted origin", 3000);
 }
 
+/** Terrain of the loaded region, kept for the interim client-side fields. */
+let terrainRef: TerrainData | null = null;
+
+/**
+ * Interim source for the hazard field while the platform's spread stream is
+ * being built: compute the drainage-driven flood extent for a window around
+ * the camera. Replaced wholesale once `map:set-hazard-field` is fed upstream.
+ */
+function computeLocalFloodField(sizeMeters = 12000): boolean {
+  if (!engine || !geoRef || !terrainRef) return false;
+  const center = engine.cameraCenter;
+  const { lat, lon } = mapPointToLatLon(center.x, center.y, geoRef);
+  const win = windowAround(lat, lon, sizeMeters);
+  return applyHazardField(
+    floodField(terrainRef, geoRef, win, engine.rainfall || 60),
+  );
+}
+
+/** Field colour ramps, keyed off the hazard the recipe produced. */
+const FIELD_KIND: Record<string, number> = {
+  flood: 0,
+  flood_extent: 0,
+  rain: 0,
+  heavy_rain: 0,
+  rain_nowcast: 0,
+  tsunami: 0,
+  wildfire: 1,
+  wildfire_spread: 1,
+  landslide: 2,
+  landslide_risk: 2,
+};
+
+/**
+ * Place an upstream hazard frame. The grid carries its own bbox, so it is
+ * mapped through the georeference rather than assumed to line up with the
+ * simulation grid — the two have no reason to share a resolution.
+ */
+function applyHazardField(field: HazardField | null): boolean {
+  if (!engine) return false;
+  if (!field) {
+    engine.setHazardField(null);
+    return true;
+  }
+  if (!geoRef) return false;
+  const [west, south, east, north] = field.bbox;
+  const nw = latLonToMapPoint(north, west, geoRef);
+  const se = latLonToMapPoint(south, east, geoRef);
+  const values =
+    field.values instanceof Float32Array
+      ? field.values
+      : Float32Array.from(field.values);
+  if (values.length !== field.width * field.height) return false;
+  engine.setHazardField({
+    width: field.width,
+    height: field.height,
+    values,
+    rect: { x: nw.x, y: nw.y, w: se.x - nw.x, h: se.y - nw.y },
+    kind: FIELD_KIND[field.hazard] ?? 2,
+    threshold: field.threshold ?? 0.05,
+  });
+  return true;
+}
+
 function handleCommand(command: DashboardToMap): void {
   const ack = (ok: boolean, error?: string) => {
     if (command.id === undefined) return;
@@ -341,6 +407,13 @@ function handleCommand(command: DashboardToMap): void {
           payload: { code: "bad-command", message: String(error) },
         });
       });
+      break;
+    }
+    case "map:set-hazard-field": {
+      if (!applyHazardField(command.payload.field)) {
+        ack(false, "bad-field");
+        return;
+      }
       break;
     }
     case "map:zoom": {
@@ -598,6 +671,7 @@ async function main(): Promise<void> {
   const region = initialRegion();
   const { terrain, geo, imagery, street } = await loadTerrain(region);
   geoRef = geo;
+  terrainRef = terrain;
   currentRegion = {
     centerLat: region.centerLat,
     centerLon: region.centerLon,
@@ -665,6 +739,10 @@ async function main(): Promise<void> {
       toNormalized,
     );
     annotations.onActivateZone = activateZone;
+    if (params.get("demo") === "flood") {
+      // Give the terrain a moment to settle before the one-off computation.
+      setTimeout(() => computeLocalFloodField(), 400);
+    }
     if (params.get("demo") === "annotations") {
       applyZones(DEMO_ZONES);
       applyMarkers(DEMO_MARKERS);

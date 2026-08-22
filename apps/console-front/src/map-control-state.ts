@@ -133,6 +133,7 @@ export function applyOptimisticControlCommand(
     case "map:set-routes":
     case "map:set-camera":
     case "map:zoom":
+    case "map:set-hazard-field":
     case "map:ping":
       return { controls, pending };
   }

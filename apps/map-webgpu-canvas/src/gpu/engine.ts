@@ -197,6 +197,11 @@ export class Engine {
   private districtTexRef: GPUTexture | null = null;
   private districtOn = true;
   private districtBlend = 0;
+  private fieldTexRef: GPUTexture | null = null;
+  private fieldRect = { x: 0, y: 0, w: 0, h: 0 };
+  private fieldMeta = { kind: 0, threshold: 0, peak: 1 };
+  private fieldBlend = 0;
+  private fieldOn = false;
   /**
    * Rainfall footprint in normalized coordinates. A radius of 10 means
    * province-wide, which the sim reads as "no footprint".
@@ -350,6 +355,20 @@ export class Engine {
       });
     }
 
+    // Hazard field starts empty; frames arrive from the platform.
+    const fieldTex = device.createTexture({
+      label: "hazard-field-placeholder",
+      size: [1, 1],
+      format: "r32float",
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+      { texture: fieldTex },
+      new Float32Array(1),
+      { bytesPerRow: 4 },
+      [1, 1],
+    );
+
     // Boundary overlay starts empty; main.ts uploads the rasterized 시/군
     // outlines once the georeference is known.
     const districtTex = device.createTexture({
@@ -431,6 +450,7 @@ export class Engine {
       satTex,
       riskTex,
       streetTex,
+      fieldTex,
       detailTex,
       districtTex,
       n,
@@ -629,6 +649,46 @@ export class Engine {
    * Allow or block manual pan/orbit/zoom. Embedded maps are driven by
    * district selection only, so the view always frames somewhere meaningful.
    */
+  /**
+   * Place an upstream hazard-field frame on the map. `rect` is the frame's
+   * bbox in normalized map coordinates; `values` is row-major, north first.
+   */
+  setHazardField(
+    frame: {
+      width: number;
+      height: number;
+      values: Float32Array;
+      rect: { x: number; y: number; w: number; h: number };
+      kind: number;
+      threshold: number;
+    } | null,
+  ): void {
+    if (!frame || frame.width < 1 || frame.height < 1) {
+      this.fieldOn = false;
+      return;
+    }
+    const tex = this.device.createTexture({
+      label: "hazard-field",
+      size: [frame.width, frame.height],
+      format: "r32float",
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    this.device.queue.writeTexture(
+      { texture: tex },
+      frame.values,
+      { bytesPerRow: frame.width * 4 },
+      [frame.width, frame.height],
+    );
+    this.surface.setFieldTexture(tex);
+    this.fieldTexRef?.destroy();
+    this.fieldTexRef = tex;
+    this.fieldRect = frame.rect;
+    let peak = frame.threshold;
+    for (const v of frame.values) if (v > peak) peak = v;
+    this.fieldMeta = { kind: frame.kind, threshold: frame.threshold, peak };
+    this.fieldOn = true;
+  }
+
   /** Confine rainfall to a footprint, or pass null for province-wide rain. */
   setRainArea(
     area: { x: number; y: number; radiusMeters: number } | null,
@@ -1412,6 +1472,21 @@ export class Engine {
       this.rainArea.y,
       this.rainArea.radius,
       this.rainArea.feather,
+    );
+    this.fieldBlend = damp(this.fieldBlend, this.fieldOn ? 1 : 0, 4, realDt);
+    g.setVec4(
+      ROW.fieldRect,
+      this.fieldRect.x,
+      this.fieldRect.y,
+      this.fieldRect.w,
+      this.fieldRect.h,
+    );
+    g.setVec4(
+      ROW.fieldMeta,
+      this.fieldBlend,
+      this.fieldMeta.kind,
+      this.fieldMeta.threshold,
+      this.fieldMeta.peak,
     );
     this.detailBlend = damp(this.detailBlend, this.detailOn ? 1 : 0, 4, realDt);
     g.setVec4(
