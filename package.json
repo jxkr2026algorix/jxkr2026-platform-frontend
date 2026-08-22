@@ -1,6 +1,7 @@
 {
   "name": "jxkr2026-platform-frontend",
   "private": true,
+  "license": "Apache-2.0",
   "packageManager": "yarn@4.18.0",
   "workspaces": [
     "apps/*"
@@ -13,6 +14,7 @@
     "dev:console": "yarn workspace @salgil/console-front dev",
     "dev:mobile": "yarn workspace @salgil/mobile dev",
     "dev:map": "yarn workspace @salgil/map-webgpu-canvas dev",
+    "dev:platform": "node scripts/platform-demo-server.mjs",
     "lint": "biome check apps",
     "typecheck": "yarn workspace @salgil/console-front typecheck && yarn workspace @salgil/mobile typecheck && yarn workspace @salgil/map-webgpu-canvas typecheck"
   },

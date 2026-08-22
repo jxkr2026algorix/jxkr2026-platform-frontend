@@ -2,11 +2,13 @@ import {
   DASHBOARD_SOURCE,
   type DashboardCommand,
   MAP_SOURCE,
+  type MapPoint,
   type MapStatePayload,
   type MapToDashboard,
   PROTOCOL_VERSION,
   SCENARIOS,
   type Scenario,
+  type TriggerKind,
 } from "@salgil/map-webgpu-canvas/protocol";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_MAP_SCENARIO, DEFAULT_RAINFALL_MM_PER_HOUR } from "./domain";
@@ -38,8 +40,25 @@ function isSeverity(value: unknown): boolean {
   );
 }
 
+function isTriggerKind(value: unknown): value is TriggerKind {
+  return [
+    "flood",
+    "wildfire",
+    "landslide",
+    "earthquake",
+    "tsunami",
+    "nuclear",
+    "chemical",
+  ].some((kind) => kind === value);
+}
+
 function isMapStatePayload(value: unknown): value is MapStatePayload {
-  if (!isRecord(value) || !isRecord(value.hazards) || !isRecord(value.camera)) {
+  if (
+    !isRecord(value) ||
+    !isRecord(value.hazards) ||
+    !isRecord(value.camera) ||
+    !isRecord(value.district)
+  ) {
     return false;
   }
   const { flood, wildfire, landslide } = value.hazards;
@@ -63,6 +82,11 @@ function isMapStatePayload(value: unknown): value is MapStatePayload {
     isFiniteNumber(center.x) &&
     isFiniteNumber(center.y) &&
     isFiniteNumber(distanceMeters);
+  const { selected, overlay, loading } = value.district;
+  const hasValidDistrictState =
+    (selected === null || typeof selected === "string") &&
+    typeof overlay === "boolean" &&
+    typeof loading === "boolean";
   const hasValidHazardState =
     isFiniteNumber(flood.coverageRatio) &&
     isSeverity(flood.severity) &&
@@ -75,6 +99,7 @@ function isMapStatePayload(value: unknown): value is MapStatePayload {
     hasValidBasemap &&
     hasValidPlaybackState &&
     hasValidCameraState &&
+    hasValidDistrictState &&
     hasValidHazardState
   );
 }
@@ -103,6 +128,14 @@ function isMapMessage(value: unknown): value is MapToDashboard {
     );
   }
   if (value.type === "map:state") return isMapStatePayload(payload);
+  if (value.type === "map:point-selected") {
+    return (
+      isTriggerKind(payload.hazard) &&
+      isRecord(payload.at) &&
+      isFiniteNumber(payload.at.x) &&
+      isFiniteNumber(payload.at.y)
+    );
+  }
   if (value.type === "map:error") {
     const validCode = [
       "webgpu-unsupported",
@@ -116,7 +149,7 @@ function isMapMessage(value: unknown): value is MapToDashboard {
 }
 
 function getMapLocation(): { src: string; origin: string } {
-  const configuredUrl = import.meta.env.VITE_MAP_URL ?? "http://localhost:5175";
+  const configuredUrl = import.meta.env.VITE_MAP_URL ?? "http://localhost:5183";
   const url = new URL(configuredUrl, window.location.href);
   url.searchParams.set("origin", window.location.origin);
   url.searchParams.set("ui", "0");
@@ -130,6 +163,11 @@ export function useMapBridge() {
   const [connection, setConnection] = useState<MapConnection>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [controls, setControls] = useState<MapControlState>(initialMapControls);
+  const [pointSelection, setPointSelection] = useState<{
+    readonly hazard: TriggerKind;
+    readonly at: MapPoint;
+    readonly nonce: number;
+  } | null>(null);
   const controlsRef = useRef<MapControlState>(initialMapControls);
   const initializedRef = useRef(false);
   const pendingControlsRef = useRef<PendingMapControls>({});
@@ -233,6 +271,13 @@ export function useMapBridge() {
         setConnection("error");
         setErrorMessage(message.payload.message);
       }
+      if (message.type === "map:point-selected") {
+        setPointSelection({
+          hazard: message.payload.hazard,
+          at: message.payload.at,
+          nonce: Date.now(),
+        });
+      }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
@@ -240,7 +285,7 @@ export function useMapBridge() {
 
   return {
     frame: { ref: frameRef, src: mapLocation.src },
-    status: { connection, controls, errorMessage },
+    status: { connection, controls, errorMessage, pointSelection },
     send,
   };
 }

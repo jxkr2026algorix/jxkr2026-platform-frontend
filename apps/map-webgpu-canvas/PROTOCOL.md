@@ -22,8 +22,8 @@
 | `ui` | 자동 | `1`이면 내장 컨트롤 패널 강제 표시, `0`이면 강제 숨김. 기본: 최상위 창이면 표시, iframe이면 숨김. |
 | `scenario` | `clear` | 초기 시나리오. |
 | `rain` | 시나리오 기본값 | 초기 강우량(mm/h). |
-| `lat`, `lon` | `36.35`, `128.75` | 지형 로드 중심 좌표(기본: 경상북도 전역 중심). |
-| `km` | `180` | 로드할 정사각 영역의 한 변 길이(km). 기본값은 경북 전역. |
+| `lat`, `lon` | `36.361`, `128.690` | 지형 로드 중심 좌표. 기본값은 국가 행정경계 데이터에서 계산한 경상북도 본토 전역의 중심. |
+| `km` | `186` | 로드할 정사각 영역의 한 변 길이(km). 기본값은 울릉군을 제외한 경북 22개 시·군이 모두 들어가는 최소 정사각형(+6% 여유). |
 | `exagg` | 자동 | 수직 과장 배율. 기본: 80km 이상 3.2, 미만 1.6. |
 | `terrain` | `real` | `procedural`이면 타일을 받지 않고 절차 생성 지형 사용. |
 
@@ -49,14 +49,18 @@
 | --- | --- | --- |
 | `map:set-scenario` | `{ scenario, rainfallMmPerHour? }` | 시나리오 전환. `scenario`: `clear` \| `rain` \| `flood` \| `wildfire` \| `landslide`. 강우량 미지정 시 시나리오 기본값 적용(아래 표). |
 | `map:set-rainfall` | `{ mmPerHour }` | 강우량 설정, 0–120. 강우량은 비 입자 밀도·물 고임·산불 진화·산사태 위험도를 함께 구동한다. |
-| `map:set-view` | `{ mode }` | `flat`(2D 탑다운 지도), `tilted`(3D), `auto`. auto는 물 시각화가 핵심인 재난(`rain`/`flood`/`landslide`/`tsunami`, 그리고 맑음+강우)에서만 3D로 전환하고, 나머지 재난은 시인성을 위해 2D를 유지한다. 수동 `flat`/`tilted`가 항상 우선. |
+| `map:set-view` | `{ mode }` | `flat`(2D 탑다운 지도), `tilted`(3D), `auto`. auto는 산불과 물 시각화가 핵심인 재난(`rain`/`flood`/`wildfire`/`landslide`/`tsunami`, 그리고 맑음+강우)에서 3D로 전환한다. 산불은 발화점 중심으로 3D 전환할 때 카메라가 천천히 회전해 진입한다. 수동 `flat`/`tilted`가 항상 우선. |
 | `map:sim-control` | `{ action, speed? }` | `play` \| `pause` \| `reset`. `speed`는 0.25–4 배속. `reset`은 물·불·산사태 상태를 초기화한다. |
 | `map:ignite` | `{ x, y }` | 정규화 좌표(0–1, 좌상단 원점)에 발화점 생성. (`map:trigger`의 산불 단축형) |
 | `map:trigger` | `{ hazard, x, y }` | 지정 지점에 재난 발생. `wildfire`=발화, `flood`=국지성 침수(물 주입), `landslide`=토석류 발생. 지도 클릭도 현재 시나리오 기준으로 동일하게 동작한다(맑음 제외). |
 | `map:set-overlay` | `{ enabled }` | 위험 지역 오버레이 토글(기본 켜짐). 시나리오별 취약지(침수·산불·산사태·액상화·해안 침수·온열/한랭/고립/용수)를 해칭으로 표시. |
 | `map:set-basemap` | `{ style }` | 바닥 지도 전환: `satellite`(위성, 기본) \| `map`(구글맵풍 일반 지도, CARTO Voyager). 지도 타일은 백그라운드 로드되며 준비되는 즉시 크로스페이드. 현재 스타일은 `map:state.basemap`으로 보고. |
-| `map:set-camera` | `{ center?, distanceMeters? }` | 3D 카메라 이동. 2D 맵과의 실시간 동기화 훅(아래 참조). 역방향 동기화는 `map:state.camera`로 제공. |
-| `map:set-zones` | `{ zones: RiskZone[] }` | **(초안)** 서버에서 내려오는 위험 지역 폴리곤 표시. 전체 교체 방식이며 `[]`는 클리어. 각 zone은 지형 위 반투명 폴리곤으로 칠해지고, 중심점에 다크 블러 배지(아이콘+라벨, Pretendard GOV 12px)가 뜬다. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. **서버 데이터 스키마 확정 시 `applyZones()`(main.ts) 한 곳만 어댑터로 수정하면 된다.** |
+| `map:set-camera` | `{ center?, distanceMeters? }` | 3D 카메라 이동. `center`는 정규화 `{x,y}` 또는 실좌표 `{lat,lon}` 둘 다 허용(실좌표는 georeference 기준으로 변환하며, 실측 지형이 없으면 `map:ack`에 `no-georeference` 오류). 2D 맵과의 실시간 동기화 훅(아래 참조). 역방향 동기화는 `map:state.camera`로 제공. |
+| `map:set-zones` | `{ zones: RiskZone[] }` | **(초안)** 서버에서 내려오는 위험 지역 폴리곤 표시. 전체 교체 방식이며 `[]`는 클리어. 각 zone은 주석 오버레이에 **점선 외곽선 + 옅은 채움**으로 그려지고, 중심점에 다크 블러 배지(아이콘+라벨, Pretendard GOV 12px)가 뜬다. 지형 셰이더에 칠하지 않고 캔버스 위 SVG로 그리므로 카메라 거리와 무관하게 선 두께가 일정하다. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. **서버 데이터 스키마 확정 시 `applyZones()`(main.ts) 한 곳만 어댑터로 수정하면 된다.** |
+| `map:set-markers` | `{ markers: MapMarker[] }` | 지점 주석(대피소·마을·시설·현장) 전체 교체. `[]`는 클리어. 각 marker는 `at`(정규화 또는 위경도), `label?`, `kind?`(`shelter`\|`community`\|`facility`\|`incident`\|`responder`), `color?`, `selected?`. 글리프+라벨 칩이 지형 위 해당 지점을 매 프레임 따라간다. |
+| `map:set-routes` | `{ routes: MapRoute[] }` | 경로 주석(대피 경로·통제 도로) 전체 교체. `[]`는 클리어. 각 route는 `path`(꼭짓점 2개 이상), `label?`, `state?`(`open` 초록 실선 \| `advised` 주황 \| `blocked` 빨강 점선), `color?`. 라벨 칩은 경로 중간점에 붙는다. |
+| `map:focus-district` | `{ code }` | 경북 시·군 선거구 포커스. `code`는 5자리 행정표준코드(예: 포항시 `47110`), `null` 또는 도 전체 코드 `47000`이면 비례대표(=도 전역) 뷰로 복귀. 해당 시·군의 실측 경계 상자에 맞춰 카메라를 이동하고 경계 오버레이에서 강조한다. 현재 로드된 지형 영역 밖의 시·군(현재는 울릉군뿐)은 지형을 다시 받아오므로 즉시 이동하지 않으며, 진행 중에는 `map:state.district.loading`이 `true`가 된다. |
+| `map:set-district-overlay` | `{ enabled }` | 시·군 행정경계 오버레이 토글(기본 켜짐). 위험 지역 오버레이(`map:set-overlay`)와 독립적으로 동작한다. |
 | `map:ping` | — | 생존 확인. `map:pong` 회신. |
 
 ### 시나리오 기본값
@@ -89,8 +93,9 @@
 
 | type | 시점 | payload 요약 |
 | --- | --- | --- |
-| `map:ready` | 초기화 완료 시 1회 | `{ protocolVersion, webgpuSupported, world: { gridSize, sizeMeters }, capabilities }`. **대시보드는 이 이벤트 수신 후에 명령을 보낸다.** 초기화 실패 시에도 `webgpuSupported: false`로 전송된다. |
-| `map:state` | 약 2 Hz 스로틀 | `{ scenario, viewMode, rainfallMmPerHour, playing, speed, simTimeSeconds, fps, hazards }`. `hazards`는 침수 면적비·연소 셀 수·산사태 위험지수와 각 심각도(`none`/`advisory`/`watch`/`warning`). |
+| `map:ready` | 초기화 완료 시, 그리고 `map:focus-district`로 지형 영역이 바뀔 때마다 | `{ protocolVersion, webgpuSupported, world: { gridSize, sizeMeters }, capabilities }`. **대시보드는 이 이벤트 수신 후에 명령을 보낸다.** 초기화 실패 시에도 `webgpuSupported: false`로 전송된다. |
+| `map:state` | 약 2 Hz 스로틀 | `{ scenario, viewMode, rainfallMmPerHour, playing, speed, simTimeSeconds, fps, basemap, camera, district, hazards }`. `hazards`는 침수 면적비·연소 셀 수·산사태 위험지수와 각 심각도(`none`/`advisory`/`watch`/`warning`). `district`는 `{ selected, overlay, loading }`으로, 현재 포커스된 시·군 코드(도 전역이면 `null`)·경계 오버레이 표시 여부·지형 재로드 진행 여부. |
+| `map:point-selected` | 지도에서 지점 재난을 클릭했을 때 | `{ hazard, at }`. 대시보드는 이 좌표를 플랫폼 이벤트 POST에 사용한다. iframe 임베드 상태에서는 로컬 시뮬레이션이 기본 정지되어 최초 지점만 즉시 렌더링하며, 확산 상태는 서버 스트림 명령으로 갱신한다. |
 | `map:hazard` | 심각도 단계 변화 시(에지 트리거) | `{ hazard, phase, severity, at? }`. `phase`: `started` \| `escalated` \| `deescalated` \| `ended`. `at`은 정규화 좌표. |
 | `map:ack` | `id` 있는 명령 처리 직후 | `{ id, ok, error? }` |
 | `map:error` | 오류 발생 시 | `{ code, message }`. `code`: `webgpu-unsupported` \| `device-lost` \| `bad-command` \| `internal` |
@@ -123,18 +128,52 @@ function send(command: { type: string; payload?: unknown }) {
 }
 ```
 
+## 주석 오버레이
+
+`map:set-zones` / `map:set-markers` / `map:set-routes`로 들어온 데이터는 **시뮬레이션과
+분리된 표현 레이어**다. 렌더러 상태를 읽지도 바꾸지도 않으므로 잘못된 payload가 시뮬레이션을
+망가뜨릴 수 없고, 세 레이어는 각각 독립적으로 전체 교체된다.
+
+구현은 `src/annotations.ts`이고 두 층으로 나뉜다:
+
+- **SVG 층** — zone 외곽선/채움, route 폴리라인. `viewBox`가 CSS 픽셀 단위라 선 두께가
+  화면 기준으로 일정하다.
+- **HTML 칩 층** — 라벨. Pretendard GOV와 backdrop blur가 필요해서 SVG `<text>`를 쓰지
+  않는다. 위험 구역은 어두운 경고 칩, 장소는 밝은 참조 칩으로 구분한다.
+
+두 층 모두 매 프레임 `engine.projectPointUnclipped()`로 재투영되므로 카메라가 움직여도
+지형에 붙어 있다. 폴리곤은 화면 밖 꼭짓점도 유지하고(잘라내면 도형이 찢어진다), 칩만 화면
+경계에서 숨긴다. 카메라 뒤로 넘어간 꼭짓점이 하나라도 있으면 그 도형 전체를 숨긴다.
+
+`?demo=annotations`로 열면 청송군 진보면 기준 샘플 주석(위험 구역 2, 마커 4, 경로 2)이
+실좌표로 로드된다. `src/demo-annotations.ts`는 개발용 픽스처이므로 플랫폼 스트림이 marker와
+route를 싣기 시작하면 삭제한다.
+
 ## 좌표계
 
-기본 지역은 경상북도 전역(중심 36.35°N 128.75°E, 180 km × 180 km, 512×512 격자)이며,
-고도는 AWS Terrain Tiles(실측 DEM), 지표 텍스처와 식생(산불 연료) 분포는 Esri World
-Imagery에서 런타임에 로드한다. 타일 로드가 실패하면 절차 생성 지형으로 폴백한다.
-`?lat=&lon=&km=`으로 특정 시·군만 고해상도로 로드할 수도 있다(예: 안동
+기본 지역은 경상북도 본토 전역(중심 36.361°N 128.690°E, 약 186 km × 186 km, 512×512
+격자)이다. 이 범위는 국가 행정경계 데이터(통계청 SGIS 시군구 경계, WGS84)에서 울릉군을
+제외한 21개 시·군을 모두 포함하는 최소 Web Mercator 정사각형으로 계산했으므로, 초기 화면에
+경북 전역이 들어온다. 고도는 AWS Terrain Tiles(실측 DEM), 지표 텍스처와 식생(산불 연료)
+분포는 Esri World Imagery에서 런타임에 로드한다. 타일 로드가 실패하면 절차 생성 지형으로
+폴백한다. `?lat=&lon=&km=`으로 특정 시·군만 고해상도로 로드할 수도 있다(예: 안동
 `?lat=36.52&lon=128.72&km=24`).
+
+### 행정구역 데이터
+
+경북 22개 시·군(군위군은 2023년 7월 대구 편입으로 제외)의 경계·중심점·경계상자는
+`src/data/gyeongbuk-districts.json`(메타데이터)과 `src/data/gyeongbuk-boundaries.json`(경계
+폴리곤)에 들어 있고, `scripts/build-gyeongbuk-districts.mjs`가 원본 국가 데이터에서
+생성한다. 손으로 고치지 않는다. 좌표는 전부 실측값이며, 대시보드는
+`@salgil/map-webgpu-canvas/districts`에서 메타데이터만 가져다 쓸 수 있다(경계 폴리곤은
+렌더러 전용이라 번들에 포함되지 않는다).
 
 모든 위치는 정규화 좌표 `{ x, y }`(0–1, 좌상단 원점)로 교환한다. 실측 지형이 로드된 경우
 `map:ready`의 `world.georeference`(`{ centerLat, centerLon, west, east, north, south }`)가
-포함되며, 정규화 좌표는 이 Web Mercator 바운딩 박스에 선형 대응한다. 지역 변경은 쿼리
-파라미터 `?lat=&lon=&km=`으로 지정한다.
+포함되며, 정규화 좌표는 이 Web Mercator 바운딩 박스에 선형 대응한다(위도는 각도가 아니라
+Mercator 투영값에 선형이다). 지역 변경은 쿼리 파라미터 `?lat=&lon=&km=` 또는
+`map:focus-district`로 하며, 후자로 영역이 바뀌면 새 georeference를 담은 `map:ready`가
+다시 전송된다.
 
 ## 2D 맵 ↔ 3D 뷰 실시간 동기화 가이드
 

@@ -1,3 +1,4 @@
+import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { getPressTransition } from "../../motion";
@@ -9,21 +10,28 @@ type ConnectionState = "idle" | "connecting" | "ready" | "error";
 type AssistantDrawerProps = {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly onCreateTrainingEvent: (
+    type: DisasterType,
+  ) => Promise<PlatformEvent>;
 };
 
 const suggestions = [
-  "청송군 산사태 현재 상황",
-  "데이터 상태 알려줘",
-  "재난별 대응 범위",
+  "Start a wildfire training event in Cheongsong",
+  "Show data health",
+  "Start a heavy rain training event",
 ] as const;
 
 const initialMessage: ChatMessage = {
   id: "welcome",
   role: "assistant",
-  text: "경북 공공데이터를 조회합니다. 지역과 재난 유형을 함께 물어보세요. 출처와 확인하지 못한 원천도 같이 표시합니다.",
+  text: "Ask about Gyeongbuk public data or start a training incident. Training events appear on the dashboard and mobile app at the same time.",
 };
 
-export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
+export function AssistantDrawer({
+  open,
+  onOpenChange,
+  onCreateTrainingEvent,
+}: AssistantDrawerProps) {
   const reduceMotion = useReducedMotion();
   const [connection, setConnection] = useState<ConnectionState>("idle");
   const [connectionLabel, setConnectionLabel] = useState("Public data");
@@ -88,7 +96,21 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
 
   const submitQuery = async (rawQuery: string) => {
     const query = rawQuery.trim();
-    if (!query || sending || connection !== "ready") return;
+    if (!query || sending) return;
+    const trainingTypes = [
+      ["wildfire", ["wildfire", "forest fire"]],
+      ["rain", ["heavy rain", "rainstorm"]],
+      ["flood", ["flood", "inundation"]],
+      ["landslide", ["landslide"]],
+      ["heatwave", ["heatwave", "heat wave"]],
+      ["earthquake", ["earthquake"]],
+    ] satisfies readonly (readonly [DisasterType, readonly string[]])[];
+    const requestedTrainingType = query.toLowerCase().includes("training")
+      ? trainingTypes.find(([, terms]) =>
+          terms.some((term) => query.toLowerCase().includes(term)),
+        )?.[0]
+      : undefined;
+    if (!requestedTrainingType && connection !== "ready") return;
     setInput("");
     setSending(true);
     setMessages((current) => [
@@ -96,6 +118,18 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
       { id: crypto.randomUUID(), role: "user", text: query },
     ]);
     try {
+      if (requestedTrainingType) {
+        const event = await onCreateTrainingEvent(requestedTrainingType);
+        setMessages((current) => [
+          ...current,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            text: `${event.headline} The training event is syncing to the dashboard and mobile app through the platform stream.`,
+          },
+        ]);
+        return;
+      }
       const { answerAssistantQuery } = await import("../../assistant-query");
       const answer = await answerAssistantQuery(query);
       setMessages((current) => [
@@ -114,7 +148,7 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            text: "공공데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+            text: "Public data could not be loaded. Try again shortly.",
           },
         ]);
       } else {
@@ -179,7 +213,7 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
                     <button
                       type="button"
                       key={suggestion}
-                      disabled={connection !== "ready"}
+                      disabled={sending}
                       onClick={() => void submitQuery(suggestion)}
                     >
                       {suggestion}
@@ -196,7 +230,9 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
                 void submitQuery(input);
               }}
             >
-              <label htmlFor="assistant-input">Ask about Gyeongbuk data</label>
+              <label htmlFor="assistant-input">
+                Ask data or create training
+              </label>
               <div>
                 <textarea
                   id="assistant-input"
@@ -204,8 +240,8 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
                   value={input}
                   rows={2}
                   maxLength={500}
-                  placeholder="청송군 산사태 상황을 알려줘"
-                  disabled={connection !== "ready"}
+                  placeholder="Show landslide conditions in Cheongsong"
+                  disabled={sending}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
@@ -217,7 +253,7 @@ export function AssistantDrawer({ open, onOpenChange }: AssistantDrawerProps) {
                 <motion.button
                   type="submit"
                   aria-label="Send question"
-                  disabled={connection !== "ready" || !input.trim() || sending}
+                  disabled={!input.trim() || sending}
                   whileTap={reduceMotion ? {} : { scale: 0.94 }}
                   transition={getPressTransition(reduceMotion)}
                 >

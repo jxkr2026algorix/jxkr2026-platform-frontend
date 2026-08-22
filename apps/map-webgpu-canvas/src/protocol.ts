@@ -72,6 +72,19 @@ export interface MapPoint {
   y: number;
 }
 
+/** A real-world coordinate, WGS84 degrees. */
+export interface GeoPoint {
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Either a normalized map point or a real coordinate. Geographic points are
+ * resolved against the terrain's georeference, so they are only meaningful
+ * once `map:ready` has reported one.
+ */
+export type AnyPoint = Partial<MapPoint> & Partial<GeoPoint>;
+
 /**
  * A vertex of a risk-zone polygon. Either normalized map coordinates (x/y)
  * or geographic coordinates (lat/lon, converted via the georeference).
@@ -98,6 +111,47 @@ export interface RiskZone {
   /** Fill/badge accent override, "#rrggbb". Defaults by severity. */
   color?: string;
   polygon: RiskZonePoint[];
+}
+
+/**
+ * Glyph drawn for a point annotation. The renderer maps each kind to a shape
+ * and a default color; unknown values fall back to `facility`.
+ */
+export type MarkerKind =
+  | "shelter"
+  | "community"
+  | "facility"
+  | "incident"
+  | "responder";
+
+/** A labeled point on the map (shelter, village, staging area, ...). */
+export interface MapMarker {
+  id: string;
+  /** Normalized `{x,y}` or real `{lat,lon}`. */
+  at: AnyPoint;
+  /** Chip text. Omit for a bare glyph. */
+  label?: string;
+  kind?: MarkerKind;
+  /** Glyph/accent override, "#rrggbb". Defaults by kind. */
+  color?: string;
+  /** Emphasized: larger glyph and a heavier chip. */
+  selected?: boolean;
+}
+
+/** Passability of a route, which drives its stroke color and dash. */
+export type RouteState = "open" | "advised" | "blocked";
+
+/** A polyline: an evacuation route, a closed road, a patrol track. */
+export interface MapRoute {
+  id: string;
+  /** At least two vertices, normalized `{x,y}` or real `{lat,lon}`. */
+  path: AnyPoint[];
+  /** Chip text, placed at the midpoint of the line. */
+  label?: string;
+  /** Defaults to "open". */
+  state?: RouteState;
+  /** Stroke override, "#rrggbb". Defaults by state. */
+  color?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,8 +228,8 @@ export type DashboardCommand =
   | {
       /**
        * Replace the externally supplied risk zones (server-driven). Each zone
-       * is filled on the terrain and labeled with a floating badge. An empty
-       * array clears the layer.
+       * is drawn in the annotation overlay as a dashed outline with a soft
+       * fill, labeled with a floating badge. An empty array clears the layer.
        */
       type: "map:set-zones";
       payload: { zones: RiskZone[] };
@@ -188,11 +242,48 @@ export type DashboardCommand =
        */
       type: "map:set-camera";
       payload: {
-        /** Normalized look-at point. Omit to keep the current center. */
-        center?: MapPoint;
+        /**
+         * Look-at point, either normalized (`x`/`y`) or geographic
+         * (`lat`/`lon`). Omit to keep the current center.
+         */
+        center?: AnyPoint;
         /** Camera distance from the look-at point, in meters. */
         distanceMeters?: number;
       };
+    }
+  | {
+      /**
+       * Replace the point annotations (shelters, communities, facilities).
+       * Each marker is drawn as a glyph with an optional label chip that
+       * tracks its position on screen. An empty array clears the layer.
+       */
+      type: "map:set-markers";
+      payload: { markers: MapMarker[] };
+    }
+  | {
+      /**
+       * Replace the route annotations (evacuation routes, closed roads).
+       * Drawn as polylines above the terrain, colored by `state`. An empty
+       * array clears the layer.
+       */
+      type: "map:set-routes";
+      payload: { routes: MapRoute[] };
+    }
+  | {
+      /**
+       * Frame a Gyeongsangbuk-do 시/군 by its 행정표준코드 and highlight its
+       * boundary. `null` (or the province code) returns to the whole-province
+       * view, which is what 비례대표 selects. Districts outside the loaded
+       * terrain region — only 울릉군 today — trigger a terrain reload, so the
+       * move is not instant.
+       */
+      type: "map:focus-district";
+      payload: { code: string | null };
+    }
+  | {
+      /** Toggle the 시/군 boundary overlay drawn from the national dataset. */
+      type: "map:set-district-overlay";
+      payload: { enabled: boolean };
     }
   | {
       type: "map:ping";
@@ -236,6 +327,14 @@ export interface MapStatePayload {
     center: MapPoint;
     distanceMeters: number;
   };
+  /** 시/군 boundary layer: what is highlighted and whether it is drawn. */
+  district: {
+    /** 행정표준코드 of the focused 시/군, or null for the province view. */
+    selected: string | null;
+    overlay: boolean;
+    /** True while a terrain reload for a remote district is in flight. */
+    loading: boolean;
+  };
   hazards: HazardMetrics;
 }
 
@@ -272,6 +371,10 @@ export type MapEvent =
       /** Periodic snapshot, throttled to roughly 2 Hz. */
       type: "map:state";
       payload: MapStatePayload;
+    }
+  | {
+      type: "map:point-selected";
+      payload: { hazard: TriggerKind; at: MapPoint };
     }
   | {
       /** Edge-triggered hazard lifecycle notification. */
@@ -317,6 +420,10 @@ const COMMAND_TYPES: readonly string[] = [
   "map:set-basemap",
   "map:set-zones",
   "map:set-camera",
+  "map:set-markers",
+  "map:set-routes",
+  "map:focus-district",
+  "map:set-district-overlay",
   "map:ping",
 ];
 

@@ -9,6 +9,15 @@
  * back to the procedural terrain in terrain-gen.ts.
  */
 
+import { PROVINCE_REGION } from "./districts";
+import {
+  globalPxToLat,
+  globalPxToLon,
+  latToGlobalPx,
+  lonToGlobalPx,
+  metersPerPixel,
+  TILE_SIZE as TILE,
+} from "./geo";
 import { clamp, lerp } from "./math";
 import { GRID_SIZE, type TerrainData } from "./terrain-gen";
 
@@ -101,34 +110,6 @@ export async function loadStreetDetailPatch(
     if (patch || options?.signal?.aborted) return patch;
   }
   return loadDetailPatch(centerLat, centerLon, sizeMeters, STREET_URL, options);
-}
-
-const TILE = 256;
-const EARTH = 6378137;
-
-function lonToGlobalPx(lon: number, zoom: number): number {
-  return ((lon + 180) / 360) * TILE * 2 ** zoom;
-}
-
-function latToGlobalPx(lat: number, zoom: number): number {
-  const rad = (lat * Math.PI) / 180;
-  const mercN = Math.log(Math.tan(Math.PI / 4 + rad / 2));
-  return ((1 - mercN / Math.PI) / 2) * TILE * 2 ** zoom;
-}
-
-function globalPxToLon(px: number, zoom: number): number {
-  return (px / (TILE * 2 ** zoom)) * 360 - 180;
-}
-
-function globalPxToLat(py: number, zoom: number): number {
-  const mercN = Math.PI * (1 - 2 * (py / (TILE * 2 ** zoom)));
-  return ((2 * Math.atan(Math.exp(mercN)) - Math.PI / 2) * 180) / Math.PI;
-}
-
-function metersPerPixel(lat: number, zoom: number): number {
-  return (
-    (2 * Math.PI * EARTH * Math.cos((lat * Math.PI) / 180)) / (TILE * 2 ** zoom)
-  );
 }
 
 // Persistent tile cache (Cache Storage): DEM, satellite, street, and
@@ -328,14 +309,21 @@ export interface RealTerrainOptions {
   timeoutMs: number;
 }
 
+/** Province-scale views need extra vertical relief to read as 3D. */
+export const PROVINCE_EXAGGERATION = 3.2;
+
+/**
+ * The whole of mainland Gyeongsangbuk-do, squared off in Mercator space from
+ * the national 시군구 boundary dataset: Sangju/Gimcheon in the west, the
+ * Uljin-Pohang coastline in the east, Bonghwa in the north, and
+ * Gyeongju/Cheongdo in the south. Every 시/군 except the offshore 울릉군 is
+ * inside this box, so the default view shows the entire province.
+ */
 export const DEFAULT_REGION: RealTerrainOptions = {
-  // The whole of Gyeongsangbuk-do: Mungyeong to the east coast (Pohang),
-  // Andong/Uiseong in the center, Gyeongju to the south.
-  centerLat: 36.35,
-  centerLon: 128.75,
-  sizeMeters: 180000,
-  // Province-scale views need extra vertical relief to read as 3D.
-  exaggeration: 3.2,
+  centerLat: PROVINCE_REGION.centerLat,
+  centerLon: PROVINCE_REGION.centerLon,
+  sizeMeters: PROVINCE_REGION.sizeMeters,
+  exaggeration: PROVINCE_EXAGGERATION,
   timeoutMs: 22000,
 };
 

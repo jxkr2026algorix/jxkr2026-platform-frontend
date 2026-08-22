@@ -45,6 +45,7 @@ export class OrbitCamera {
   readonly eye: Vec3 = [0, 0, 0];
 
   private pointers: PointerState[] = [];
+  private detachController: AbortController | null = null;
   private pinchDistance = 0;
   private shakeAmp = 0;
   onUserInteraction: (() => void) | null = null;
@@ -122,56 +123,73 @@ export class OrbitCamera {
     }
   }
 
+  /**
+   * Bind pointer/wheel input. Listeners are tied to an AbortController so a
+   * terrain reload (which rebuilds the engine on the same canvas) can drop
+   * the old camera's handlers instead of stacking a second set on top.
+   */
   attach(canvas: HTMLCanvasElement): void {
-    canvas.addEventListener("pointerdown", (event) => {
-      canvas.setPointerCapture(event.pointerId);
-      canvas.classList.add("dragging");
-      this.pointers.push({
-        id: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-        startX: event.clientX,
-        startY: event.clientY,
-        startTime: performance.now(),
-      });
-      if (this.pointers.length === 2) {
-        const [a, b] = this.pointers as [PointerState, PointerState];
-        this.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
-      }
-    });
-    canvas.addEventListener("pointermove", (event) => {
-      const pointer = this.pointers.find((p) => p.id === event.pointerId);
-      if (!pointer) return;
-      const dx = event.clientX - pointer.x;
-      const dy = event.clientY - pointer.y;
-      pointer.x = event.clientX;
-      pointer.y = event.clientY;
-      this.onUserInteraction?.();
-
-      if (this.pointers.length === 2) {
-        const [a, b] = this.pointers as [PointerState, PointerState];
-        const dist = Math.hypot(a.x - b.x, a.y - b.y);
-        if (this.pinchDistance > 0) {
-          this.zoomBy(this.pinchDistance / Math.max(dist, 1));
+    this.detachController?.abort();
+    const controller = new AbortController();
+    this.detachController = controller;
+    const { signal } = controller;
+    canvas.addEventListener(
+      "pointerdown",
+      (event) => {
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add("dragging");
+        this.pointers.push({
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          startX: event.clientX,
+          startY: event.clientY,
+          startTime: performance.now(),
+        });
+        if (this.pointers.length === 2) {
+          const [a, b] = this.pointers as [PointerState, PointerState];
+          this.pinchDistance = Math.hypot(a.x - b.x, a.y - b.y);
         }
-        this.pinchDistance = dist;
-        this.pan(dx * 0.5, dy * 0.5);
-        return;
-      }
+      },
+      { signal },
+    );
+    canvas.addEventListener(
+      "pointermove",
+      (event) => {
+        const pointer = this.pointers.find((p) => p.id === event.pointerId);
+        if (!pointer) return;
+        const dx = event.clientX - pointer.x;
+        const dy = event.clientY - pointer.y;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        this.onUserInteraction?.();
 
-      const wantsPan =
-        this.flatBlend > 0.5 ||
-        event.shiftKey ||
-        (event.buttons & 2) !== 0 ||
-        (event.buttons & 4) !== 0;
-      if (wantsPan) {
-        this.pan(dx, dy);
-      } else {
-        this.yaw -= dx * 0.005;
-        this.yawGoal = this.yaw;
-        this.pitchTilted = clamp(this.pitchTilted + dy * 0.004, 0.35, 1.35);
-      }
-    });
+        if (this.pointers.length === 2) {
+          const [a, b] = this.pointers as [PointerState, PointerState];
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          if (this.pinchDistance > 0) {
+            this.zoomBy(this.pinchDistance / Math.max(dist, 1));
+          }
+          this.pinchDistance = dist;
+          this.pan(dx * 0.5, dy * 0.5);
+          return;
+        }
+
+        const wantsPan =
+          this.flatBlend > 0.5 ||
+          event.shiftKey ||
+          (event.buttons & 2) !== 0 ||
+          (event.buttons & 4) !== 0;
+        if (wantsPan) {
+          this.pan(dx, dy);
+        } else {
+          this.yaw -= dx * 0.005;
+          this.yawGoal = this.yaw;
+          this.pitchTilted = clamp(this.pitchTilted + dy * 0.004, 0.35, 1.35);
+        }
+      },
+      { signal },
+    );
     const release = (event: PointerEvent) => {
       const pointer = this.pointers.find((p) => p.id === event.pointerId);
       if (
@@ -191,14 +209,27 @@ export class OrbitCamera {
       if (this.pointers.length < 2) this.pinchDistance = 0;
       if (this.pointers.length === 0) canvas.classList.remove("dragging");
     };
-    canvas.addEventListener("pointerup", release);
-    canvas.addEventListener("pointercancel", release);
-    canvas.addEventListener("wheel", (event) => {
-      event.preventDefault();
-      this.onUserInteraction?.();
-      this.zoomBy(Math.exp(event.deltaY * 0.0012));
+    canvas.addEventListener("pointerup", release, { signal });
+    canvas.addEventListener("pointercancel", release, { signal });
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        this.onUserInteraction?.();
+        this.zoomBy(Math.exp(event.deltaY * 0.0012));
+      },
+      { signal },
+    );
+    canvas.addEventListener("contextmenu", (event) => event.preventDefault(), {
+      signal,
     });
-    canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+  }
+
+  /** Release every listener bound by {@link attach}. */
+  detach(): void {
+    this.detachController?.abort();
+    this.detachController = null;
+    this.pointers = [];
   }
 
   private zoomBy(factor: number): void {

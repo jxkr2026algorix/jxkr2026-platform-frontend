@@ -1,108 +1,150 @@
 import type { DashboardCommand } from "@salgil/map-webgpu-canvas/protocol";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
-import {
-  Navigate,
-  NavLink,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router";
+import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
+import { useEffect, useMemo, useState } from "react";
+import QRCode from "react-qr-code";
+import { Navigate, NavLink, Route, Routes } from "react-router";
 import { AssistantDrawer } from "./components/AssistantDrawer";
-import {
-  type CommunityName,
-  communities,
-  DEFAULT_MAP_SCENARIO,
-  DEFAULT_RAINFALL_MM_PER_HOUR,
-  navItems,
-  type View,
-} from "./domain";
-import { getPressTransition } from "./motion";
-import { ContactPage } from "./pages/contact-page";
-import { PatrolPage } from "./pages/patrol-page";
-import { PlanPage } from "./pages/plan-page";
 import { SituationPage } from "./pages/situation-page";
 import { useMapBridge } from "./use-map-bridge";
-
-const MotionNavLink = motion.create(NavLink);
+import { usePlatformStream } from "./use-platform-stream";
 
 export function App() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const reduceMotion = useReducedMotion();
-  const [selectedCommunity, setSelectedCommunity] =
-    useState<CommunityName>("Sangchon");
-  const [approved, setApproved] = useState(false);
-  const [contacted, setContacted] = useState(false);
-  const [reported, setReported] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [placementArmed, setPlacementArmed] = useState(false);
   const map = useMapBridge();
-  const currentView =
-    navItems.find((item) => item.path === location.pathname)?.view ??
-    "situation";
+  const platform = usePlatformStream();
+  const mobileUrl = useMemo(
+    () =>
+      new URL(
+        import.meta.env.VITE_MOBILE_URL ?? "/mobile/",
+        window.location.href,
+      ).toString(),
+    [],
+  );
+  const handleMapCommand = (command: DashboardCommand) => map.send(command);
 
-  const handleNavigate = (nextView: View) => {
-    const destination = navItems.find((item) => item.view === nextView);
-    if (!destination) return;
-    navigate(destination.path);
-  };
-
-  const handleSelectCommunity = (name: CommunityName) => {
-    setSelectedCommunity(name);
-    const community = communities.find((item) => item.name === name);
-    if (community) {
-      map.send({
-        type: "map:set-camera",
-        payload: { center: community.mapPoint, distanceMeters: 94_000 },
-      });
-    }
-  };
-
-  const handleStartContact = () => {
-    if (!approved) {
-      handleNavigate("plan");
-      return;
-    }
-    setContacted(true);
-  };
-
-  const handleSubmitReport = () => {
-    setReported(true);
-    setApproved(false);
-    setReportOpen(false);
-    map.send({
-      type: "map:set-scenario",
-      payload: { scenario: DEFAULT_MAP_SCENARIO, rainfallMmPerHour: 86 },
-    });
-    map.send({ type: "map:set-overlay", payload: { enabled: true } });
-  };
-
-  const handleReset = () => {
-    setApproved(false);
-    setContacted(false);
-    setReported(false);
-    setReportOpen(false);
-    setSelectedCommunity("Sangchon");
-    handleNavigate("situation");
-    map.send({ type: "map:sim-control", payload: { action: "reset" } });
-    map.send({ type: "map:set-overlay", payload: { enabled: true } });
+  useEffect(() => {
+    const event = platform.event;
+    if (!event) return;
     map.send({
       type: "map:set-scenario",
       payload: {
-        scenario: DEFAULT_MAP_SCENARIO,
-        rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
+        scenario: event.type,
+        ...(event.rainfallMmPerHour !== undefined
+          ? { rainfallMmPerHour: event.rainfallMmPerHour }
+          : {}),
       },
     });
+    map.send({
+      type: "map:set-view",
+      payload: { mode: event.presentation === "3d" ? "auto" : "flat" },
+    });
+    map.send({ type: "map:sim-control", payload: { action: "pause" } });
+    map.send({
+      type: "map:set-zones",
+      payload: {
+        zones: (event.zones ?? []).map((zone) => ({
+          id: zone.id,
+          polygon: zone.polygon,
+          ...(zone.label !== undefined ? { label: zone.label } : {}),
+          ...(zone.hazard !== undefined ? { hazard: zone.hazard } : {}),
+          ...(zone.severity !== undefined ? { severity: zone.severity } : {}),
+          ...(zone.color !== undefined ? { color: zone.color } : {}),
+        })),
+      },
+    });
+    if (event.phase !== "initial") return;
+    switch (event.type) {
+      case "wildfire":
+      case "flood":
+      case "landslide":
+      case "earthquake":
+      case "tsunami":
+      case "nuclear":
+      case "chemical":
+        if (event.location) {
+          map.send({
+            type: "map:trigger",
+            payload: {
+              hazard: event.type,
+              x: event.location.x,
+              y: event.location.y,
+            },
+          });
+          map.send({
+            type: "map:set-camera",
+            payload: {
+              center: event.location,
+              distanceMeters: event.presentation === "3d" ? 42_000 : 94_000,
+            },
+          });
+        }
+        break;
+      case "rain":
+      case "typhoon":
+      case "heatwave":
+      case "coldwave":
+      case "snow":
+      case "drought":
+        break;
+      default:
+        event.type satisfies never;
+    }
+  }, [map.send, platform.event]);
+
+  useEffect(() => {
+    const selection = map.status.pointSelection;
+    if (!placementArmed || !selection) return;
+    if (selection.hazard !== platform.selectedType) return;
+    setPlacementArmed(false);
+    void platform
+      .publish({
+        type: platform.selectedType,
+        mode: platform.mode,
+        location: {
+          x: selection.at.x,
+          y: selection.at.y,
+          label: "Dashboard selected origin",
+        },
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof Error)) throw error;
+      });
+  }, [
+    map.status.pointSelection,
+    placementArmed,
+    platform.mode,
+    platform.publish,
+    platform.selectedType,
+  ]);
+
+  const handleEventSelect = (type: DisasterType, needsLocation: boolean) => {
+    platform.setSelectedType(type);
+    if (needsLocation) {
+      setPlacementArmed(true);
+      map.send({ type: "map:set-scenario", payload: { scenario: type } });
+      map.send({ type: "map:set-view", payload: { mode: "auto" } });
+      map.send({ type: "map:sim-control", payload: { action: "pause" } });
+      return;
+    }
+    setPlacementArmed(false);
+    void platform
+      .publish({
+        type,
+        mode: platform.mode,
+        ...(type === "rain" ? { rainfallMmPerHour: 72 } : {}),
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof Error)) throw error;
+      });
   };
 
-  const handleMapCommand = (command: DashboardCommand) => map.send(command);
-  const contextHidden = currentView === "situation" && assistantOpen;
+  const createTrainingEvent = (type: DisasterType): Promise<PlatformEvent> =>
+    platform.publish({ type, mode: "training" });
 
   return (
     <div
-      className={`app-shell view-${currentView}${assistantOpen ? " is-assistant-open" : ""}`}
+      className={`app-shell view-situation${assistantOpen ? " is-assistant-open" : ""}`}
     >
       <div className="map-canvas">
         <iframe
@@ -129,131 +171,59 @@ export function App() {
         )}
       </div>
       <aside className="side-nav">
-        <MotionNavLink
+        <NavLink
           className="brand"
           to="/situation"
-          whileTap={reduceMotion ? {} : { scale: 0.975 }}
-          transition={getPressTransition(reduceMotion)}
           aria-label="SALGIL operations home"
         >
           <span className="brand-lockup">
             <img src="/salgil-mark.svg" alt="" />
             <strong>Salgil</strong>
           </span>
-          <small>Evacuation operations</small>
-        </MotionNavLink>
-        <nav aria-label="Main views">
-          {navItems.map((item) => (
-            <MotionNavLink
-              key={item.view}
-              className="nav-item"
-              to={item.path}
-              whileTap={reduceMotion ? {} : { scale: 0.975 }}
-              transition={getPressTransition(reduceMotion)}
-            >
-              <span className="nav-label-full">{item.label}</span>
-              <span className="nav-label-short">{item.shortLabel}</span>
-            </MotionNavLink>
-          ))}
-        </nav>
-        <div className="side-footer">
-          <span>Exercise mode</span>
-          <p>Cheongsong multi-hazard response</p>
-          <a href="/mobile/">Open field view</a>
-        </div>
+          <span
+            className="mobile-qr"
+            role="img"
+            aria-label="Mobile demo QR code"
+          >
+            <QRCode value={mobileUrl} size={42} level="M" />
+          </span>
+        </NavLink>
       </aside>
 
       <div className="workspace">
-        <header
-          className="context-bar"
-          aria-hidden={contextHidden}
-          inert={contextHidden}
+        <main
+          className="route-main route-situation"
+          id="main-content"
+          tabIndex={-1}
         >
-          <div className="context-title">
-            <strong>Cheongsong Emergency Operations Center</strong>
-            <span>Updated Aug 22, 2026 at 14:10</span>
-          </div>
-          <div className="context-actions">
-            <motion.button
-              className="button secondary"
-              type="button"
-              onClick={handleReset}
-              whileTap={reduceMotion ? {} : { scale: 0.975 }}
-              transition={getPressTransition(reduceMotion)}
-            >
-              Reset exercise
-            </motion.button>
-          </div>
-        </header>
-
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.main
-            key={location.pathname}
-            className={`route-main route-${currentView}`}
-            id="main-content"
-            tabIndex={-1}
-            initial={reduceMotion ? false : { opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? {} : { opacity: 0, y: -2 }}
-            transition={{ duration: reduceMotion ? 0 : 0.13, ease: "easeOut" }}
-          >
-            <Routes location={location}>
-              <Route
-                path="/situation"
-                element={
-                  <SituationPage
-                    assistantOpen={assistantOpen}
-                    map={map}
-                    selectedCommunity={selectedCommunity}
-                    reported={reported}
-                    onSelectCommunity={handleSelectCommunity}
-                    onNavigate={handleNavigate}
-                    onMapCommand={handleMapCommand}
-                  />
-                }
-              />
-              <Route
-                path="/evacuation-plan"
-                element={
-                  <PlanPage
-                    approved={approved}
-                    reported={reported}
-                    onApprove={() => setApproved(true)}
-                    onNavigate={handleNavigate}
-                  />
-                }
-              />
-              <Route
-                path="/contact-status"
-                element={
-                  <ContactPage
-                    approved={approved}
-                    contacted={contacted}
-                    onStartContact={handleStartContact}
-                    onNavigate={handleNavigate}
-                  />
-                }
-              />
-              <Route
-                path="/field-tasks"
-                element={
-                  <PatrolPage
-                    contacted={contacted}
-                    reported={reported}
-                    reportOpen={reportOpen}
-                    onReportOpenChange={setReportOpen}
-                    onSubmitReport={handleSubmitReport}
-                    onNavigate={handleNavigate}
-                  />
-                }
-              />
-              <Route path="/" element={<Navigate to="/situation" replace />} />
-              <Route path="*" element={<Navigate to="/situation" replace />} />
-            </Routes>
-          </motion.main>
-        </AnimatePresence>
+          <Routes>
+            <Route
+              path="/situation"
+              element={
+                <SituationPage
+                  map={map}
+                  mode={platform.mode}
+                  selectedType={platform.selectedType}
+                  placementArmed={placementArmed}
+                  publishing={platform.publishing}
+                  errorMessage={platform.errorMessage}
+                  latestEvent={platform.event}
+                  onMapCommand={handleMapCommand}
+                  onModeChange={platform.setMode}
+                  onEventSelect={handleEventSelect}
+                />
+              }
+            />
+            <Route path="/" element={<Navigate to="/situation" replace />} />
+            <Route path="*" element={<Navigate to="/situation" replace />} />
+          </Routes>
+        </main>
       </div>
-      <AssistantDrawer open={assistantOpen} onOpenChange={setAssistantOpen} />
+      <AssistantDrawer
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
+        onCreateTrainingEvent={createTrainingEvent}
+      />
     </div>
   );
 }

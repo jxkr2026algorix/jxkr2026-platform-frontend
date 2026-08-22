@@ -17,6 +17,7 @@ interface FloatingSelectProps {
   readonly value: string;
   readonly options: readonly FloatingSelectOption[];
   readonly preferredPlacement?: "auto" | "top" | "bottom";
+  readonly disabled?: boolean;
   readonly onValueChange: (value: string) => void;
 }
 
@@ -25,6 +26,7 @@ export function FloatingSelect({
   value,
   options,
   preferredPlacement = "auto",
+  disabled = false,
   onValueChange,
 }: FloatingSelectProps) {
   const reduceMotion = useReducedMotion();
@@ -127,6 +129,7 @@ export function FloatingSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listboxId}
+        disabled={disabled}
         aria-activedescendant={
           open ? `${listboxId}-option-${activeIndex}` : undefined
         }

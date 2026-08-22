@@ -1,3 +1,4 @@
+import { DISTRICTS } from "@salgil/map-webgpu-canvas/districts";
 import { z } from "zod";
 import { callMcpTool } from "./mcp-client";
 
@@ -17,30 +18,13 @@ const hazardTerms = [
   ["nuclear", ["원전", "방사능", "nuclear"]],
 ] as const;
 
-const regions = [
-  "포항시",
-  "경주시",
-  "김천시",
-  "안동시",
-  "구미시",
-  "영주시",
-  "영천시",
-  "상주시",
-  "문경시",
-  "경산시",
-  "의성군",
-  "청송군",
-  "영양군",
-  "영덕군",
-  "청도군",
-  "고령군",
-  "성주군",
-  "칠곡군",
-  "예천군",
-  "봉화군",
-  "울진군",
-  "울릉군",
-] as const;
+const regions = DISTRICTS.map((district) => ({
+  backendName: district.name,
+  searchTerms: [
+    district.nameEn.toLowerCase(),
+    district.name.replace(/[시군]$/, ""),
+  ],
+}));
 
 const citationSchema = z.object({
   dataset_name: z.string(),
@@ -168,12 +152,12 @@ function routeQuery(query: string): ToolRoute {
   )?.[0];
   if (hazard || includesAny(normalized, ["현재", "상황", "위험", "status"])) {
     const matchedRegion = regions.find((region) =>
-      normalized.includes(region.replace(/[시군]$/, "")),
+      region.searchTerms.some((term) => normalized.includes(term)),
     );
     return {
       name: "gbsafe_hazard_context",
       args: {
-        region: matchedRegion ?? "청송군",
+        region: matchedRegion?.backendName ?? "청송군",
         ...(hazard ? { hazard } : {}),
       },
     };
@@ -202,21 +186,21 @@ function formatHazardResult(value: unknown): AssistantAnswer | null {
       ? headline.payload.headline
       : null,
     rainfall && typeof rainfall.payload.value === "number"
-      ? `최근 1시간 강우 ${rainfall.payload.value} ${String(rainfall.payload.unit ?? "mm")}`
+      ? `Rainfall in the last hour: ${rainfall.payload.value} ${String(rainfall.payload.unit ?? "mm")}`
       : null,
-    observedAt ? `관측 시각 ${observedAt}` : null,
-    `${parsed.data.record_count}건의 공공데이터 레코드 확인`,
+    observedAt ? `Observed at ${observedAt}` : null,
+    `${parsed.data.record_count} public data records checked`,
   ].filter((detail): detail is string => detail !== null);
   const missingSourceCount = parsed.data.warnings?.length ?? 0;
   return {
     text:
       parsed.data.complete === false
-        ? "일부 원천을 확인하지 못해 현재 상황을 완전하게 판단할 수 없습니다. 확인된 자료만 요약합니다."
-        : "현재 조회 가능한 공공데이터를 확인했습니다.",
+        ? "Some sources are unavailable, so the current situation cannot be assessed completely. This summary uses verified data only."
+        : "Available public data has been checked.",
     details,
     ...(missingSourceCount > 0
       ? {
-          warning: `확인하지 못한 데이터 원천이 ${missingSourceCount}개 있습니다. 대피 판단 전 원천 상태를 별도로 확인하세요.`,
+          warning: `${missingSourceCount} data sources could not be checked. Verify source status before making an evacuation decision.`,
         }
       : {}),
     citations: uniqueCitations(parsed.data.citations ?? []),
@@ -228,10 +212,10 @@ function formatDataHealth(value: unknown): AssistantAnswer | null {
   if (!parsed.success) return null;
   const summary = parsed.data.summary;
   return {
-    text: `${summary.connectors}개 데이터 원천 중 ${summary.available}개를 지금 사용할 수 있습니다.`,
+    text: `${summary.available} of ${summary.connectors} data sources are available now.`,
     details: [
-      `심의 대기 ${summary.pending_review}개`,
-      `로컬 파일 필요 ${summary.requires_local_file}개`,
+      `${summary.pending_review} pending review`,
+      `${summary.requires_local_file} require local files`,
     ],
     citations: [],
   };
@@ -241,10 +225,10 @@ function formatDatasetSearch(value: unknown): AssistantAnswer | null {
   const parsed = datasetSearchSchema.safeParse(value);
   if (!parsed.success) return null;
   return {
-    text: `${parsed.data.count}개 관련 데이터셋을 찾았고 ${parsed.data.callable_now}개는 즉시 호출할 수 있습니다.`,
+    text: `Found ${parsed.data.count} relevant datasets; ${parsed.data.callable_now} are callable now.`,
     details: parsed.data.datasets.map(
       (dataset) =>
-        `${dataset.provider} · ${dataset.name}${dataset.dev_ready ? "" : " · 심의 필요"}`,
+        `${dataset.provider} · ${dataset.name}${dataset.dev_ready ? "" : " · Review required"}`,
     ),
     ...(parsed.data.notes[0] ? { warning: parsed.data.notes[0] } : {}),
     citations: parsed.data.datasets.map((dataset) => ({
@@ -259,14 +243,14 @@ function formatHazardCapabilities(value: unknown): AssistantAnswer | null {
   if (!parsed.success) return null;
   const { ready, partial, blocked } = parsed.data.summary;
   return {
-    text: `13개 재난 유형 중 ${ready.length}개는 탐지·위험도·대피소 정보를 모두 확인할 수 있습니다.`,
+    text: `${ready.length} of 13 hazard types have complete detection, risk, and shelter coverage.`,
     details: [
-      `전체 지원 · ${ready.join(", ")}`,
-      `부분 지원 · ${partial.join(", ")}`,
-      `탐지 제한 · ${blocked.join(", ")}`,
+      `Full coverage · ${ready.join(", ")}`,
+      `Partial coverage · ${partial.join(", ")}`,
+      `Detection limited · ${blocked.join(", ")}`,
     ],
     warning:
-      "부분 지원은 위험도나 대피소 자료가 부족하고, 탐지 제한 재난은 발생 여부도 확인할 수 없습니다. 이 답만으로 대피를 결정하지 마세요.",
+      "Partial coverage may lack risk or shelter data, and detection-limited hazards may not confirm whether an incident occurred. Do not make evacuation decisions from this answer alone.",
     citations: [],
   };
 }
@@ -281,8 +265,8 @@ export async function answerAssistantQuery(
     formatDataHealth(result) ??
     formatHazardCapabilities(result) ??
     formatDatasetSearch(result) ?? {
-      text: "공공데이터 조회는 완료했지만 이 화면에서 요약할 수 없는 형식입니다.",
-      details: ["질문을 지역명과 재난 유형을 포함해 다시 입력해 주세요."],
+      text: "The public data request completed, but its format cannot be summarized here.",
+      details: ["Try again with a district name and hazard type."],
       citations: [],
     }
   );

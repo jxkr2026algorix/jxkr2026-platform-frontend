@@ -1,6 +1,10 @@
 {
   "files": {
-    "includes": ["apps/**/*", "!apps/**/dist/**"]
+    "includes": [
+      "apps/**/*",
+      "!apps/**/dist/**",
+      "!apps/map-webgpu-canvas/src/data/**"
+    ]
   },
   "formatter": {
     "enabled": true,

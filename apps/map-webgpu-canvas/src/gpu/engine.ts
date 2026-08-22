@@ -193,6 +193,9 @@ export class Engine {
   private detailOn = false;
   private detailBlend = 0;
   private detailTexRef: GPUTexture | null = null;
+  private districtTexRef: GPUTexture | null = null;
+  private districtOn = true;
+  private districtBlend = 0;
 
   private readonly debrisQueue: {
     start: number;
@@ -241,7 +244,6 @@ export class Engine {
     private readonly particles: ParticleSystems,
     private readonly surface: SurfaceRenderer,
     private readonly statsStaging: GPUBuffer,
-    private readonly zoneTex: GPUTexture,
     hasImagery: boolean,
     hasStreet: boolean,
   ) {
@@ -334,17 +336,19 @@ export class Engine {
       });
     }
 
-    const zoneTex = device.createTexture({
-      label: "risk-zones",
-      size: [n, n],
+    // Boundary overlay starts empty; main.ts uploads the rasterized 시/군
+    // outlines once the georeference is known.
+    const districtTex = device.createTexture({
+      label: "district-boundaries-placeholder",
+      size: [1, 1],
       format: "rgba8unorm",
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     device.queue.writeTexture(
-      { texture: zoneTex },
-      new Uint8Array(n * n * 4),
-      { bytesPerRow: n * 4 },
-      [n, n],
+      { texture: districtTex },
+      new Uint8Array(4),
+      { bytesPerRow: 4 },
+      [1, 1],
     );
 
     let streetTex: GPUTexture;
@@ -410,9 +414,9 @@ export class Engine {
       textures.fireA,
       satTex,
       riskTex,
-      zoneTex,
       streetTex,
       detailTex,
+      districtTex,
       n,
       targets,
     );
@@ -434,7 +438,6 @@ export class Engine {
       particles,
       surface,
       statsStaging,
-      zoneTex,
       imagery !== null,
       street !== null,
     );
@@ -509,6 +512,7 @@ export class Engine {
       // Only water hazards benefit from the 3D view (terrain + water depth);
       // everything else reads better as a top-down map. Manual 2D/3D wins.
       const wants3d =
+        this.scenario === "wildfire" ||
         WATER_3D_SCENARIOS.includes(this.scenario) ||
         (this.scenario === "clear" && this.rainTarget > 0);
       this.camera.setMode(wants3d ? "tilted" : "flat");
@@ -601,6 +605,11 @@ export class Engine {
     this.camera.flyTo(center?.x, center?.y, distanceMeters);
   }
 
+  /** Normalized look-at point the camera is easing toward. */
+  get cameraCenter(): MapPoint {
+    return this.camera.centerUV;
+  }
+
   setBasemapStyle(style: import("../protocol").BasemapStyle): void {
     if (style !== this.basemapStyle) this.clearDetailPatch();
     this.basemapStyle = style;
@@ -637,6 +646,44 @@ export class Engine {
     this.detailOn = false;
   }
 
+  /**
+   * Upload a rasterized 시/군 boundary overlay covering the whole map, or
+   * `null` to clear it. Rasterization lives in district-layer.ts so the
+   * engine stays independent of the boundary dataset.
+   */
+  setDistrictOverlay(canvas: HTMLCanvasElement | null): void {
+    if (!canvas) {
+      this.districtTexRef?.destroy();
+      this.districtTexRef = null;
+      return;
+    }
+    const tex = this.device.createTexture({
+      label: "district-boundaries",
+      size: [canvas.width, canvas.height],
+      format: "rgba8unorm",
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    this.device.queue.copyExternalImageToTexture(
+      { source: canvas },
+      { texture: tex },
+      [canvas.width, canvas.height],
+    );
+    this.surface.setDistrictTexture(tex);
+    this.districtTexRef?.destroy();
+    this.districtTexRef = tex;
+  }
+
+  setDistrictOverlayEnabled(enabled: boolean): void {
+    this.districtOn = enabled;
+  }
+
+  get districtOverlayEnabled(): boolean {
+    return this.districtOn;
+  }
+
   get streetBasemapReady(): boolean {
     return this.streetReady;
   }
@@ -661,64 +708,13 @@ export class Engine {
     this.streetReady = true;
   }
 
-  /** Rasterize externally supplied risk-zone polygons into the fill layer. */
-  setZones(
-    zones: { color: [number, number, number]; points: MapPoint[] }[],
-  ): void {
-    const n = this.terrain.gridSize;
-    const data = new Uint8Array(n * n * 4);
-    for (const zone of zones) {
-      const pts = zone.points;
-      if (pts.length < 3) continue;
-      let minX = 1;
-      let minY = 1;
-      let maxX = 0;
-      let maxY = 0;
-      for (const pt of pts) {
-        minX = Math.min(minX, pt.x);
-        minY = Math.min(minY, pt.y);
-        maxX = Math.max(maxX, pt.x);
-        maxY = Math.max(maxY, pt.y);
-      }
-      const i0 = Math.max(0, Math.floor(minX * n));
-      const i1 = Math.min(n - 1, Math.ceil(maxX * n));
-      const j0 = Math.max(0, Math.floor(minY * n));
-      const j1 = Math.min(n - 1, Math.ceil(maxY * n));
-      for (let j = j0; j <= j1; j++) {
-        const py = (j + 0.5) / n;
-        for (let i = i0; i <= i1; i++) {
-          const px = (i + 0.5) / n;
-          let inside = false;
-          for (let a = 0, b = pts.length - 1; a < pts.length; b = a++) {
-            const pa = pts[a];
-            const pb = pts[b];
-            if (!pa || !pb) continue;
-            if (
-              pa.y > py !== pb.y > py &&
-              px < ((pb.x - pa.x) * (py - pa.y)) / (pb.y - pa.y) + pa.x
-            ) {
-              inside = !inside;
-            }
-          }
-          if (!inside) continue;
-          const idx = (j * n + i) * 4;
-          data[idx] = Math.round(zone.color[0] * 255);
-          data[idx + 1] = Math.round(zone.color[1] * 255);
-          data[idx + 2] = Math.round(zone.color[2] * 255);
-          data[idx + 3] = 140;
-        }
-      }
-    }
-    this.device.queue.writeTexture(
-      { texture: this.zoneTex },
-      data,
-      { bytesPerRow: n * 4 },
-      [n, n],
-    );
-  }
-
-  /** Project a normalized map point to canvas pixels (null when off screen). */
-  projectPoint(u: number, v: number): { x: number; y: number } | null {
+  /**
+   * Project a normalized map point to canvas pixels, keeping points that fall
+   * outside the viewport. Null only when the point is behind the camera.
+   * Polygon and polyline overlays need this: culling individual vertices
+   * would tear the shape apart as it crosses the screen edge.
+   */
+  projectPointUnclipped(u: number, v: number): { x: number; y: number } | null {
     const world = this.terrain.worldSize;
     const wx = u * world;
     const wz = v * world;
@@ -733,10 +729,35 @@ export class Engine {
     const cy =
       ((m[1] ?? 0) * wx + (m[5] ?? 0) * wy + (m[9] ?? 0) * wz + (m[13] ?? 0)) /
       cw;
-    if (Math.abs(cx) > 1.15 || Math.abs(cy) > 1.15) return null;
     return {
       x: (cx * 0.5 + 0.5) * this.canvas.clientWidth,
       y: (1 - (cy * 0.5 + 0.5)) * this.canvas.clientHeight,
+    };
+  }
+
+  /** Project a normalized map point to canvas pixels (null when off screen). */
+  projectPoint(u: number, v: number): { x: number; y: number } | null {
+    const at = this.projectPointUnclipped(u, v);
+    if (!at) return null;
+    const margin = 0.15;
+    const width = this.canvas.clientWidth;
+    const height = this.canvas.clientHeight;
+    if (
+      at.x < -margin * width ||
+      at.x > width * (1 + margin) ||
+      at.y < -margin * height ||
+      at.y > height * (1 + margin)
+    ) {
+      return null;
+    }
+    return at;
+  }
+
+  /** Canvas size in CSS pixels, for sizing the annotation overlay. */
+  get viewportSize(): { width: number; height: number } {
+    return {
+      width: this.canvas.clientWidth,
+      height: this.canvas.clientHeight,
     };
   }
 
@@ -916,7 +937,12 @@ export class Engine {
     }
   }
 
-  getState(): MapStatePayload {
+  /**
+   * Everything the engine itself knows. District selection is owned by
+   * main.ts (it drives terrain reloads), which merges it in before the
+   * `map:state` event is sent.
+   */
+  getState(): Omit<MapStatePayload, "district"> {
     return {
       scenario: this.scenario,
       viewMode: this.camera.mode,
@@ -953,6 +979,7 @@ export class Engine {
 
   destroy(): void {
     this.running = false;
+    this.camera.detach();
     this.device.destroy();
   }
 
@@ -1091,7 +1118,8 @@ export class Engine {
     this.waterAcc = Math.min(this.waterAcc - pairs * 2 * WATER_DT, 0.1);
 
     this.fireAcc += simDt;
-    const fireTick = this.playing && this.fireAcc >= FIRE_DT;
+    const fireTick =
+      (this.playing || this.igniteRequest !== null) && this.fireAcc >= FIRE_DT;
     if (fireTick) this.fireAcc = Math.min(this.fireAcc - FIRE_DT, FIRE_DT);
 
     const statsDue = this.frameCounter % 30 === 0 && !this.statsBusy;
@@ -1311,6 +1339,9 @@ export class Engine {
       this.weatherDrought,
       this.styleBlend,
     );
+    const districtGoal = this.districtOn && this.districtTexRef ? 1 : 0;
+    this.districtBlend = damp(this.districtBlend, districtGoal, 5, realDt);
+    g.setVec4(ROW.district, this.districtBlend, 0, 0, 0);
     this.detailBlend = damp(this.detailBlend, this.detailOn ? 1 : 0, 4, realDt);
     g.setVec4(
       ROW.detail,

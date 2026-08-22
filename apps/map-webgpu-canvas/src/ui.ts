@@ -37,11 +37,16 @@ export class ControlPanel {
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly engine: Engine,
+    private engine: Engine,
   ) {
     this.build();
     this.root.hidden = false;
     setInterval(() => this.refresh(), 500);
+  }
+
+  /** Re-point at the engine rebuilt by a terrain-region reload. */
+  setEngine(engine: Engine): void {
+    this.engine = engine;
   }
 
   private build(): void {
@@ -239,75 +244,6 @@ export class ControlPanel {
       row.append(strong, document.createTextNode(value));
       this.metricsBox.append(row);
     }
-  }
-}
-
-const ZONE_ICONS: Record<string, string> = {
-  flood: "\u{1F30A}",
-  tsunami: "\u{1F30A}",
-  wildfire: "\u{1F525}",
-  landslide: "\u26F0\uFE0F",
-  earthquake: "\u{1F6A8}",
-  typhoon: "\u{1F300}",
-  nuclear: "\u2622\uFE0F",
-  chemical: "\u{1F9EA}",
-  snow: "\u2744\uFE0F",
-  heatwave: "\u{1F321}\uFE0F",
-  coldwave: "\u{1F976}",
-  drought: "\u{1F3DC}\uFE0F",
-};
-const ZONE_ICON_DEFAULT = "\u26A0\uFE0F";
-
-export interface ZoneLabelItem {
-  id: string;
-  label: string;
-  hazard?: string;
-  centroid: { x: number; y: number };
-}
-
-/**
- * Floating badge labels for server-driven risk zones. Each badge tracks its
- * polygon centroid on screen every frame via the engine's projection.
- */
-export class ZoneLabels {
-  private items: { data: ZoneLabelItem; el: HTMLDivElement }[] = [];
-
-  constructor(
-    private readonly container: HTMLElement,
-    private readonly engine: Engine,
-  ) {
-    const tick = () => {
-      for (const item of this.items) {
-        const at = this.engine.projectPoint(
-          item.data.centroid.x,
-          item.data.centroid.y,
-        );
-        if (at) {
-          item.el.hidden = false;
-          item.el.style.transform = `translate(-50%, -50%) translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px)`;
-        } else {
-          item.el.hidden = true;
-        }
-      }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }
-
-  set(zones: ZoneLabelItem[]): void {
-    this.container.replaceChildren();
-    this.items = zones.map((data) => {
-      const el = document.createElement("div");
-      el.className = "zone-badge";
-      el.hidden = true;
-      const icon = document.createElement("span");
-      icon.textContent = ZONE_ICONS[data.hazard ?? ""] ?? ZONE_ICON_DEFAULT;
-      const text = document.createElement("span");
-      text.textContent = data.label;
-      el.append(icon, text);
-      this.container.append(el);
-      return { data, el };
-    });
   }
 }
 

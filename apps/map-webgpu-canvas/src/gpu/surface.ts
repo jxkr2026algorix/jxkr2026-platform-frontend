@@ -5,7 +5,9 @@
  *
  * Terrain blends three looks: a cartographic "flat map" style, a natural
  * palette, and (when loaded) draped satellite imagery. Fire char/glow,
- * wetness, and the landslide-risk overlay are applied on top.
+ * wetness, the scenario susceptibility overlay, and administrative
+ * boundaries are applied on top. Server-supplied risk zones are NOT drawn
+ * here: they belong to the map's annotation UI, not the terrain surface.
  */
 
 import { GLOBALS_WGSL, GRID_WGSL, UTIL_WGSL } from "./common";
@@ -18,9 +20,9 @@ ${GLOBALS_WGSL}
 @group(0) @binding(4) var satTex : texture_2d<f32>;
 @group(0) @binding(5) var satSampler : sampler;
 @group(0) @binding(6) var riskTex : texture_2d<f32>;
-@group(0) @binding(7) var zoneTex : texture_2d<f32>;
-@group(0) @binding(8) var streetTex : texture_2d<f32>;
-@group(0) @binding(9) var detailTex : texture_2d<f32>;
+@group(0) @binding(7) var streetTex : texture_2d<f32>;
+@group(0) @binding(8) var detailTex : texture_2d<f32>;
+@group(0) @binding(9) var districtTex : texture_2d<f32>;
 ${GRID_WGSL}
 ${UTIL_WGSL}
 
@@ -168,10 +170,11 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   let hatch = 0.7 + 0.3 * step(0.5, fract((in.worldPos.x + in.worldPos.z) / (G.world.x * 0.005)));
   albedo = mix(albedo, zoneColor, G.fx.w * zone * 0.42 * hatch);
 
-  // Externally supplied risk-zone polygons (map:set-zones), pre-rasterized
-  // into a texture; bilinear sampling keeps the edges smooth.
-  let zoneFill = textureSampleLevel(zoneTex, satSampler, in.uv, 0.0);
-  albedo = mix(albedo, zoneFill.rgb, zoneFill.a * G.fx.w * 0.8);
+  // Administrative 시/군 boundaries from the national dataset. Independent of
+  // the hazard overlay: an operator navigating by district still needs the
+  // outlines when the hazard layer is off.
+  let districtLine = textureSampleLevel(districtTex, satSampler, in.uv, 0.0);
+  albedo = mix(albedo, districtLine.rgb, districtLine.a * G.district.x);
 
   // Point-source events: earthquake shockwave and airborne plumes.
   var extraGlow = vec3f(0.0);
@@ -364,6 +367,7 @@ export class SurfaceRenderer {
   private buildTerrainBG!: () => GPUBindGroup;
   private streetView!: GPUTextureView;
   private detailView!: GPUTextureView;
+  private districtView!: GPUTextureView;
 
   constructor(
     device: GPUDevice,
@@ -373,9 +377,9 @@ export class SurfaceRenderer {
     fireTex: GPUTexture,
     satTex: GPUTexture,
     riskTex: GPUTexture,
-    zoneTex: GPUTexture,
     streetTex: GPUTexture,
     detailTex: GPUTexture,
+    districtTex: GPUTexture,
     gridSize: number,
     targets: SurfaceTargets,
   ) {
@@ -442,6 +446,7 @@ export class SurfaceRenderer {
     });
     this.streetView = streetTex.createView();
     this.detailView = detailTex.createView();
+    this.districtView = districtTex.createView();
     this.buildTerrainBG = () =>
       device.createBindGroup({
         layout: this.terrain.getBindGroupLayout(0),
@@ -453,9 +458,9 @@ export class SurfaceRenderer {
           { binding: 4, resource: satTex.createView() },
           { binding: 5, resource: sampler },
           { binding: 6, resource: riskTex.createView() },
-          { binding: 7, resource: zoneTex.createView() },
-          { binding: 8, resource: this.streetView },
-          { binding: 9, resource: this.detailView },
+          { binding: 7, resource: this.streetView },
+          { binding: 8, resource: this.detailView },
+          { binding: 9, resource: this.districtView },
         ],
       });
     this.terrainBG = this.buildTerrainBG();
@@ -497,6 +502,12 @@ export class SurfaceRenderer {
   /** Swap in the lazily loaded street basemap texture. */
   setStreetTexture(streetTex: GPUTexture): void {
     this.streetView = streetTex.createView();
+    this.terrainBG = this.buildTerrainBG();
+  }
+
+  /** Swap in a freshly rasterized district-boundary overlay. */
+  setDistrictTexture(districtTex: GPUTexture): void {
+    this.districtView = districtTex.createView();
     this.terrainBG = this.buildTerrainBG();
   }
 

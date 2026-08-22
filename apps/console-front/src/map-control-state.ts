@@ -1,3 +1,4 @@
+import { PROVINCE_CODE } from "@salgil/map-webgpu-canvas/districts";
 import type {
   BasemapStyle,
   DashboardCommand,
@@ -14,12 +15,23 @@ export interface MapControlState {
   readonly viewMode: ViewMode;
   readonly playing: boolean;
   readonly overlayEnabled: boolean;
+  /** Focused 시/군 code, or null for the province-wide view. */
+  readonly districtCode: string | null;
+  readonly districtOverlay: boolean;
+  /** True while the renderer reloads terrain for a remote district. */
+  readonly districtLoading: boolean;
 }
 
 export type PendingMapControls = Partial<
   Pick<
     MapControlState,
-    "basemap" | "scenario" | "rainfallMmPerHour" | "viewMode" | "playing"
+    | "basemap"
+    | "scenario"
+    | "rainfallMmPerHour"
+    | "viewMode"
+    | "playing"
+    | "districtCode"
+    | "districtOverlay"
   >
 >;
 
@@ -35,6 +47,9 @@ export const initialMapControls: MapControlState = {
   viewMode: "tilted",
   playing: false,
   overlayEnabled: true,
+  districtCode: null,
+  districtOverlay: true,
+  districtLoading: false,
 };
 
 export function applyOptimisticControlCommand(
@@ -92,9 +107,26 @@ export function applyOptimisticControlCommand(
         controls: { ...controls, basemap: command.payload.style },
         pending: { ...pending, basemap: command.payload.style },
       };
+    case "map:focus-district": {
+      const code = command.payload.code;
+      // The renderer treats the province sentinel and null identically; the
+      // console keeps only null so the 비례대표 row stays the selected one.
+      const districtCode = code === PROVINCE_CODE ? null : code;
+      return {
+        controls: { ...controls, districtCode, districtLoading: true },
+        pending: { ...pending, districtCode },
+      };
+    }
+    case "map:set-district-overlay":
+      return {
+        controls: { ...controls, districtOverlay: command.payload.enabled },
+        pending: { ...pending, districtOverlay: command.payload.enabled },
+      };
     case "map:ignite":
     case "map:trigger":
     case "map:set-zones":
+    case "map:set-markers":
+    case "map:set-routes":
     case "map:set-camera":
     case "map:ping":
       return { controls, pending };
@@ -117,6 +149,14 @@ export function reconcileMapControls(
     pending.playing !== undefined && pending.playing !== mapState.playing;
   const keepBasemap =
     pending.basemap !== undefined && pending.basemap !== mapState.basemap;
+  // A focus request stays pending until the renderer reports the same
+  // district, which for 울릉군 is only after its terrain has loaded.
+  const keepDistrict =
+    pending.districtCode !== undefined &&
+    pending.districtCode !== mapState.district.selected;
+  const keepDistrictOverlay =
+    pending.districtOverlay !== undefined &&
+    pending.districtOverlay !== mapState.district.overlay;
 
   return {
     controls: {
@@ -128,6 +168,13 @@ export function reconcileMapControls(
         : mapState.rainfallMmPerHour,
       viewMode: keepView ? controls.viewMode : mapState.viewMode,
       playing: keepPlaying ? controls.playing : mapState.playing,
+      districtCode: keepDistrict
+        ? controls.districtCode
+        : mapState.district.selected,
+      districtOverlay: keepDistrictOverlay
+        ? controls.districtOverlay
+        : mapState.district.overlay,
+      districtLoading: mapState.district.loading || keepDistrict,
     },
     pending: {
       ...(keepBasemap ? { basemap: pending.basemap } : {}),
@@ -135,6 +182,10 @@ export function reconcileMapControls(
       ...(keepRainfall ? { rainfallMmPerHour: pending.rainfallMmPerHour } : {}),
       ...(keepView ? { viewMode: pending.viewMode } : {}),
       ...(keepPlaying ? { playing: pending.playing } : {}),
+      ...(keepDistrict ? { districtCode: pending.districtCode } : {}),
+      ...(keepDistrictOverlay
+        ? { districtOverlay: pending.districtOverlay }
+        : {}),
     },
   };
 }

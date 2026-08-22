@@ -1,3 +1,4 @@
+import { MapAnnotations } from "./annotations";
 import { DashboardBridge } from "./bridge";
 import {
   DEFAULT_REGION,
@@ -8,13 +9,30 @@ import {
   loadDetailPatch,
   loadRealTerrain,
   loadStreetDetailPatch,
+  PROVINCE_EXAGGERATION,
+  type RealTerrainOptions,
   TMAP_ENABLED,
 } from "./dem";
+import { DEMO_MARKERS, DEMO_ROUTES, DEMO_ZONES } from "./demo-annotations";
+import { renderDistrictOverlay } from "./district-layer";
+import {
+  cameraForBbox,
+  districtByCode,
+  latLonToMapPoint,
+  PROVINCE_CODE,
+  PROVINCE_REGION,
+  regionForDistrict,
+} from "./districts";
+import type { RegionBox } from "./geo";
 import { Engine, type HazardEvent } from "./gpu/engine";
 import {
+  type AnyPoint,
   clampRainfall,
   type DashboardToMap,
   MAX_RAINFALL_MM_PER_HOUR,
+  type MapMarker,
+  type MapRoute,
+  type MapStatePayload,
   PROTOCOL_VERSION,
   type RiskZone,
   type RiskZonePoint,
@@ -22,7 +40,7 @@ import {
   type Scenario,
 } from "./protocol";
 import { GRID_SIZE, generateTerrain, type TerrainData } from "./terrain-gen";
-import { ControlPanel, showStatus, ZoneLabels } from "./ui";
+import { ControlPanel, showStatus } from "./ui";
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
@@ -47,72 +65,111 @@ const SEVERITY_LABELS = {
 
 let engine: Engine | null = null;
 let bridge: DashboardBridge;
-let zoneLabels: ZoneLabels | null = null;
+let annotations: MapAnnotations | null = null;
+let controlPanel: ControlPanel | null = null;
 let geoRef: GeoReference | null = null;
 
-const SEVERITY_COLORS: Record<string, [number, number, number]> = {
-  warning: [0.937, 0.267, 0.267],
-  watch: [0.976, 0.451, 0.086],
-  advisory: [0.918, 0.702, 0.031],
-};
+/** Terrain region currently loaded, and the district framed inside it. */
+let currentRegion: RegionBox = PROVINCE_REGION;
+let selectedDistrict: string | null = null;
+let districtOverlayOn = true;
+let regionLoading = false;
+/** Last annotations received, so they survive a terrain-region reload. */
+let activeZones: RiskZone[] = [];
+let activeMarkers: MapMarker[] = [];
+let activeRoutes: MapRoute[] = [];
 
-function toNormalized(pt: RiskZonePoint): { x: number; y: number } | null {
+function toNormalized(pt: RiskZonePoint | AnyPoint): {
+  x: number;
+  y: number;
+} | null {
   if (typeof pt.x === "number" && typeof pt.y === "number") {
     return { x: pt.x, y: pt.y };
   }
   if (typeof pt.lat === "number" && typeof pt.lon === "number" && geoRef) {
-    const { west, east, north, south } = geoRef;
-    return {
-      x: (pt.lon - west) / (east - west),
-      y: (north - pt.lat) / (north - south),
-    };
+    return latLonToMapPoint(pt.lat, pt.lon, geoRef);
   }
   return null;
 }
 
-function zoneColor(zone: RiskZone): [number, number, number] {
-  const hex = zone.color?.match(/^#?([0-9a-f]{6})$/i)?.[1];
-  if (hex) {
-    return [
-      Number.parseInt(hex.slice(0, 2), 16) / 255,
-      Number.parseInt(hex.slice(2, 4), 16) / 255,
-      Number.parseInt(hex.slice(4, 6), 16) / 255,
-    ];
-  }
-  return SEVERITY_COLORS[zone.severity ?? ""] ?? [0.2, 0.4, 1];
+/**
+ * Annotations are presentation only: the overlay resolves each point against
+ * the georeference and draws it above the canvas. Nothing reaches the
+ * simulation, so a bad payload can never corrupt renderer state.
+ */
+function applyZones(zones: RiskZone[]): void {
+  activeZones = zones;
+  annotations?.setZones(zones);
 }
 
-function applyZones(zones: RiskZone[]): void {
+function applyMarkers(markers: MapMarker[]): void {
+  activeMarkers = markers;
+  annotations?.setMarkers(markers);
+}
+
+function applyRoutes(routes: MapRoute[]): void {
+  activeRoutes = routes;
+  annotations?.setRoutes(routes);
+}
+
+/** Re-resolve every layer, e.g. after a terrain region swap moved the bounds. */
+function reapplyAnnotations(): void {
+  annotations?.setZones(activeZones);
+  annotations?.setMarkers(activeMarkers);
+  annotations?.setRoutes(activeRoutes);
+}
+
+/** Regions are compared by value; main() rebuilds the object on startup. */
+function sameRegion(a: RegionBox, b: RegionBox): boolean {
+  return (
+    Math.abs(a.centerLat - b.centerLat) < 1e-6 &&
+    Math.abs(a.centerLon - b.centerLon) < 1e-6 &&
+    Math.abs(a.sizeMeters - b.sizeMeters) < 1
+  );
+}
+
+/** Redraw the 시/군 boundary overlay for the current region and selection. */
+function refreshDistrictOverlay(): void {
   if (!engine) return;
-  const converted = zones
-    .map((zone) => ({
-      zone,
-      points: zone.polygon
-        .map(toNormalized)
-        .filter((pt): pt is { x: number; y: number } => pt !== null),
-    }))
-    .filter((entry) => entry.points.length >= 3);
-  engine.setZones(
-    converted.map(({ zone, points }) => ({ color: zoneColor(zone), points })),
+  if (!geoRef) {
+    engine.setDistrictOverlay(null);
+    return;
+  }
+  engine.setDistrictOverlay(
+    renderDistrictOverlay({ bounds: geoRef, selected: selectedDistrict }),
   );
-  zoneLabels?.set(
-    converted
-      .filter(({ zone }) => zone.label)
-      .map(({ zone, points }) => {
-        let cx = 0;
-        let cy = 0;
-        for (const pt of points) {
-          cx += pt.x;
-          cy += pt.y;
-        }
-        return {
-          id: zone.id,
-          label: zone.label ?? "",
-          ...(zone.hazard !== undefined ? { hazard: zone.hazard } : {}),
-          centroid: { x: cx / points.length, y: cy / points.length },
-        };
-      }),
-  );
+}
+
+/**
+ * Frame a 시/군 by its real bounding box. Districts inside the loaded region
+ * are a camera move; anything outside it (울릉군) needs its own terrain.
+ */
+async function focusDistrict(code: string | null): Promise<void> {
+  const normalized = code && code !== PROVINCE_CODE ? code : null;
+  const district = normalized ? districtByCode(normalized) : undefined;
+  if (normalized && !district) throw new Error("unknown-district");
+  selectedDistrict = district ? district.code : null;
+
+  const target = district
+    ? regionForDistrict(district, currentRegion)
+    : {
+        region: PROVINCE_REGION,
+        reload: !sameRegion(currentRegion, PROVINCE_REGION),
+      };
+  if (target.reload) await switchRegion(target.region);
+
+  refreshDistrictOverlay();
+  if (!engine) return;
+  if (!district) {
+    // 비례대표 / province view: pull all the way back to the full extent.
+    engine.setCamera({ x: 0.5, y: 0.5 }, currentRegion.sizeMeters * 0.92);
+    return;
+  }
+  const framing = cameraForBbox(district.bbox);
+  const center = geoRef
+    ? latLonToMapPoint(framing.lat, framing.lon, geoRef)
+    : { x: 0.5, y: 0.5 };
+  engine.setCamera(center, framing.distanceMeters);
 }
 
 function handleCommand(command: DashboardToMap): void {
@@ -176,11 +233,41 @@ function handleCommand(command: DashboardToMap): void {
     case "map:set-overlay":
       engine.setOverlay(command.payload.enabled);
       break;
-    case "map:set-camera":
-      engine.setCamera(command.payload.center, command.payload.distanceMeters);
+    case "map:set-camera": {
+      const center = command.payload.center;
+      const point = center ? toNormalized(center) : null;
+      if (center && !point) {
+        ack(false, "no-georeference");
+        return;
+      }
+      engine.setCamera(point ?? undefined, command.payload.distanceMeters);
+      break;
+    }
+    case "map:focus-district": {
+      if (regionLoading) {
+        ack(false, "region-loading");
+        return;
+      }
+      void focusDistrict(command.payload.code).catch((error) => {
+        bridge.send({
+          type: "map:error",
+          payload: { code: "bad-command", message: String(error) },
+        });
+      });
+      break;
+    }
+    case "map:set-district-overlay":
+      districtOverlayOn = command.payload.enabled;
+      engine.setDistrictOverlayEnabled(districtOverlayOn);
       break;
     case "map:set-zones":
       applyZones(command.payload.zones ?? []);
+      break;
+    case "map:set-markers":
+      applyMarkers(command.payload.markers ?? []);
+      break;
+    case "map:set-routes":
+      applyRoutes(command.payload.routes ?? []);
       break;
     case "map:set-basemap":
       engine.setBasemapStyle(command.payload.style);
@@ -234,12 +321,38 @@ function showFallback(): void {
   fallbackBox.hidden = false;
 }
 
-async function loadTerrain(): Promise<{
+interface LoadedTerrain {
   terrain: TerrainData;
   geo: GeoReference | null;
   imagery: HTMLCanvasElement | null;
   street: HTMLCanvasElement | null;
-}> {
+}
+
+/** Town-scale views keep near-real relief; province scale needs more. */
+function exaggerationFor(sizeMeters: number): number {
+  return sizeMeters >= 80000 ? PROVINCE_EXAGGERATION : 1.6;
+}
+
+/** The region to load at startup: the whole province unless overridden. */
+function initialRegion(): RealTerrainOptions {
+  const options = { ...DEFAULT_REGION };
+  const lat = Number(params.get("lat"));
+  const lon = Number(params.get("lon"));
+  const km = Number(params.get("km"));
+  if (Number.isFinite(lat) && lat !== 0) options.centerLat = lat;
+  if (Number.isFinite(lon) && lon !== 0) options.centerLon = lon;
+  if (Number.isFinite(km) && km > 0) {
+    options.sizeMeters = km * 1000;
+    options.exaggeration = exaggerationFor(options.sizeMeters);
+  }
+  const exagg = Number(params.get("exagg"));
+  if (Number.isFinite(exagg) && exagg > 0) options.exaggeration = exagg;
+  return options;
+}
+
+async function loadTerrain(
+  options: RealTerrainOptions,
+): Promise<LoadedTerrain> {
   if (params.get("terrain") === "procedural") {
     return {
       terrain: generateTerrain(),
@@ -249,19 +362,6 @@ async function loadTerrain(): Promise<{
     };
   }
   try {
-    const options = { ...DEFAULT_REGION };
-    const lat = Number(params.get("lat"));
-    const lon = Number(params.get("lon"));
-    const km = Number(params.get("km"));
-    if (Number.isFinite(lat) && lat !== 0) options.centerLat = lat;
-    if (Number.isFinite(lon) && lon !== 0) options.centerLon = lon;
-    if (Number.isFinite(km) && km > 0) {
-      options.sizeMeters = km * 1000;
-      // Town-scale views keep near-real relief; province scale needs more.
-      options.exaggeration = km >= 80 ? 3.2 : 1.6;
-    }
-    const exagg = Number(params.get("exagg"));
-    if (Number.isFinite(exagg) && exagg > 0) options.exaggeration = exagg;
     const result = await loadRealTerrain(options);
     return {
       terrain: result.terrain,
@@ -281,38 +381,8 @@ async function loadTerrain(): Promise<{
   }
 }
 
-async function main(): Promise<void> {
-  bridge = new DashboardBridge(params.get("origin"), handleCommand);
-
-  if (!navigator.gpu) {
-    showFallback();
-    sendReady(false, null);
-    bridge.send({
-      type: "map:error",
-      payload: {
-        code: "webgpu-unsupported",
-        message: "navigator.gpu is not available in this browser",
-      },
-    });
-    return;
-  }
-
-  const { terrain, geo, imagery, street } = await loadTerrain();
-  geoRef = geo;
-
-  try {
-    engine = await Engine.create(canvas, terrain, imagery, street);
-  } catch (error) {
-    showFallback();
-    sendReady(false, geo);
-    bridge.send({
-      type: "map:error",
-      payload: { code: "webgpu-unsupported", message: String(error) },
-    });
-    return;
-  }
-
-  engine.onHazard = (event: HazardEvent) => {
+function wireEngine(target: Engine): void {
+  target.onHazard = (event: HazardEvent) => {
     bridge.send({
       type: "map:hazard",
       payload: {
@@ -330,13 +400,114 @@ async function main(): Promise<void> {
         : `${label} ${severity} — simulation detected`,
     );
   };
-  engine.onError = (code, message) => {
+  target.onError = (code, message) => {
     bridge.send({ type: "map:error", payload: { code, message } });
     showFallback();
   };
-  engine.onTrigger = (hazard) => {
+  target.onTrigger = (hazard, at) => {
+    bridge.send({ type: "map:point-selected", payload: { hazard, at } });
     showStatus(`${HAZARD_LABELS[hazard]} origin selected`, 2500);
   };
+}
+
+/**
+ * Rebuild the world around a different terrain region. Only 울릉군 needs this
+ * today — every mainland 시/군 already sits inside the province region — so
+ * the cost of tearing the engine down is paid once, on demand. Operator-set
+ * scenario, weather, and view state is carried across the rebuild.
+ */
+async function switchRegion(region: RegionBox): Promise<void> {
+  if (!engine || regionLoading) return;
+  regionLoading = true;
+  showStatus("Loading measured terrain for the selected district…", 0);
+  const previous = engine;
+  const carried = {
+    scenario: previous.scenario,
+    rainfall: previous.rainfall,
+    viewMode: previous.viewMode,
+    basemap: previous.basemapStyle,
+    overlay: previous.overlayEnabled,
+    playing: previous.playing,
+  };
+  try {
+    const loaded = await loadTerrain({
+      ...region,
+      exaggeration: exaggerationFor(region.sizeMeters),
+      timeoutMs: DEFAULT_REGION.timeoutMs,
+    });
+    previous.destroy();
+    engine = await Engine.create(
+      canvas,
+      loaded.terrain,
+      loaded.imagery,
+      loaded.street,
+    );
+    geoRef = loaded.geo;
+    currentRegion = region;
+    wireEngine(engine);
+    engine.setScenario(carried.scenario, carried.rainfall);
+    engine.setViewMode(carried.viewMode);
+    engine.setBasemapStyle(carried.basemap);
+    engine.setOverlay(carried.overlay);
+    engine.setDistrictOverlayEnabled(districtOverlayOn);
+    engine.simControl(carried.playing ? "play" : "pause");
+    controlPanel?.setEngine(engine);
+    reapplyAnnotations();
+    engine.start();
+    sendReady(true, geoRef);
+    showStatus("Terrain ready", 2000);
+  } catch (error) {
+    // The old engine is already gone if the failure came after destroy();
+    // surface it rather than pretending the region changed.
+    bridge.send({
+      type: "map:error",
+      payload: { code: "internal", message: String(error) },
+    });
+    showStatus("Could not load terrain for that district.", 4000);
+  } finally {
+    regionLoading = false;
+  }
+}
+
+async function main(): Promise<void> {
+  bridge = new DashboardBridge(params.get("origin"), handleCommand);
+
+  if (!navigator.gpu) {
+    showFallback();
+    sendReady(false, null);
+    bridge.send({
+      type: "map:error",
+      payload: {
+        code: "webgpu-unsupported",
+        message: "navigator.gpu is not available in this browser",
+      },
+    });
+    return;
+  }
+
+  const region = initialRegion();
+  const { terrain, geo, imagery, street } = await loadTerrain(region);
+  geoRef = geo;
+  currentRegion = {
+    centerLat: region.centerLat,
+    centerLon: region.centerLon,
+    sizeMeters: region.sizeMeters,
+  };
+
+  try {
+    engine = await Engine.create(canvas, terrain, imagery, street);
+  } catch (error) {
+    showFallback();
+    sendReady(false, geo);
+    bridge.send({
+      type: "map:error",
+      payload: { code: "webgpu-unsupported", message: String(error) },
+    });
+    return;
+  }
+
+  wireEngine(engine);
+  refreshDistrictOverlay();
 
   const initialScenario = params.get("scenario") as Scenario | null;
   if (initialScenario && SCENARIOS.includes(initialScenario)) {
@@ -347,6 +518,7 @@ async function main(): Promise<void> {
     engine.setRainfall(clampRainfall(initialRain));
   }
 
+  if (bridge.embedded) engine.simControl("pause");
   engine.start();
   startDetailLod();
   if (TMAP_ENABLED) {
@@ -356,17 +528,47 @@ async function main(): Promise<void> {
     }
   }
 
-  const zoneContainer = document.getElementById("zone-labels");
-  if (zoneContainer) zoneLabels = new ZoneLabels(zoneContainer, engine);
+  const overlayContainer = document.getElementById("map-annotations");
+  if (overlayContainer) {
+    // The overlay reads the engine through a narrow projector interface, so
+    // it stays swappable across the rebuild a region change performs.
+    annotations = new MapAnnotations(
+      overlayContainer,
+      {
+        projectPointUnclipped: (u, v) =>
+          engine?.projectPointUnclipped(u, v) ?? null,
+        get viewportSize() {
+          return engine?.viewportSize ?? { width: 0, height: 0 };
+        },
+      },
+      toNormalized,
+    );
+    if (params.get("demo") === "annotations") {
+      applyZones(DEMO_ZONES);
+      applyMarkers(DEMO_MARKERS);
+      applyRoutes(DEMO_ROUTES);
+    } else {
+      reapplyAnnotations();
+    }
+  }
   sendReady(true, geo);
   setInterval(() => {
-    if (engine) bridge.send({ type: "map:state", payload: engine.getState() });
+    if (!engine) return;
+    const payload: MapStatePayload = {
+      ...engine.getState(),
+      district: {
+        selected: selectedDistrict,
+        overlay: engine.districtOverlayEnabled,
+        loading: regionLoading,
+      },
+    };
+    bridge.send({ type: "map:state", payload });
   }, 500);
 
   const uiParam = params.get("ui");
   const showPanel = uiParam === "1" || (!bridge.embedded && uiParam !== "0");
   if (showPanel) {
-    new ControlPanel(panelBox, engine);
+    controlPanel = new ControlPanel(panelBox, engine);
   }
 }
 

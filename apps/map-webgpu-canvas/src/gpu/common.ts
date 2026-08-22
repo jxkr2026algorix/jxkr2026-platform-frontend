@@ -1,12 +1,12 @@
 /**
  * Shared WGSL prelude and the CPU<->GPU globals uniform layout.
  *
- * Every pipeline binds the same 208-byte globals uniform buffer at
+ * Every pipeline binds the same globals uniform buffer at
  * @group(0) @binding(0). The Float32Array layout in `GlobalsWriter`
  * must match `GLOBALS_WGSL` field-for-field.
  */
 
-export const GLOBALS_FLOATS = 68; // 272 bytes
+export const GLOBALS_FLOATS = 72; // 288 bytes
 
 export const GLOBALS_WGSL = /* wgsl */ `
 struct Globals {
@@ -24,6 +24,7 @@ struct Globals {
   event : vec4f,    // x source u, y source v, z elapsed s, w kind (1 quake, 3 nuclear, 4 chemical)
   weather : vec4f,  // x snow 0..1, y temperature -1 cold..1 heat, z drought 0..1, w street-map blend
   detail : vec4f,   // high-zoom patch: x u0, y v0, z size (normalized), w blend
+  district : vec4f, // x boundary-overlay blend 0..1, yzw reserved
 };
 @group(0) @binding(0) var<uniform> G : Globals;
 `;
@@ -147,6 +148,7 @@ export const ROW = {
   event: 10,
   weather: 11,
   detail: 12,
+  district: 13,
 } as const;
 
 export function createGridTexture(

@@ -122,6 +122,7 @@ p {
 
 .app-shell {
   position: relative;
+  width: 100%;
   height: 100dvh;
   overflow: hidden;
   background: var(--canvas);
@@ -145,6 +146,8 @@ p {
 }
 
 .map-canvas iframe {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -223,7 +226,8 @@ p {
   font-size: 11px;
 }
 
-.side-nav nav {
+.side-nav nav,
+.dashboard-status-dock {
   position: fixed;
   bottom: 16px;
   left: 50%;
@@ -242,6 +246,10 @@ p {
   transform: translateX(-50%);
   pointer-events: auto;
   scrollbar-width: none;
+}
+
+.dashboard-status-dock {
+  pointer-events: none;
 }
 
 .nav-item {
@@ -440,11 +448,15 @@ p {
   pointer-events: none;
 }
 
+.route-situation > .map-view {
+  pointer-events: none;
+}
+
 .operations-panel-left {
   position: fixed;
   z-index: 14;
-  top: var(--operations-panel-top, 82px);
-  bottom: 78px;
+  top: 16px;
+  bottom: 16px;
   left: 16px;
   width: 300px;
   overflow: visible;
@@ -572,7 +584,7 @@ textarea {
   width: 100%;
   min-height: 40px;
   padding: 0 40px 0 12px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--radius-control);
   background: var(--floating-field);
   color: var(--ink);
@@ -586,8 +598,14 @@ textarea {
 
 .floating-select-trigger:hover,
 .floating-select-trigger[aria-expanded="true"] {
-  border-color: var(--floating-border-strong);
+  border-color: var(--line-strong);
   background: var(--floating-control-hover);
+}
+
+.floating-select-trigger:disabled {
+  color: var(--ink-tertiary);
+  cursor: wait;
+  opacity: 0.68;
 }
 
 .floating-select-chevron {
@@ -618,7 +636,7 @@ textarea {
   max-height: 278px;
   padding: 5px;
   overflow-y: auto;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--floating-popover);
   box-shadow: var(--floating-popover-shadow);
@@ -936,8 +954,8 @@ textarea {
 
 .community-list {
   display: grid;
-  gap: 2px;
-  margin: 0 -12px -10px;
+  gap: 6px;
+  margin: 4px 4px 0;
 }
 
 .community-row {
@@ -945,18 +963,18 @@ textarea {
   grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 46px;
-  padding: 5px 12px;
+  min-height: 54px;
+  padding: 8px 14px;
   border: 0;
-  border-top: 0;
-  background: transparent;
+  border-radius: var(--radius-control);
+  background: var(--floating-control-weak);
   color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
 
 .community-row:hover {
-  background: var(--floating-control-weak);
+  background: var(--floating-control-selected);
 }
 
 .community-row[aria-selected="true"] {
@@ -983,6 +1001,39 @@ textarea {
   margin-top: 1px;
   color: var(--ink-tertiary);
   font-size: 10px;
+}
+
+/* The 22 시·군 plus 비례대표 do not fit the rail, so this one list owns a
+   bounded scroll rather than pushing the panel past the viewport. */
+.district-list {
+  max-height: 176px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.district-row {
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-height: 38px;
+}
+
+.district-row small {
+  font-variant-numeric: tabular-nums;
+}
+
+.district-section .check-row {
+  margin-bottom: 4px;
+}
+
+.district-loading {
+  margin-top: 8px;
+  color: var(--ink-tertiary);
+  font-size: 11px;
+}
+
+@media (max-height: 780px) {
+  .district-list {
+    max-height: 132px;
+  }
 }
 
 .operations-timeline {
@@ -1124,12 +1175,12 @@ textarea {
 .assistant-drawer {
   position: fixed;
   z-index: 35;
-  top: var(--assistant-drawer-top, 82px);
+  top: 16px;
   right: 16px;
-  bottom: 78px;
+  bottom: 16px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: 320px;
+  width: 288px;
   overflow: hidden;
   border: 1px solid var(--floating-border);
   border-radius: var(--radius-layer);
@@ -1895,5 +1946,336 @@ tbody tr:last-child td {
   .range-control input[type="range"]:active::-webkit-slider-thumb,
   .range-control input[type="range"]:active::-moz-range-thumb {
     transform: none;
+  }
+}
+
+.app-shell.view-situation {
+  --panel-intro-top: 128px;
+}
+
+.operations-panel-left {
+  bottom: 16px;
+  max-height: none;
+  height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
+.district-selector {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.district-status-kicker {
+  color: var(--ink-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.district-selector p,
+.district-data-note {
+  margin: 0;
+  color: var(--ink-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.district-status-panel {
+  position: fixed;
+  z-index: 14;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: 288px;
+  height: calc(100dvh - 32px);
+  padding: 16px 16px 88px;
+  overflow-y: auto;
+  border: 1px solid var(--floating-border);
+  border-radius: var(--radius-layer);
+  background: var(--floating-bg-strong);
+  box-shadow: var(--floating-shadow);
+  backdrop-filter: blur(18px) saturate(0.96);
+  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  pointer-events: auto;
+}
+
+.district-status-panel h2 {
+  margin: 3px 0 16px;
+  font-size: 20px;
+  letter-spacing: -0.035em;
+}
+
+.district-status-heading,
+.district-event-summary > strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.district-status-heading span {
+  color: var(--safe-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.weather-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin: 12px 0 10px;
+}
+
+.weather-metrics div:last-child {
+  grid-column: span 2;
+}
+
+.weather-metrics dt {
+  color: var(--ink-tertiary);
+  font-size: 10px;
+}
+
+.weather-metrics dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.district-event-summary {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.district-event-summary p {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.district-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.district-history > strong {
+  font-size: 12px;
+}
+
+.district-history ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.district-history li {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.district-history time {
+  color: var(--ink-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell.is-assistant-open .district-status-panel {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+}
+
+@media (max-width: 860px) {
+  .district-status-panel {
+    top: auto;
+    right: 16px;
+    bottom: 78px;
+    width: min(288px, calc(100vw - 32px));
+  }
+}
+
+.brand {
+  width: 300px;
+  justify-content: space-between;
+}
+
+.mobile-qr {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  place-items: center;
+  background: var(--floating-field);
+}
+
+.assistant-launcher {
+  top: auto;
+  right: 32px;
+  bottom: 32px;
+  left: auto;
+  width: 256px;
+  min-height: 42px;
+  justify-content: flex-start;
+}
+
+.assistant-drawer,
+.view-situation .assistant-drawer {
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  left: auto;
+  width: 288px;
+}
+
+.app-shell.is-assistant-open .object-inspector,
+.view-situation.is-assistant-open .context-bar {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.event-control-heading,
+.incident-mode,
+.event-grid {
+  display: flex;
+  align-items: center;
+}
+
+.event-control-heading {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.incident-mode {
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--floating-control-weak);
+}
+
+.incident-mode button {
+  flex: 1;
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.incident-mode button[aria-pressed="true"] {
+  background: var(--floating-control);
+  box-shadow: var(--control-shadow);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.event-grid {
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+}
+
+.event-grid button {
+  display: grid;
+  flex: 1 0 calc(33.333% - 4px);
+  gap: 1px;
+  min-width: 78px;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--floating-control-weak);
+  color: var(--ink-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.event-grid button[aria-pressed="true"] {
+  background: var(--floating-control-selected);
+  color: var(--ink);
+}
+
+.event-grid button span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.event-grid button small {
+  color: var(--ink-tertiary);
+  font-size: 9px;
+}
+
+.placement-prompt,
+.backend-simulation-note {
+  margin: 8px 0 0;
+  color: var(--ink-tertiary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.placement-prompt {
+  padding-left: 8px;
+  border-left: 2px solid var(--alert-ink);
+  color: var(--alert-ink);
+}
+
+.event-error {
+  margin: 8px 0 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--critical);
+  color: var(--critical);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.latest-platform-event {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.latest-platform-event span,
+.latest-platform-event strong {
+  display: block;
+}
+
+.latest-platform-event span {
+  color: var(--alert-ink);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.latest-platform-event strong {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@media (max-height: 840px) {
+  .priority-section {
+    display: none;
+  }
+
+  .backend-simulation-note {
+    display: none;
   }
 }

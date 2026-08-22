@@ -66,18 +66,18 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 - Base spacing unit: 8px, with 4px and 12px half-steps where density requires them.
 - Control gaps: 8px; row padding: 12–16px; section gaps: 24–32px.
-- Desktop shell: one full-bleed map fixed to `100dvh`. The map is mounted outside route content and persists across navigation. On the situation route, product identity belongs to the left operations rail and incident/map status belongs to the right inspector rail; neither is a detached top island. Page navigation remains in a centered bottom dock.
-- Map workspace: the renderer owns the entire viewport. Situation controls float at the left, selected-object inspection floats at the right, and recent events occupy one centered bottom rail capped at 680px above the navigation dock.
-- Map scroll ownership: the application shell is fixed to `100dvh`; the map never scrolls. Layer and inspector rails own independent vertical scroll only when their content exceeds the viewport.
+- Desktop shell: one full-bleed map fixed to `100dvh`. Full-height floating left and right rails frame the renderer with the existing 16px safe-area inset, blur, radius, and shadow. Product identity, mobile QR, and event controls occupy the left rail; district context occupies the right rail. Mobile is a separate client and is entered only through the QR code.
+- Map workspace: the renderer owns the entire viewport. Event, map-view, basemap, and a compact district selector share one left rail. The right rail is reserved for the selected district's weather snapshot, platform-alert summary, and a compact three-item recent-event timeline. Static district lists, community priority, and selected-community inspection remain absent.
+- Map scroll ownership: the application shell is fixed to `100dvh`; the map never scrolls. The left operations rail owns vertical scroll only when its content exceeds the viewport.
 - Console scope: desktop operations only, verified at 1280×800 and 1440×900. Narrow-screen console behavior is not part of the acceptance surface; resident and field workflows belong to `apps/mobile`.
-- Desktop adaptation: the selected-object inspector may collapse below 1100px, but the full-screen map, operational controls, and centered route dock remain the console structure.
+- Desktop adaptation: the full-screen map, operational controls, and centered shortcut dock remain the console structure.
 - Scroll ownership: the desktop main region owns vertical scroll. A map/list split may give the village list one bounded scroll owner. The field app uses document scroll only.
 
 ## 5. Components
 
 ### App shell
 
-- Structure: persistent full-screen map, rail-owned product and incident context on the situation route, bottom-centered route dock, and one route content layer. Non-map workflow routes may retain compact detached context because they do not expose the two side rails.
+- Structure: persistent full-screen map, full-height left and right rails, and one route content layer. The situation route has no bottom status dock or decorative connection indicator; mode remains visible only where it controls event creation.
 - States: default and current navigation item.
 - Accessibility: navigation has an explicit label and current item uses `aria-current`.
 - Layout owner: the shell never scrolls. Situation overlays own bounded local scrolling; non-map routes use one centered floating work sheet as their sole scroll owner.
@@ -139,24 +139,24 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 ### Spatial operations workspace
 
-- Structure: real interactive basemap, one consolidated left operations panel, one right selected-object inspector, and one compact operational timeline.
-- Floating controls: brand identity, incident heading, simulation controls, and community priority share the left panel. The reset action remains detached at the top right. Normal renderer connectivity and FPS are not repeated in the interface; only loading or failure states surface when they affect map use. These rails use an 88% neutral fill, 18px blur, a 14px radius, and spacing instead of internal section rules wherever alignment is sufficient.
+- Structure: real interactive basemap and one consolidated left operations panel. The previous evacuation-plan, contact-status, and field-task routes are redirected to the situation map and are no longer exposed in navigation.
+- Floating controls: brand identity with a real mobile QR, incident heading, and renderer controls share the left edge. Event controls expose one training/live mode switch and compact disaster actions; point hazards enter an explicit map-placement state. Normal connectivity, FPS, and platform stream badges are not repeated. The rail uses an 88% neutral fill, 18px blur, a 14px radius, and spacing instead of internal section rules wherever alignment is sufficient.
 - Route dock: four routes appear in a compact centered horizontal row near the lower safe area. The dock uses an 82% neutral blurred surface; the active route uses a quiet neutral inset fill and near-black text. Inactive routes remain neutral gray, never blue.
 - Floating work sheets: plan, contact, and field-task routes retain the live map behind a centered, bounded 82–86% white reading lens. The sheet owns its vertical scroll and leaves map context visible around its edges. Existing table boxes are flattened so the lens, not an old page container, owns the visual hierarchy.
-- Map plane: the WebGPU terrain and hazard simulation is visually primary. It is isolated in an iframe; dashboard chrome never overlays renderer controls except for explicit loading, failure, and route-revision states.
+- Map plane: the WebGPU terrain renderer is visually primary. It is isolated in an iframe. When embedded by the dashboard, local simulation stays paused: the renderer may draw the operator-selected origin immediately, but spread, phase changes, and forecast zones arrive from the platform stream.
 - Overlay groups: communities, multi-hazard exposure, evacuation routes, access constraints, shelters, and field teams. Every group has a labelled checkbox and a numeric count.
 - Map objects: compact square or diamond markers with persistent short labels. Selected communities use a cobalt outline and remain paired with a textual inspector.
 - Hazard areas: translucent geometry plus a named legend item; never color alone. Routes use safe green when open, action blue when selected, and dashed critical red only for a blocked segment.
-- Inspector: selected community, operational state, affected residents, primary hazard, assigned shelter, transport, last update, and one next action.
+- Incident details appear only when supplied by the platform event; the console does not carry a static selected-community inspector.
 - Timeline: latest four decision events in time order. It uses one structural divider and no individual cards.
 - Motion: map pan/zoom and immediate overlay visibility only. Route changes update the map and written explanation together.
 - Fallback: if online tiles are unavailable, the map region states that the basemap is unavailable while retaining overlay controls and the textual community list.
 
 ### Public data assistant
 
-- Structure: one bottom-right pill launcher opens a 320px right-side evidence drawer. On the situation route the drawer temporarily replaces the selected-community inspector rather than stacking above it.
+- Structure: one compact launcher at the lower-right of the right rail opens a full-height right-side evidence drawer. The drawer temporarily replaces the district context so the map remains unobstructed.
 - Material: the drawer uses the same 94% neutral floating surface, quiet border, 18px blur, and restrained shadow as dense operational reading surfaces. Messages remain row-led; only the operator message gets one weak neutral fill.
-- Content: questions are routed to the SALGIL public-data MCP. Every answer shows incomplete-source warnings, observation time, and source links when supplied; it never decides an evacuation priority or invents missing data.
+- Content: questions are routed to the SALGIL public-data MCP. Explicit training requests invoke the platform event tool path and are labelled as training in every client. Data answers show incomplete-source warnings, observation time, and source links when supplied; the assistant never decides an evacuation priority or invents missing data.
 - Scroll ownership: the transcript alone scrolls between the fixed header and fixed composer. Long source URLs wrap without widening the drawer.
 - Motion: the drawer enters 18px from the right over 160ms and exits the same way. Reduced-motion mode uses opacity only; Escape and the explicit close control dismiss it.
 - Accessibility: the launcher, close control, composer, status, and transcript have explicit accessible names. Enter submits, Shift+Enter adds a line, and focus remains visibly indicated.
@@ -169,8 +169,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 ## 6. Motion & Interaction
 
-- Route navigation uses React Router and retains the shared shell. Route content crossfades by 4px over 130ms; reduced-motion preferences make the transition immediate.
-- Sidebar navigation stays neutral: inactive labels use muted neutral ink and the current route uses primary ink weight only, with no brand-tinted background.
+- React Router keeps `/situation` as the single dashboard surface and redirects legacy paths there. The bottom dock is status-only and never navigates into the separate mobile client.
 - Navigation, buttons, and compact map controls compress to `0.975` for roughly 100ms while pressed. Selection and disclosure transitions are limited to 110–160ms opacity, transform, or background color.
 - Camera and basemap segments use the beui.dev tabs mechanism: one shared `layoutId` selection surface moves with the compact `420 / 36 / 0.55` spring. Only the position changes; the label never slides or blurs.
 - Map control values, including camera and basemap selection, update optimistically in the console. Continuous rainfall input is coalesced to one renderer command per animation frame so the thumb and numeric label never wait for iframe state acknowledgement.
@@ -184,6 +183,8 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - **Alert:** one orange warning and one directive, “Move to higher ground now.” The dominant action reveals a safe route; Call 119 is the only red control.
 - **Route:** a green route, nearest safe shelter, travel time, ordered checklist, and a single evacuation progress action.
 - The demo mode switch exposes all three states for judging, but the content itself remains usable without understanding the switch.
+- QR entrants are assigned to the shared `청송군 진보면 공동 데모 지점` rather than GPS. Every mobile demo client therefore receives the same platform event, location summary, safety steps, and acknowledgement action.
+- The mobile shell owns document scroll. It follows Furikake's compact operational grammar: one white page, a cobalt primary action, one subtle information surface, and row separators instead of a decorative map, glass surface, or fixed bottom dock. Current platform events remain the authoritative source of disaster state.
 
 ## 7. Depth & Surface
 
@@ -202,5 +203,5 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Focus is visible on every interactive element.
 - Touch targets are at least 44px on the field app.
 - Maps are duplicated by the layer rail, inspector, route summary, and timeline so map interpretation is never the only path to information.
-- Accepted prototype debt: operational geometry and coordinates are static scenario data; there is no authentication, backend, telephony, routing engine, live sensor ingestion, or cross-device synchronization. The iframe URL is supplied through `VITE_MAP_URL`; production deployment must configure its final map origin explicitly.
+- Accepted prototype debt: operational geometry and the shared mobile demo coordinate are static. There is no authentication, telephony, or routing engine. Until the platform backend is available, POST failures fall back to an explicitly labelled local preview and same-browser `BroadcastChannel` synchronization; real cross-device synchronization requires the documented SSE endpoint. The iframe URL is supplied through `VITE_MAP_URL`; production deployment must configure its final map origin explicitly.
 - Accepted responsive debt: `console-front` intentionally targets desktop command workstations. Narrow-screen resident and patrol use cases are owned by `apps/mobile` rather than a compressed console.
