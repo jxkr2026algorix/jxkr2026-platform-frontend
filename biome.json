@@ -3,6 +3,7 @@
     "includes": [
       "apps/**/*",
       "!apps/**/dist/**",
+      "!apps/**/dev-dist/**",
       "!apps/map-webgpu-canvas/src/data/**"
     ]
   },
