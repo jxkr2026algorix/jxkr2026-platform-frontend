@@ -24,10 +24,35 @@ Requires Node.js 20.19+ and Corepack.
 corepack enable
 yarn install
 
-yarn dev:map --port 5175
-SALGIL_PLATFORM_API_URL=http://127.0.0.1:8000 SALGIL_PLATFORM_API_KEY=<operator-key> VITE_MAP_URL=http://localhost:5175 yarn dev:mobile --port 5174
-SALGIL_PLATFORM_API_URL=http://127.0.0.1:8000 SALGIL_PLATFORM_API_KEY=<operator-key> VITE_MAP_URL=http://localhost:5175 VITE_MOBILE_URL=http://localhost:5174 yarn dev:console --port 5173
+cp .env.local.example .env.local   # then fill in the keys
+yarn doctor                        # check the setup before wondering why nothing arrives
+yarn dev                           # console 5173 · mobile 5176 · map 5183
 ```
+
+`.env.local` chooses the backend and holds the keys. All three apps read the
+same file, because started separately with separate settings they drift: the
+console ends up talking to one backend and the phone to another, and the two
+screens disagree about what is happening.
+
+```bash
+SALGIL_PLATFORM_API_URL=https://api.salgil.gyeongbuk.kr
+SALGIL_OPERATOR_API_KEY=…   # the console declares incidents
+SALGIL_MOBILE_API_KEY=…     # the phone only reads
+```
+
+The two keys are separate on purpose. The phone is the audience view reached by
+QR; a screen anyone can open must not carry a key that can declare an incident.
+Against a local backend both fall back to the development key the backend ships,
+so no configuration is needed to run against your own.
+
+`yarn dev --remote` and `yarn dev --local` override the file for one run.
+Nothing here reaches the browser — the dev server proxies with the key so it
+never leaves the machine.
+
+**Every platform call is 401 without a key**, including the situation stream, so
+a missing key looks like a backend outage rather than a credentials problem.
+`yarn doctor` names it, along with a chatbot or push service that is reachable
+but switched off at the backend.
 
 `yarn lint`, `yarn typecheck`, `yarn build` cover every workspace.
 

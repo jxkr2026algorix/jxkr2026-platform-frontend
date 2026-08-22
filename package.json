@@ -11,13 +11,17 @@
     "build:console": "yarn workspace @salgil/console-front build",
     "build:mobile": "yarn workspace @salgil/mobile build",
     "build:map": "yarn workspace @salgil/map-webgpu-canvas build",
+    "dev": "node scripts/dev.mjs",
+    "dev:remote": "node scripts/dev.mjs --remote",
+    "dev:local": "node scripts/dev.mjs --local",
     "dev:console": "yarn workspace @salgil/console-front dev",
     "dev:mobile": "yarn workspace @salgil/mobile dev",
     "dev:map": "yarn workspace @salgil/map-webgpu-canvas dev",
     "dev:platform": "node scripts/platform-demo-server.mjs",
     "lint": "biome check apps",
     "typecheck": "yarn workspace @salgil/console-front typecheck && yarn workspace @salgil/mobile typecheck && yarn workspace @salgil/map-webgpu-canvas typecheck",
-    "qa:map": "node scripts/qa-map.mjs"
+    "qa:map": "node scripts/qa-map.mjs",
+    "doctor": "node scripts/doctor.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
