@@ -151,6 +151,7 @@ export function App() {
       },
     });
     postMapCommand({ type: "map:set-view", payload: { mode: "flat" } });
+    postMapCommand({ type: "map:set-basemap", payload: { style: "map" } });
     postMapCommand({
       type: "map:set-markers",
       payload: {
@@ -238,14 +239,6 @@ export function App() {
         />
         {!mapReady ? <span className="map-loading">Loading map</span> : null}
       </div>
-
-      <header className="mobile-header">
-        <a className="mobile-brand" href="/" aria-label="SALGIL mobile home">
-          <img src="/salgil-mark.svg" alt="" width="30" height="30" />
-          <strong>Salgil</strong>
-        </a>
-        <span>Jinbo-myeon</span>
-      </header>
 
       <section className="mobile-sheet" aria-live="polite">
         <div className="sheet-handle" aria-hidden="true" />

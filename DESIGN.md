@@ -184,7 +184,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - **Route:** a green route, nearest safe shelter, travel time, ordered checklist, and a single evacuation progress action.
 - The demo mode switch exposes all three states for judging, but the content itself remains usable without understanding the switch.
 - QR entrants are assigned to the shared `청송군 진보면 공동 데모 지점` rather than GPS. Every mobile demo client therefore receives the same platform event, location summary, safety steps, and acknowledgement action.
-- The mobile shell keeps the live map as a full-height working plane and places resident guidance in one white bottom sheet. The upper map remains visible behind a compact floating location header; the sheet owns bounded scrolling, uses row separators instead of nested cards, and carries one cobalt acknowledgement action. Current platform events remain the authoritative source of disaster state and supply the incident origin, risk zones, shelter, and route shown on the map.
+- The mobile shell contains only a viewport-filling conventional 2D street map and one white bottom sheet; it has no product header, floating logo, satellite view, or terrain presentation. The sheet owns bounded scrolling, uses row separators instead of nested cards, and carries one cobalt acknowledgement action. Current platform events remain the authoritative source of disaster state and supply the incident origin, risk zones, shelter, and route shown on the map.
 
 ## 7. Depth & Surface
 

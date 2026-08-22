@@ -30,21 +30,19 @@ body {
   background: var(--color-map-fallback);
 }
 
-button,
-a {
+button {
   font: inherit;
   -webkit-tap-highlight-color: transparent;
 }
 
-button:focus-visible,
-a:focus-visible {
+button:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 3px;
 }
 
 .mobile-shell {
   position: relative;
-  width: min(100%, 520px);
+  width: 100%;
   height: 100dvh;
   min-height: 560px;
   margin: 0 auto;
@@ -73,46 +71,10 @@ a:focus-visible {
   transform: translate(-50%, -50%);
 }
 
-.mobile-header,
-.mobile-brand,
 .mobile-intro,
 .panel-heading {
   display: flex;
   align-items: center;
-}
-
-.mobile-header {
-  position: absolute;
-  z-index: 2;
-  top: max(12px, env(safe-area-inset-top));
-  right: var(--space-page);
-  left: var(--space-page);
-  justify-content: space-between;
-  min-height: 48px;
-  padding: 8px 12px;
-  border: 1px solid rgb(255 255 255 / 54%);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 90%);
-  box-shadow: 0 8px 24px rgb(23 23 25 / 10%);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
-.mobile-header > span {
-  color: var(--color-ink-subtle);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.mobile-brand {
-  gap: 7px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.mobile-brand strong {
-  font-size: 17px;
-  letter-spacing: -0.03em;
 }
 
 .mobile-sheet {
