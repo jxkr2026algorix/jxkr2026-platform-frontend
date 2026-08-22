@@ -896,14 +896,15 @@ input[type="range"] {
 .operations-timeline {
   position: fixed;
   z-index: 13;
-  right: 320px;
   bottom: 78px;
-  left: 332px;
+  left: 50%;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  width: min(680px, calc(100vw - 680px));
   overflow: hidden;
   border-radius: 14px;
   background: var(--floating-bg-soft);
+  transform: translateX(-50%);
   pointer-events: auto;
 }
 
@@ -1351,6 +1352,10 @@ tbody tr:last-child td {
 
   .operations-timeline {
     right: 16px;
+    left: 332px;
+    width: auto;
+    max-width: 680px;
+    transform: none;
   }
 }
 

@@ -67,7 +67,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Base spacing unit: 8px, with 4px and 12px half-steps where density requires them.
 - Control gaps: 8px; row padding: 12–16px; section gaps: 24–32px.
 - Desktop shell: one full-bleed map fixed to `100dvh`. The map is mounted outside route content and persists across navigation. Product identity sits at the upper-left, incident/map status at the upper-right, and page navigation in a centered bottom dock.
-- Map workspace: the renderer owns the entire viewport. Situation controls float at the left, selected-object inspection floats at the right, and recent events occupy one compact bottom rail above the navigation dock.
+- Map workspace: the renderer owns the entire viewport. Situation controls float at the left, selected-object inspection floats at the right, and recent events occupy one centered bottom rail capped at 680px above the navigation dock.
 - Map scroll ownership: the application shell is fixed to `100dvh`; the map never scrolls. Layer and inspector rails own independent vertical scroll only when their content exceeds the viewport.
 - Console scope: desktop operations only, verified at 1280×800 and 1440×900. Narrow-screen console behavior is not part of the acceptance surface; resident and field workflows belong to `apps/mobile`.
 - Desktop adaptation: the selected-object inspector may collapse below 1100px, but the full-screen map, operational controls, and centered route dock remain the console structure.
