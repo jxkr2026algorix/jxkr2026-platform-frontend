@@ -2655,3 +2655,87 @@ tbody tr:last-child td {
   line-height: 1.1;
   opacity: 0.6;
 }
+
+/* --- Assistant, while it is generating ---------------------------------- */
+
+/* The one place this product uses a gradient. It is not decoration: it marks
+   the live edge of the text so a growing answer is distinguishable from a
+   finished one at a glance, and it stops the moment the answer settles. */
+.assistant-stream p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+
+.assistant-stream em {
+  font-style: normal;
+  background: linear-gradient(
+    100deg,
+    var(--ink) 0%,
+    var(--ink) 20%,
+    #6f8dff 45%,
+    #b98cff 60%,
+    var(--ink) 85%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: assistant-sweep 1.5s linear infinite;
+}
+
+/* A caret at the very end, so the answer reads as still being written even
+   during the pauses between tokens. */
+.assistant-stream p::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: linear-gradient(180deg, #6f8dff, #b98cff);
+  animation: assistant-caret 1.05s steps(2, jump-none) infinite;
+}
+
+@keyframes assistant-sweep {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -80% 0;
+  }
+}
+
+@keyframes assistant-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0.12;
+  }
+}
+
+/* While a tool is running there is nothing to read yet, so the shimmer moves
+   across the status line instead. */
+.assistant-pending i {
+  background: linear-gradient(90deg, #6f8dff, #b98cff, #6f8dff);
+  background-size: 200% 100%;
+  animation: assistant-sweep 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assistant-stream em,
+  .assistant-stream p::after,
+  .assistant-pending i {
+    animation: none;
+  }
+  .assistant-stream em {
+    background: none;
+    color: var(--ink);
+  }
+}

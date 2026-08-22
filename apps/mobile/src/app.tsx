@@ -1,3 +1,4 @@
+import { cameraForBbox } from "@salgil/map-webgpu-canvas/districts";
 import {
   DASHBOARD_SOURCE,
   type DashboardCommand,
@@ -18,11 +19,10 @@ import {
   type Shelter,
 } from "@salgil/platform-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NotificationPermissionGate } from "./notification-permission-gate";
 import {
-  notificationState,
   notifyIncident,
   notifyRouteBlocked,
-  requestNotifications,
 } from "./notifications";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -66,9 +66,8 @@ function getMapLocation(): { src: string; origin: string } {
   url.searchParams.set("origin", window.location.origin);
   url.searchParams.set("ui", "0");
   url.searchParams.set("scenario", "clear");
-  // Residents read a plan of their own area; they do not pan the province.
   url.searchParams.set("district", "47750");
-  url.searchParams.set("interaction", "0");
+  url.searchParams.set("interaction", "1");
   return { src: url.toString(), origin: url.origin };
 }
 
@@ -79,8 +78,112 @@ function getMapLocation(): { src: string; origin: string } {
 const ORIGIN = {
   lat: 36.43,
   lon: 129.05,
-  label: "Jinbo-myeon, Cheongsong",
+  label: "Demo location · Jinbo-myeon, Cheongsong",
 } as const;
+
+const DEMO_SHELTER: Shelter = {
+  id: "demo-jinbo-shelter",
+  region_code: "47750",
+  name: "Jinbo Culture and Sports Center",
+  address: "Jinbo-myeon, Cheongsong",
+  lat: 36.4239,
+  lon: 129.0572,
+  capacity: null,
+  capacity_basis: null,
+  hazards: ["wildfire", "flood", "landslide", "earthquake"],
+  facility_type: "demo shelter",
+  distance_km: 1.1,
+  source_attribution: "SALGIL fixed demo scenario",
+  data_mode: "synthetic",
+};
+
+function createDemoRoutePlan(hazard: string): RoutePlan {
+  return {
+    origin: {
+      lat: ORIGIN.lat,
+      lon: ORIGIN.lon,
+      community_name: ORIGIN.label,
+    },
+    hazard,
+    mode: "foot",
+    mode_name: "Walking",
+    mode_note: "Fixed demo route",
+    routes: [
+      {
+        shelter_id: DEMO_SHELTER.id,
+        shelter_name: DEMO_SHELTER.name,
+        shelter_capacity: null,
+        capacity_basis: null,
+        found: true,
+        reason: null,
+        geometry: [
+          [ORIGIN.lon, ORIGIN.lat],
+          [129.0522, 36.4288],
+          [129.0541, 36.4272],
+          [129.0559, 36.4253],
+          [DEMO_SHELTER.lon ?? ORIGIN.lon, DEMO_SHELTER.lat ?? ORIGIN.lat],
+        ],
+        distance_m: 1_100,
+        duration_minutes: 14,
+        straight_line_km: 0.95,
+        max_risk: null,
+        mean_risk: null,
+        avoided_edges: 0,
+        blocked_by_reports: [],
+      },
+    ],
+    recommended: DEMO_SHELTER.id,
+    prediction_used: false,
+    prediction_model: null,
+    prediction_is_stub: true,
+    horizons_minutes: [],
+    field_reports_applied: 0,
+    road_network: "fixed-demo",
+    attribution: "SALGIL fixed demo scenario · illustrative geometry",
+    is_derived: true,
+    notice:
+      "Demo route only. Follow official alerts and on-site directions during a real emergency.",
+    warnings: ["This route does not use live GPS."],
+    generated_at: new Date().toISOString(),
+  };
+}
+
+function cameraForRoute(
+  geometry: readonly (readonly number[])[],
+): { center: { lat: number; lon: number }; distanceMeters: number } | null {
+  let west = Number.POSITIVE_INFINITY;
+  let south = Number.POSITIVE_INFINITY;
+  let east = Number.NEGATIVE_INFINITY;
+  let north = Number.NEGATIVE_INFINITY;
+
+  for (const coordinate of geometry) {
+    const lon = coordinate[0];
+    const lat = coordinate[1];
+    if (lon === undefined || lat === undefined) continue;
+    west = Math.min(west, lon);
+    south = Math.min(south, lat);
+    east = Math.max(east, lon);
+    north = Math.max(north, lat);
+  }
+
+  if (![west, south, east, north].every(Number.isFinite)) return null;
+  const longitudePadding = Math.max((east - west) * 0.16, 0.0012);
+  const latitudePadding = Math.max((north - south) * 0.16, 0.0012);
+  const camera = cameraForBbox(
+    [
+      west - longitudePadding,
+      south - latitudePadding,
+      east + longitudePadding,
+      north + latitudePadding,
+    ],
+    40,
+    0.7,
+  );
+  return {
+    center: { lat: camera.lat, lon: camera.lon },
+    distanceMeters: Math.max(camera.distanceMeters, 4_200),
+  };
+}
 
 type PlatformRiskZone = NonNullable<PlatformEvent["zones"]>[number];
 
@@ -128,10 +231,9 @@ export function App() {
   const [plan, setPlan] = useState<RoutePlan | null>(null);
   const [shelters, setShelters] = useState<Shelter[]>([]);
   const [mapReady, setMapReady] = useState(false);
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [isSheetCollapsed, setIsSheetCollapsed] = useState(false);
   /** Hazard the platform is actively streaming spread for, if any. */
   const [liveHazard, setLiveHazard] = useState<string | null>(null);
-  const [alertsOn, setAlertsOn] = useState(notificationState() === "granted");
   const notifiedIncidentRef = useRef("");
   const blockedRouteRef = useRef("");
 
@@ -153,7 +255,6 @@ export function App() {
     const unsubscribe = client.subscribe((message) => {
       if (message.kind === "disaster.event") {
         setEvent(message.event);
-        setAcknowledged(false);
       }
       if (message.kind === "incident.clear") setEvent(null);
     });
@@ -189,8 +290,8 @@ export function App() {
 
   useEffect(() => {
     if (!event) {
-      setPlan(null);
-      setShelters([]);
+      setPlan(createDemoRoutePlan("wildfire"));
+      setShelters([DEMO_SHELTER]);
       return;
     }
     let cancelled = false;
@@ -215,7 +316,9 @@ export function App() {
         setShelters(nextShelters);
       })
       .catch(() => {
-        if (!cancelled) setPlan(null);
+        if (cancelled) return;
+        setPlan(createDemoRoutePlan(hazard));
+        setShelters([DEMO_SHELTER]);
       });
     return () => {
       cancelled = true;
@@ -231,6 +334,22 @@ export function App() {
     },
     [mapLocation.origin],
   );
+
+  const best = plan ? recommendedLeg(plan) : undefined;
+  const routeCamera = useMemo(
+    () => (best ? cameraForRoute(best.geometry) : null),
+    [best],
+  );
+
+  const fitRoute = useCallback(() => {
+    if (!routeCamera) return;
+    postMapCommand({ type: "map:set-camera", payload: routeCamera });
+  }, [postMapCommand, routeCamera]);
+
+  const handleSheetToggle = useCallback(() => {
+    setIsSheetCollapsed((collapsed) => !collapsed);
+    window.requestAnimationFrame(fitRoute);
+  }, [fitRoute]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -292,7 +411,6 @@ export function App() {
               lat: lat ?? 0,
               lon: lon ?? 0,
             })),
-            label: leg.shelter_name,
             // "advised", never "open": this is a suggested route, not a
             // verified official safe route.
             state: "advised" as const,
@@ -336,9 +454,10 @@ export function App() {
         },
       });
     }
-  }, [event, mapReady, plan, postMapCommand, shelters]);
-
-  const best = plan ? recommendedLeg(plan) : undefined;
+    if (routeCamera) {
+      postMapCommand({ type: "map:set-camera", payload: routeCamera });
+    }
+  }, [event, mapReady, plan, postMapCommand, routeCamera, shelters]);
 
   useEffect(() => {
     if (!event) return;
@@ -378,7 +497,9 @@ export function App() {
 
   return (
     <main className="mobile-shell">
-      <div className="mobile-map">
+      <div
+        className={`mobile-map${isSheetCollapsed ? " is-sheet-collapsed" : ""}`}
+      >
         <iframe
           ref={frameRef}
           src={mapLocation.src}
@@ -387,95 +508,126 @@ export function App() {
           onLoad={() => setMapReady(false)}
         />
         {!mapReady ? <span className="map-loading">Loading map</span> : null}
+        <nav className="mobile-map-zoom" aria-label="Map zoom controls">
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={() =>
+              postMapCommand({ type: "map:zoom", payload: { factor: 0.72 } })
+            }
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={() =>
+              postMapCommand({ type: "map:zoom", payload: { factor: 1.38 } })
+            }
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+        </nav>
+        <button
+          className="fit-route-button"
+          type="button"
+          disabled={!routeCamera}
+          onClick={fitRoute}
+        >
+          View full route
+        </button>
       </div>
 
-      <section className="mobile-sheet" aria-live="polite">
-        <div className="sheet-handle" aria-hidden="true" />
-        <div className="mobile-intro">
-          <div>
-            <p>{event ? "Current incident" : "Emergency guidance"}</p>
-            <h1>{event?.headline ?? "No active incident in your area"}</h1>
-          </div>
-          <span>
-            {event
-              ? `${event.mode === "training" ? "Training" : "Alert"} · ${timeFormatter.format(new Date(event.createdAt))}`
-              : "Monitoring official alerts"}
-          </span>
-        </div>
-
-        <div className="panel-heading">
-          <h2>Evacuation</h2>
-          <strong>{travelTime}</strong>
-        </div>
-        <dl className="guidance-list">
-          <div>
-            <dt>Assigned shelter</dt>
-            <dd>{shelter}</dd>
-          </div>
-          <div>
-            <dt>Route</dt>
-            {/* Never "official": the backend's data contract forbids
-                presenting a computed route as a verified safe route. */}
-            <dd>
-              {best
-                ? "Suggested route, avoiding predicted risk"
-                : "Awaiting a reachable route"}
-            </dd>
-          </div>
-          <div>
-            <dt>Guidance</dt>
-            <dd>{instruction}</dd>
-          </div>
-        </dl>
-
-        {blocked.length > 0 ? (
-          <ul className="blocked-routes">
-            {blocked.map((leg) => (
-              <li key={leg.shelter_id}>
-                <strong>{leg.shelter_name}</strong>
-                <span>{leg.reason ?? "Unreachable"}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {liveHazard ? (
-          <p className="live-spread" role="status">
-            Live spread forecast for this area
-          </p>
-        ) : null}
-
-        {plan ? (
-          <p className="route-notice">
-            {plan.notice}
-            <small>{plan.attribution}</small>
-          </p>
-        ) : null}
-
-        {!alertsOn && notificationState() !== "unsupported" ? (
-          <button
-            className="enable-alerts"
-            type="button"
-            onClick={() => {
-              void requestNotifications().then((state) =>
-                setAlertsOn(state === "granted"),
-              );
-            }}
-          >
-            Turn on emergency alerts
-            <small>So you are told even with the screen off</small>
-          </button>
-        ) : null}
-
+      <section
+        className={`mobile-sheet${isSheetCollapsed ? " is-collapsed" : ""}`}
+        aria-live="polite"
+      >
         <button
-          className="acknowledge-button"
+          className="sheet-toggle"
           type="button"
-          disabled={acknowledged}
-          onClick={() => setAcknowledged(true)}
+          aria-controls="mobile-sheet-content"
+          aria-expanded={!isSheetCollapsed}
+          aria-label={
+            isSheetCollapsed
+              ? "Show evacuation guidance"
+              : "Hide evacuation guidance"
+          }
+          onClick={handleSheetToggle}
         >
-          {acknowledged ? "Guidance reviewed" : "Review guidance"}
+          <span className="sheet-handle" aria-hidden="true" />
+          {isSheetCollapsed ? <span>Show guidance</span> : null}
         </button>
+
+        <div id="mobile-sheet-content" hidden={isSheetCollapsed}>
+          <div className="mobile-intro">
+            <div>
+              <p>{event ? "Current incident" : "Emergency guidance"}</p>
+              <h1>{event?.headline ?? "No active incident in your area"}</h1>
+            </div>
+            <span>
+              {event
+                ? `${event.mode === "training" ? "Training" : "Alert"} · ${timeFormatter.format(new Date(event.createdAt))}`
+                : "Monitoring official alerts"}
+            </span>
+          </div>
+
+          <div className="panel-heading">
+            <h2>Evacuation</h2>
+            <strong>{travelTime}</strong>
+          </div>
+          <dl className="guidance-list">
+            <div>
+              <dt>Assigned shelter</dt>
+              <dd>{shelter}</dd>
+            </div>
+            <div>
+              <dt>Route</dt>
+              {/* Never "official": the backend's data contract forbids
+                presenting a computed route as a verified safe route. */}
+              <dd>
+                {best
+                  ? "Suggested route, avoiding predicted risk"
+                  : "Awaiting a reachable route"}
+              </dd>
+            </div>
+            <div>
+              <dt>Guidance</dt>
+              <dd>{instruction}</dd>
+            </div>
+          </dl>
+
+          {blocked.length > 0 ? (
+            <ul className="blocked-routes">
+              {blocked.map((leg) => (
+                <li key={leg.shelter_id}>
+                  <strong>{leg.shelter_name}</strong>
+                  <span>{leg.reason ?? "Unreachable"}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {liveHazard ? (
+            <p className="live-spread" role="status">
+              Live spread forecast for this area
+            </p>
+          ) : null}
+
+          {plan ? (
+            <p className="route-notice">
+              {plan.notice}
+              <small>{plan.attribution}</small>
+            </p>
+          ) : null}
+
+        </div>
       </section>
+
+      <NotificationPermissionGate />
     </main>
   );
 }

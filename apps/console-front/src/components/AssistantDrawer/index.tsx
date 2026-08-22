@@ -27,6 +27,11 @@ export function AssistantDrawer({
   const [messages, setMessages] = useState<readonly ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  /** Text arriving token by token, before it becomes a settled message. */
+  const [streamingText, setStreamingText] = useState("");
+  /** Which upstream tool the model is running, so the wait is explained. */
+  const [runningTool, setRunningTool] = useState<string | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
   const connectionStartedRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -129,6 +134,50 @@ export function AssistantDrawer({
         ]);
         return;
       }
+      const { assistantStatus, streamChat } = await import(
+        "../../assistant-chat"
+      );
+      const status = await assistantStatus();
+      if (status.configured) {
+        // The model reasons before it answers, so the text is streamed: a
+        // blank panel for eight seconds reads as broken, a sentence forming
+        // reads as thinking.
+        await new Promise<void>((resolve) => {
+          let text = "";
+          const history = [
+            ...messages.map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.text,
+            })),
+            { role: "user" as const, content: query },
+          ];
+          abortRef.current = streamChat(history, (event) => {
+            if (event.kind === "tool") setRunningTool(event.name);
+            if (event.kind === "notice" || event.kind === "error") {
+              text += (text ? "\n\n" : "") + event.text;
+              setStreamingText(text);
+            }
+            if (event.kind === "delta") {
+              text += event.text;
+              setStreamingText(text);
+            }
+            if (event.kind === "done") {
+              setRunningTool(null);
+              setStreamingText("");
+              if (text.trim()) {
+                setMessages((current) => [
+                  ...current,
+                  { id: crypto.randomUUID(), role: "assistant", text },
+                ]);
+              }
+              resolve();
+            }
+          });
+        });
+        return;
+      }
+      // No model configured: the read-only query path still answers from the
+      // platform's own data rather than leaving the question unanswered.
       const { answerAssistantQuery } = await import("../../assistant-query");
       const answer = await answerAssistantQuery(query);
       setMessages((current) => [
@@ -155,8 +204,19 @@ export function AssistantDrawer({
       }
     } finally {
       setSending(false);
+      setRunningTool(null);
+      setStreamingText("");
+      abortRef.current = null;
     }
   };
+
+  // Closing the panel mid-answer stops the work rather than leaving it
+  // streaming into a component nobody is looking at.
+  useEffect(() => {
+    if (open) return;
+    abortRef.current?.();
+    abortRef.current = null;
+  }, [open]);
 
   return (
     <>
@@ -198,10 +258,23 @@ export function AssistantDrawer({
               {messages.map((message) => (
                 <AssistantMessage key={message.id} message={message} />
               ))}
-              {sending ? (
+              {streamingText ? (
+                <div className="assistant-stream" aria-live="polite">
+                  {/* The gradient sweeps only over the last few characters,
+                      so it marks where the text is growing rather than
+                      animating the whole answer forever. */}
+                  <p>
+                    {streamingText.slice(0, -12)}
+                    <em>{streamingText.slice(-12)}</em>
+                  </p>
+                </div>
+              ) : null}
+              {sending && !streamingText ? (
                 <div className="assistant-pending" role="status">
                   <i />
-                  {t("assistant.checking")}
+                  {runningTool
+                    ? t("assistant.runningTool", { tool: runningTool })
+                    : t("assistant.checking")}
                 </div>
               ) : null}
               {messages.length === 0 ? (

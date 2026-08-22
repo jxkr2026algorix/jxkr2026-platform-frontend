@@ -102,6 +102,7 @@ const english = {
     "Data connection unavailable. Reopen the assistant to retry.",
   "assistant.welcome":
     "Ask about Gyeongbuk public data or start a training incident. Training events appear on the dashboard and mobile app at the same time.",
+  "assistant.runningTool": "Checking {tool}…",
   "assistant.checking": "Checking public data",
   "assistant.askLabel": "Ask data or create training",
   "assistant.placeholder": "Show landslide conditions in Cheongsong",
@@ -226,6 +227,7 @@ const korean: Record<TranslationKey, string> = {
     "데이터 연결을 사용할 수 없습니다. 도우미를 다시 열어 재시도하세요.",
   "assistant.welcome":
     "경북 공공데이터를 질문하거나 훈련 상황을 시작하세요. 훈련 이벤트는 대시보드와 모바일 앱에 동시에 표시됩니다.",
+  "assistant.runningTool": "{tool} 조회 중…",
   "assistant.checking": "공공데이터 확인 중",
   "assistant.askLabel": "데이터 질문 또는 훈련 생성",
   "assistant.placeholder": "청송 산사태 상황을 보여줘",

@@ -43,6 +43,7 @@ button:focus-visible {
 .mobile-shell {
   position: relative;
   width: 100%;
+  max-width: 480px;
   height: 100dvh;
   min-height: 560px;
   margin: 0 auto;
@@ -53,13 +54,26 @@ button:focus-visible {
 .mobile-map,
 .mobile-map iframe {
   position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
+}
+
+.mobile-map {
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 58dvh;
+  min-height: 300px;
+}
+
+.mobile-map.is-sheet-collapsed {
+  height: 100dvh;
 }
 
 .mobile-map iframe {
+  inset: 0;
+  height: 100%;
   border: 0;
+  touch-action: none;
 }
 
 .map-loading {
@@ -80,25 +94,111 @@ button:focus-visible {
 .mobile-sheet {
   position: absolute;
   z-index: 3;
+  top: 58dvh;
   right: 0;
   bottom: 0;
   left: 0;
-  max-height: 61dvh;
   overflow-y: auto;
-  padding: 9px var(--space-page)
+  padding: 0 var(--space-page)
     max(18px, calc(env(safe-area-inset-bottom) + 12px));
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   background: var(--color-surface);
   box-shadow: 0 -12px 32px rgb(23 23 25 / 12%);
   overscroll-behavior: contain;
+  transition: transform 150ms ease-out;
+}
+
+.mobile-sheet.is-collapsed {
+  overflow: hidden;
+  transform: translateY(calc(100% - 64px));
+}
+
+.mobile-map-zoom {
+  position: absolute;
+  z-index: 2;
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid rgb(23 23 25 / 10%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 4px 16px rgb(23 23 25 / 12%);
+  backdrop-filter: blur(12px);
+}
+
+.mobile-map-zoom button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+}
+
+.mobile-map-zoom button + button {
+  border-top: 1px solid var(--color-line);
+}
+
+.mobile-map-zoom svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.fit-route-button {
+  position: absolute;
+  z-index: 2;
+  right: 14px;
+  bottom: 14px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgb(23 23 25 / 10%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 4px 16px rgb(23 23 25 / 12%);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(12px);
+}
+
+.fit-route-button:disabled {
+  opacity: 0.42;
+}
+
+.mobile-map.is-sheet-collapsed .fit-route-button {
+  bottom: 78px;
+}
+
+.sheet-toggle {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  padding: 18px 0 4px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .sheet-handle {
+  position: absolute;
+  top: 8px;
+  left: 50%;
   width: 34px;
   height: 4px;
-  margin: 0 auto 13px;
   border-radius: 2px;
   background: var(--color-line);
+  transform: translateX(-50%);
 }
 
 .mobile-intro {
@@ -173,27 +273,19 @@ button:focus-visible {
   line-height: 1.45;
 }
 
-.acknowledge-button {
-  width: 100%;
-  min-height: 48px;
-  margin-top: 12px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--color-primary);
-  color: var(--color-surface);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.acknowledge-button:disabled {
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-}
-
 @media (max-height: 680px) {
+  .mobile-map {
+    height: 52dvh;
+  }
+
   .mobile-sheet {
-    max-height: 66dvh;
+    top: 52dvh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-sheet {
+    transition: none;
   }
 }
 
@@ -297,27 +389,100 @@ button:focus-visible {
   }
 }
 
-/* Asking has to be a deliberate tap: browsers refuse a permission prompt that
-   is not tied to a gesture, and a refused prompt cannot be asked again. */
-.enable-alerts {
+.notification-gate-backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
   display: grid;
-  gap: 2px;
-  width: 100%;
-  margin-top: 12px;
-  padding: 13px 16px;
-  border: 1px solid #fdba74;
-  border-radius: 12px;
-  background: #fff7ed;
-  color: #c2410c;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 650;
-  text-align: center;
-  cursor: pointer;
+  padding: var(--space-page);
+  place-items: center;
+  background: rgb(23 23 25 / 52%);
+  backdrop-filter: blur(8px);
 }
 
-.enable-alerts small {
-  font-size: 11px;
-  font-weight: 450;
-  opacity: 0.85;
+.notification-gate {
+  width: min(100%, 350px);
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--color-surface);
+  box-shadow: 0 18px 48px rgb(23 23 25 / 24%);
+  text-align: center;
+}
+
+.notification-gate-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.notification-gate-icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.notification-gate > p {
+  margin: 0 0 5px;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notification-gate h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+
+.notification-gate > span {
+  display: block;
+  margin-top: 10px;
+  color: var(--color-ink-subtle);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.notification-gate-steps {
+  display: grid;
+  gap: 7px;
+  margin: 18px 0 0;
+  padding: 14px 14px 14px 34px;
+  border-radius: 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-ink-subtle);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.notification-gate .notification-gate-error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.notification-gate > button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.notification-gate > button:disabled {
+  opacity: 0.58;
 }
