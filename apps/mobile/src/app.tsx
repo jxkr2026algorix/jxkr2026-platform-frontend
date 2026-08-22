@@ -218,6 +218,11 @@ export function App() {
       createPlatformClient({
         apiUrl: import.meta.env.VITE_PLATFORM_API_URL ?? "/api/platform",
         regionCode: import.meta.env.VITE_PLATFORM_REGION_CODE ?? "47750",
+        // This screen is the audience view reached by QR: the people holding it
+        // are wherever the demo is, not in one particular county. Filtering to
+        // a home region means an exercise started anywhere else never arrives.
+        // A resident build would set this false and filter to their own county.
+        watchAllRegions: true,
       }),
     [],
   );
@@ -232,11 +237,15 @@ export function App() {
   /** Hazard the platform is actively streaming spread for, if any. */
   const [liveHazard, setLiveHazard] = useState<string | null>(null);
   /**
-   * A drill. Said plainly on screen and in the notification, because a drill
-   * that reads as real teaches people to ignore the next one — and the real
-   * one after that.
+   * Where the stream says the incident is. The polled event can only carry a
+   * normalized `map_origin`, which an incident raised elsewhere — from the
+   * assistant, or another console — never has.
    */
-  const [drill, setDrill] = useState(false);
+  const [streamedAt, setStreamedAt] = useState<{
+    lat: number;
+    lon: number;
+  } | null>(null);
+  const [streamDrill, setStreamDrill] = useState(false);
   const notifiedIncidentRef = useRef("");
   const blockedRouteRef = useRef("");
 
@@ -249,8 +258,15 @@ export function App() {
       onEvent: (streamEvent) => {
         if (streamEvent.kind === "frame")
           setLiveHazard(streamEvent.frame.hazard);
-        if (streamEvent.kind === "incident")
-          setDrill(streamEvent.incident.drill);
+        if (streamEvent.kind === "incident") {
+          setStreamDrill(streamEvent.incident.drill);
+          const { lat, lon } = streamEvent.incident;
+          setStreamedAt(
+            typeof lat === "number" && typeof lon === "number"
+              ? { lat, lon }
+              : null,
+          );
+        }
       },
     });
     return close;
@@ -340,6 +356,15 @@ export function App() {
     [mapLocation.origin],
   );
 
+  // Either channel is enough. A phone that scans the QR after the exercise
+  // has started never sees the stream event that announced it, and a drill it
+  // reads as real teaches the person holding it to ignore the next one.
+  // Said plainly on screen and in the notification, because a drill that reads
+  // as real teaches people to ignore the next one — and the real one after.
+  const drill =
+    streamDrill || event?.drill === true || event?.mode === "training";
+  const declaredAt = streamedAt ?? event?.at ?? null;
+
   const best = plan ? recommendedLeg(plan) : undefined;
   const routeCamera = useMemo(
     () => (best ? cameraForRoute(best.geometry) : null),
@@ -390,12 +415,12 @@ export function App() {
               label: s.name,
               kind: "shelter" as const,
             })),
-          ...(event?.location
+          ...((declaredAt ?? event?.location)
             ? [
                 {
-                  id: `incident-${event.id}`,
-                  at: event.location,
-                  label: event.location.label,
+                  id: `incident-${event?.id ?? "declared"}`,
+                  at: declaredAt ?? event?.location ?? ORIGIN,
+                  ...(event?.headline ? { label: event.headline } : {}),
                   kind: "incident" as const,
                   selected: true,
                 },
@@ -462,7 +487,15 @@ export function App() {
     if (routeCamera) {
       postMapCommand({ type: "map:set-camera", payload: routeCamera });
     }
-  }, [event, mapReady, plan, postMapCommand, routeCamera, shelters]);
+  }, [
+    declaredAt,
+    event,
+    mapReady,
+    plan,
+    postMapCommand,
+    routeCamera,
+    shelters,
+  ]);
 
   useEffect(() => {
     if (!event) return;

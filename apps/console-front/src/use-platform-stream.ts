@@ -2,6 +2,7 @@ import {
   createPlatformClient,
   type DisasterType,
   type EventDraft,
+  type IncidentDeclared,
   openSituationStream,
   type PlatformConnection,
   type PlatformEvent,
@@ -15,6 +16,7 @@ export function usePlatformStream() {
       createPlatformClient({
         apiUrl: import.meta.env.VITE_PLATFORM_API_URL ?? "/api/platform",
         regionCode: import.meta.env.VITE_PLATFORM_REGION_CODE ?? "47750",
+        watchAllRegions: true,
       }),
     [],
   );
@@ -33,11 +35,13 @@ export function usePlatformStream() {
   } | null>(null);
   const [streaming, setStreaming] = useState(false);
   /**
-   * Set while the open incident is a drill. It rides the stream rather than
-   * being inferred, because a drill that looks real teaches people to ignore
-   * the next real one.
+   * The incident the stream last declared, kept whole. The drill flag rides
+   * the stream rather than being inferred, because a drill that looks real
+   * teaches people to ignore the next real one; the coordinates ride it for a
+   * plainer reason — an incident declared from the assistant has no other way
+   * to tell the map which county it is in.
    */
-  const [drill, setDrill] = useState<{ title: string } | null>(null);
+  const [declared, setDeclared] = useState<IncidentDeclared | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   // Spread arrives as frames on the stream, not in a response body: the
@@ -50,11 +54,7 @@ export function usePlatformStream() {
         if (event.kind === "frame") {
           setFrame({ frame: event.frame, values: event.values });
         }
-        if (event.kind === "incident") {
-          setDrill(
-            event.incident.drill ? { title: event.incident.title } : null,
-          );
-        }
+        if (event.kind === "incident") setDeclared(event.incident);
       },
     });
     return close;
@@ -116,9 +116,31 @@ export function usePlatformStream() {
     setEvent(next);
   }, []);
 
+  // Either channel is enough. The stream is instant; the polled event is what
+  // a console opened after the exercise started has.
+  const drill = declared?.drill
+    ? { title: declared.title }
+    : event?.drill || event?.mode === "training"
+      ? { title: event.headline }
+      : null;
+
+  /**
+   * Where the open incident is, whichever channel said so first. Memoized on
+   * the coordinates themselves: a fresh object every render re-fires the
+   * effects that watch it, and those drive the map.
+   */
+  const lat = declared?.lat ?? event?.at?.lat ?? null;
+  const lon = declared?.lon ?? event?.at?.lon ?? null;
+  const incidentAt = useMemo(
+    () => (lat === null || lon === null ? null : { lat, lon }),
+    [lat, lon],
+  );
+
   return {
     client,
+    declared,
     drill,
+    incidentAt,
     frame,
     streaming,
     event,

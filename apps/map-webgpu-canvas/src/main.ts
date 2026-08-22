@@ -454,13 +454,28 @@ function handleCommand(command: DashboardToMap): void {
     case "map:ignite":
       engine.ignite(command.payload.x, command.payload.y);
       break;
-    case "map:trigger":
-      engine.triggerAt(
-        command.payload.hazard,
-        command.payload.x,
-        command.payload.y,
-      );
+    case "map:trigger": {
+      const at = toNormalized(command.payload);
+      if (!at) {
+        ack(false, "no-georeference");
+        return;
+      }
+      // Same routing as a click on the map. `engine.triggerAt` alone runs the
+      // coarse simulation grid, which at close zoom is a field of 646 m
+      // squares; the hazards the drainage model covers get the 23 m spread
+      // instead, so an incident arriving on the stream looks like one an
+      // operator placed by hand.
+      const hazard = command.payload.hazard;
+      const geo = geoRef ? mapPointToLatLon(at.x, at.y, geoRef) : null;
+      if (geo && (hazard === "flood" || hazard === "landslide")) {
+        void playLocalSpread("flood", geo.lat, geo.lon);
+      } else if (geo && hazard === "wildfire") {
+        void playLocalSpread("wildfire", geo.lat, geo.lon);
+      } else {
+        engine.triggerAt(hazard, at.x, at.y);
+      }
       break;
+    }
     case "map:set-overlay":
       engine.setOverlay(command.payload.enabled);
       break;

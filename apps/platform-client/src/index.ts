@@ -34,7 +34,7 @@ export {
   type PlatformEvent,
   type PlatformMessage,
 } from "./contracts";
-export { SCENARIO_TO_HAZARD } from "./incidents";
+export { HAZARD_TO_SCENARIO, SCENARIO_TO_HAZARD } from "./incidents";
 export {
   type RouteLeg,
   type RoutePlan,
@@ -57,7 +57,14 @@ export type PlatformConnection = "connecting" | "live" | "unavailable";
 
 type PlatformClientConfig = {
   readonly apiUrl: string;
+  /** The county an incident declared from this screen belongs to. */
   readonly regionCode: string;
+  /**
+   * Watch every county rather than just `regionCode`. The provincial console
+   * covers all 22 — filtering its own view to one of them hides an incident
+   * declared anywhere else, including one the assistant just started.
+   */
+  readonly watchAllRegions?: boolean;
   readonly pollIntervalMs?: number;
 };
 
@@ -288,7 +295,9 @@ export class PlatformClient {
         .get(this.incidentsUrl, {
           searchParams: {
             status: "open",
-            region_code: this.config.regionCode,
+            ...(this.config.watchAllRegions
+              ? {}
+              : { region_code: this.config.regionCode }),
             limit: 50,
             offset: 0,
           },

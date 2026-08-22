@@ -52,7 +52,7 @@
 | `map:set-view` | `{ mode }` | `flat`(2D 탑다운 지도), `tilted`(3D), `auto`. auto는 산불과 물 시각화가 핵심인 재난(`rain`/`flood`/`wildfire`/`landslide`/`tsunami`, 그리고 맑음+강우)에서 3D로 전환한다. 산불은 발화점 중심으로 3D 전환할 때 카메라가 천천히 회전해 진입한다. 수동 `flat`/`tilted`가 항상 우선. |
 | `map:sim-control` | `{ action, speed? }` | `play` \| `pause` \| `reset`. `speed`는 0.25–4 배속. `reset`은 물·불·산사태 상태를 초기화한다. |
 | `map:ignite` | `{ x, y }` | 정규화 좌표(0–1, 좌상단 원점)에 발화점 생성. (`map:trigger`의 산불 단축형) |
-| `map:trigger` | `{ hazard, x, y }` | 지정 지점에 재난 발생. `wildfire`=발화, `flood`=국지성 침수(물 주입), `landslide`=토석류 발생. 지도 클릭도 현재 시나리오 기준으로 동일하게 동작한다(맑음 제외). |
+| `map:trigger` | `{ hazard, x?, y?, lat?, lon? }` | 지정 지점에 재난 발생. 위치는 정규화 `{x,y}` 또는 실좌표 `{lat,lon}` 둘 다 허용(실측 지형이 없으면 `map:ack`에 `no-georeference` 오류). `wildfire`=발화, `flood`=국지성 침수(물 주입), `landslide`=토석류 발생. 지도 클릭도 현재 시나리오 기준으로 동일하게 동작한다(맑음 제외). |
 | `map:set-overlay` | `{ enabled }` | 위험 지역 오버레이 토글(기본 켜짐). 시나리오별 취약지(침수·산불·산사태·액상화·해안 침수·온열/한랭/고립/용수)를 해칭으로 표시. |
 | `map:set-basemap` | `{ style }` | 바닥 지도 전환: `satellite`(위성, 기본) \| `map`(구글맵풍 일반 지도, CARTO Voyager). 지도 타일은 백그라운드 로드되며 준비되는 즉시 크로스페이드. 현재 스타일은 `map:state.basemap`으로 보고. |
 | `map:set-camera` | `{ center?, distanceMeters? }` | 3D 카메라 이동. `center`는 정규화 `{x,y}` 또는 실좌표 `{lat,lon}` 둘 다 허용(실좌표는 georeference 기준으로 변환하며, 실측 지형이 없으면 `map:ack`에 `no-georeference` 오류). 2D 맵과의 실시간 동기화 훅(아래 참조). 역방향 동기화는 `map:state.camera`로 제공. |

@@ -261,8 +261,13 @@ export type DashboardCommand =
        * flood injects a water burst, landslide releases a debris flow.
        * Clicking the map does the same for the active scenario.
        */
+      /**
+       * Start a hazard at a point. Takes lat/lon as well as normalized
+       * coordinates: an incident off the stream knows where it is in the
+       * world, not where that lands on somebody's viewport.
+       */
       type: "map:trigger";
-      payload: MapPoint & { hazard: TriggerKind };
+      payload: AnyPoint & { hazard: TriggerKind };
     }
   | {
       /** Toggle the hazard-susceptibility zone overlay (default on). */

@@ -1,3 +1,7 @@
+import {
+  districtByCode,
+  PROVINCE_CODE,
+} from "@salgil/map-webgpu-canvas/districts";
 import type {
   BasemapStyle,
   DashboardCommand,
@@ -52,8 +56,19 @@ export function SituationControls({
   onEventDeclare,
   onReset,
 }: SituationControlsProps) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const controls = map.status.controls;
+  // The heading names what the operator is looking at. It used to be pinned to
+  // Cheongsong, so an incident declared in Andong put "Cheongsong operational
+  // map" above a map of Andong.
+  const selectedCode = controls.districtCode;
+  const district = selectedCode ? districtByCode(selectedCode) : undefined;
+  const title =
+    !selectedCode || selectedCode === PROVINCE_CODE || !district
+      ? t("map.titleProvince")
+      : t("map.titleDistrict", {
+          district: locale === "ko" ? district.name : district.nameEn,
+        });
   const basemapLabels: Readonly<Record<BasemapStyle, string>> = {
     satellite: t("map.satellite"),
     map: t("map.standard"),
@@ -65,7 +80,7 @@ export function SituationControls({
       aria-label={t("map.controls")}
     >
       <div className="panel-intro">
-        <h1 id="situation-title">{t("map.title")}</h1>
+        <h1 id="situation-title">{title}</h1>
       </div>
       <div className="rail-section">
         <EventControls

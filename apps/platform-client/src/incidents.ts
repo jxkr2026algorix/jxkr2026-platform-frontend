@@ -12,6 +12,9 @@ const incidentEvidenceSchema = z
     source: z.string().optional(),
     mode: z.enum(["live", "training"]).optional(),
     map_origin: mapPointSchema.optional(),
+    lat: z.number().optional(),
+    lon: z.number().optional(),
+    drill: z.boolean().optional(),
     rainfall_mm_per_hour: z.number().min(0).max(120).optional(),
   })
   .loose();
@@ -118,7 +121,7 @@ export const SCENARIO_TO_HAZARD: Record<DisasterType, string> = {
   nuclear: "nuclear",
 };
 
-const HAZARD_TO_SCENARIO: Readonly<Record<string, DisasterType>> = {
+export const HAZARD_TO_SCENARIO: Readonly<Record<string, DisasterType>> = {
   heavy_rain: "rain",
   flood: "flood",
   wildfire: "wildfire",
@@ -159,9 +162,16 @@ export function incidentToPlatformEvent(
   const type = HAZARD_TO_SCENARIO[incident.hazard];
   if (!type) return null;
   const copy = EVENT_COPY[type];
+  const evidence = incident.opening_evidence;
+  const at =
+    typeof evidence?.lat === "number" && typeof evidence?.lon === "number"
+      ? { lat: evidence.lat, lon: evidence.lon }
+      : undefined;
+  // The demo fallback only applies when nothing real is known. An incident
+  // that says where it is must not be moved to the sample site.
   const location =
-    incident.opening_evidence?.map_origin ??
-    (type === "wildfire" ? DEMO_LOCATION : undefined);
+    evidence?.map_origin ??
+    (type === "wildfire" && !at ? DEMO_LOCATION : undefined);
   return {
     id: incident.id,
     sequence: Date.parse(incident.updated_at),
@@ -180,6 +190,8 @@ export function incidentToPlatformEvent(
     instruction: incident.summary ?? copy.instruction,
     createdAt: incident.declared_at,
     ...(location ? { location } : {}),
+    ...(at ? { at } : {}),
+    ...(evidence?.drill ? { drill: true } : {}),
     ...(incident.opening_evidence?.rainfall_mm_per_hour === undefined
       ? {}
       : { rainfallMmPerHour: incident.opening_evidence.rainfall_mm_per_hour }),

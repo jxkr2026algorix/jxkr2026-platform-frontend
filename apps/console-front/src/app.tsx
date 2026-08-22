@@ -1,6 +1,10 @@
-import type { DashboardCommand } from "@salgil/map-webgpu-canvas/protocol";
+import type {
+  DashboardCommand,
+  TriggerKind,
+} from "@salgil/map-webgpu-canvas/protocol";
 import {
   type DisasterType,
+  HAZARD_TO_SCENARIO,
   type PlatformEvent,
   SCENARIO_TO_HAZARD,
 } from "@salgil/platform-client";
@@ -10,10 +14,22 @@ import { AssistantDrawer } from "./components/AssistantDrawer";
 import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
 import { MapCanvas } from "./components/MapCanvas";
 import { useI18n } from "./i18n";
+import { districtAt } from "./pages/evacuation-map";
 import { SituationPage } from "./pages/situation-page";
 import { useSidebarTheme } from "./theme";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
+
+/** Hazards that start at a point, so a trigger has somewhere to go. */
+const POINT_HAZARDS: readonly DisasterType[] = [
+  "wildfire",
+  "flood",
+  "landslide",
+  "earthquake",
+  "tsunami",
+  "nuclear",
+  "chemical",
+];
 
 export function App() {
   const { t } = useI18n();
@@ -208,6 +224,46 @@ export function App() {
     // The district stays: reset clears the incident, not where the operator
     // is looking.
   };
+
+  /**
+   * An incident declared on the stream — by the assistant, or by another
+   * console — is shown where it actually is. The polling path can only offer
+   * a normalized `map_origin`, which an incident raised from outside this
+   * browser never has; the stream carries real coordinates, so the map is
+   * driven from those.
+   */
+  useEffect(() => {
+    const scenario = platform.declared
+      ? HAZARD_TO_SCENARIO[platform.declared.hazard]
+      : platform.event?.type;
+    const point = platform.incidentAt;
+    if (!scenario || !point) return;
+    const { lat, lon } = point;
+    const district = districtAt(lat, lon);
+    if (district) {
+      map.send({ type: "map:focus-district", payload: { code: district } });
+    }
+    map.send({ type: "map:set-scenario", payload: { scenario } });
+    // Only hazards that start somewhere get a trigger. A heatwave has no
+    // ignition point, and asking the map for one lands the whole county
+    // under a hazard the model never placed there.
+    if (POINT_HAZARDS.includes(scenario)) {
+      map.send({
+        type: "map:trigger",
+        payload: { hazard: scenario as TriggerKind, lat, lon },
+      });
+      // Close in on the origin. Framed to the whole county the fire is a few
+      // pixels across and the operator sees nothing happen at all.
+      map.send({
+        type: "map:set-camera",
+        payload: {
+          center: { lat, lon },
+          distanceMeters: scenario === "earthquake" ? 60_000 : 24_000,
+        },
+      });
+    }
+    map.send({ type: "map:sim-control", payload: { action: "play" } });
+  }, [map.send, platform.declared, platform.event, platform.incidentAt]);
 
   // Platform-computed spread reaches the map as-is. The renderer draws the
   // field it is given; it does not decide how a hazard behaves.

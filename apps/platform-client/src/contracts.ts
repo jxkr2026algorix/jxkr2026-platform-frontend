@@ -65,6 +65,18 @@ export const platformEventSchema = z.object({
   instruction: z.string(),
   createdAt: z.string(),
   location: mapPointSchema.optional(),
+  /**
+   * Where the incident actually is. `location` is a normalized viewport point,
+   * which an incident raised outside this browser — from the assistant, or
+   * another console — has no way to produce.
+   */
+  at: z.object({ lat: z.number(), lon: z.number() }).optional(),
+  /**
+   * A drill. Carried on the event, not only on the live stream: a phone that
+   * scans the QR after the exercise starts learns about it by polling, and a
+   * drill that reads as real teaches people to ignore the next one.
+   */
+  drill: z.boolean().optional(),
   rainfallMmPerHour: z.number().min(0).max(120).optional(),
   zones: z.array(riskZoneSchema).optional(),
 });
