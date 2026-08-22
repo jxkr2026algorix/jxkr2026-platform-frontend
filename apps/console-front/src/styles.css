@@ -1950,13 +1950,14 @@ tbody tr:last-child td {
 }
 
 .app-shell.view-situation {
-  --panel-intro-top: 128px;
+  --panel-intro-top: 64px;
 }
 
 .operations-panel-left {
   bottom: 16px;
   max-height: none;
   height: calc(100dvh - 32px);
+  padding-bottom: 72px;
   overflow-y: auto;
 }
 
@@ -2109,10 +2110,14 @@ tbody tr:last-child td {
 
 .brand {
   width: 300px;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .mobile-qr {
+  position: fixed;
+  z-index: 31;
+  bottom: 32px;
+  left: 32px;
   display: grid;
   width: 42px;
   height: 42px;
@@ -2126,9 +2131,15 @@ tbody tr:last-child td {
   right: 32px;
   bottom: 32px;
   left: auto;
-  width: 256px;
-  min-height: 42px;
-  justify-content: flex-start;
+  width: 48px;
+  min-height: 48px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.assistant-launcher span {
+  display: none;
 }
 
 .assistant-drawer,

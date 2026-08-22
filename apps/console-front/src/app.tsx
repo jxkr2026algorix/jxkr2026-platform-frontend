@@ -180,14 +180,10 @@ export function App() {
             <img src="/salgil-mark.svg" alt="" />
             <strong>Salgil</strong>
           </span>
-          <span
-            className="mobile-qr"
-            role="img"
-            aria-label="Mobile demo QR code"
-          >
-            <QRCode value={mobileUrl} size={42} level="M" />
-          </span>
         </NavLink>
+        <span className="mobile-qr" role="img" aria-label="Mobile demo QR code">
+          <QRCode value={mobileUrl} size={42} level="M" />
+        </span>
       </aside>
 
       <div className="workspace">

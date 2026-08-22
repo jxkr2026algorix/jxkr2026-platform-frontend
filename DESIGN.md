@@ -66,7 +66,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 - Base spacing unit: 8px, with 4px and 12px half-steps where density requires them.
 - Control gaps: 8px; row padding: 12–16px; section gaps: 24–32px.
-- Desktop shell: one full-bleed map fixed to `100dvh`. Full-height floating left and right rails frame the renderer with the existing 16px safe-area inset, blur, radius, and shadow. Product identity, mobile QR, and event controls occupy the left rail; district context occupies the right rail. Mobile is a separate client and is entered only through the QR code.
+- Desktop shell: one full-bleed map fixed to `100dvh`. Full-height floating left and right rails frame the renderer with the existing 16px safe-area inset, blur, radius, and shadow. Product identity and event controls begin directly below one compact header row in the left rail; the mobile QR occupies the lower-left safe area. District context occupies the right rail. Mobile is a separate client and is entered only through the QR code.
 - Map workspace: the renderer owns the entire viewport. Event, map-view, basemap, and a compact district selector share one left rail. The right rail is reserved for the selected district's weather snapshot, platform-alert summary, and a compact three-item recent-event timeline. Static district lists, community priority, and selected-community inspection remain absent.
 - Map scroll ownership: the application shell is fixed to `100dvh`; the map never scrolls. The left operations rail owns vertical scroll only when its content exceeds the viewport.
 - Console scope: desktop operations only, verified at 1280×800 and 1440×900. Narrow-screen console behavior is not part of the acceptance surface; resident and field workflows belong to `apps/mobile`.
@@ -154,7 +154,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 ### Public data assistant
 
-- Structure: one compact launcher at the lower-right of the right rail opens a full-height right-side evidence drawer. The drawer temporarily replaces the district context so the map remains unobstructed.
+- Structure: one 48px circular icon launcher at the lower-right of the right rail opens a full-height right-side evidence drawer. Its accessible name carries the text label. The drawer temporarily replaces the district context so the map remains unobstructed.
 - Material: the drawer uses the same 94% neutral floating surface, quiet border, 18px blur, and restrained shadow as dense operational reading surfaces. Messages remain row-led; only the operator message gets one weak neutral fill.
 - Content: questions are routed to the SALGIL public-data MCP. Explicit training requests invoke the platform event tool path and are labelled as training in every client. Data answers show incomplete-source warnings, observation time, and source links when supplied; the assistant never decides an evacuation priority or invents missing data.
 - Scroll ownership: the transcript alone scrolls between the fixed header and fixed composer. Long source URLs wrap without widening the drawer.
