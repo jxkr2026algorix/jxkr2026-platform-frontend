@@ -75,7 +75,7 @@ function getMapLocation(): { src: string; origin: string } {
 const ORIGIN = {
   lat: 36.43,
   lon: 129.05,
-  label: "Demo location · Jinbo-myeon, Cheongsong",
+  label: "Demo location · Jinbo-myeon",
 } as const;
 
 const DEMO_SHELTER: Shelter = {
@@ -583,7 +583,6 @@ export function App() {
         <div id="mobile-sheet-content" hidden={isSheetCollapsed}>
           <div className="mobile-intro">
             <div>
-              <p>{event ? "Current incident" : "Emergency guidance"}</p>
               <h1>{event?.headline ?? "No active incident in your area"}</h1>
             </div>
             <span>

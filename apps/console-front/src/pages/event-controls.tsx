@@ -58,12 +58,7 @@ export function EventControls({
   onDeclare,
   onReset,
 }: EventControlsProps) {
-  const { locale, t } = useI18n();
-  const selected = eventOptions.find((o) => o.type === selectedType);
-  const selectedLabel = selected ? t(selected.labelKey) : "";
-  // English reads better mid-sentence in lower case; Korean has no such case.
-  const hazardLabel =
-    locale === "en" ? selectedLabel.toLowerCase() : selectedLabel;
+  const { t } = useI18n();
 
   return (
     <div className="event-controls">
@@ -102,31 +97,19 @@ export function EventControls({
             key={option.type}
             type="button"
             aria-pressed={selectedType === option.type}
+            // The hazard button is the confirmation. A second "Declare X"
+            // step after picking X added a click without adding a decision:
+            // the mode segment above already says what the click will do.
             onClick={() =>
-              onSelect(selectedType === option.type ? null : option.type)
+              selectedType === option.type
+                ? onSelect(null)
+                : onDeclare(option.type, mode)
             }
           >
             <span>{t(option.labelKey)}</span>
           </button>
         ))}
       </fieldset>
-
-      {selected ? (
-        <div className="event-confirm">
-          <button
-            className={mode === "declare" ? "button critical" : "button"}
-            type="button"
-            disabled={publishing}
-            onClick={() => onDeclare(selected.type, mode)}
-          >
-            {publishing
-              ? t("event.declaring")
-              : t(mode === "declare" ? "event.declareReal" : "event.simulate", {
-                  hazard: hazardLabel,
-                })}
-          </button>
-        </div>
-      ) : null}
 
       {placementArmed ? (
         <p className="placement-prompt" role="status">

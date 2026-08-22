@@ -3,17 +3,22 @@
   --color-ink-subtle: #5f6269;
   --color-ink-muted: #96999f;
   --color-primary: #2f6ff2;
+  --color-primary-hover: #2957e8;
   --color-primary-soft: #edf3ff;
   --color-critical: #b91c1c;
   --color-line: #e8e9ec;
+  --color-line-strong: #d1d5db;
   --color-surface: #ffffff;
-  --color-scrim: rgb(23 23 25 / 52%);
+  --color-surface-subtle: #f7f8fa;
+  --color-scrim: rgb(23 23 25 / 44%);
   --color-map-fallback: #dfe6e6;
   --space-page: 16px;
-  --control-height: 48px;
-  --radius-control: 10px;
-  --radius-sheet: 22px;
-  --shadow-overlay: 0 18px 48px rgb(23 23 25 / 24%);
+  --control-height: 52px;
+  --radius-control: 8px;
+  --radius-overlay: 12px;
+  --radius-sheet: 16px;
+  --shadow-control: 0 1px 2px rgb(23 23 25 / 10%);
+  --shadow-overlay: 0 8px 24px rgb(23 23 25 / 16%);
   color: var(--color-ink);
   background: var(--color-map-fallback);
   font-family:
@@ -107,8 +112,9 @@ button:focus-visible {
   padding: 0 var(--space-page)
     max(18px, calc(env(safe-area-inset-bottom) + 12px));
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  border-top: 1px solid var(--color-line);
   background: var(--color-surface);
-  box-shadow: 0 -12px 32px rgb(23 23 25 / 12%);
+  box-shadow: none;
   overscroll-behavior: contain;
   transition: transform 150ms ease-out;
 }
@@ -125,11 +131,10 @@ button:focus-visible {
   right: 14px;
   display: grid;
   overflow: hidden;
-  border: 1px solid rgb(23 23 25 / 10%);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 4px 16px rgb(23 23 25 / 12%);
-  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-control);
 }
 
 .mobile-map-zoom button {
@@ -145,6 +150,11 @@ button:focus-visible {
 
 .mobile-map-zoom button + button {
   border-top: 1px solid var(--color-line);
+}
+
+.mobile-map-zoom button:hover,
+.mobile-map-zoom button:active {
+  background: var(--color-surface-subtle);
 }
 
 .mobile-map-zoom svg {
@@ -163,14 +173,21 @@ button:focus-visible {
   bottom: 14px;
   min-height: 44px;
   padding: 0 16px;
-  border: 1px solid rgb(23 23 25 / 10%);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 94%);
-  box-shadow: 0 4px 16px rgb(23 23 25 / 12%);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-control);
   color: var(--color-ink);
   font-size: 13px;
   font-weight: 700;
-  backdrop-filter: blur(12px);
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+.fit-route-button:hover,
+.fit-route-button:active {
+  background: var(--color-surface-subtle);
 }
 
 .fit-route-button:disabled {
@@ -211,13 +228,6 @@ button:focus-visible {
   justify-content: space-between;
   gap: 16px;
   padding-bottom: 17px;
-}
-
-.mobile-intro p {
-  margin: 0 0 4px;
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .mobile-intro h1 {
@@ -313,19 +323,17 @@ button:focus-visible {
 /* Shelters the router could not reach, kept visible with their reason:
    "none nearby" and "roads blocked" call for different actions. */
 .blocked-routes {
-  display: grid;
-  gap: 6px;
   margin: 12px 0 0;
   padding: 0;
+  border-top: 1px solid var(--color-line);
   list-style: none;
 }
 
 .blocked-routes li {
   display: grid;
   gap: 2px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #fef2f2;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-line);
 }
 
 .blocked-routes strong {
@@ -334,7 +342,7 @@ button:focus-visible {
 }
 
 .blocked-routes span {
-  color: #b91c1c;
+  color: var(--color-critical);
   font-size: 12px;
 }
 
@@ -342,7 +350,7 @@ button:focus-visible {
    network it came from is an ODbL derivative. Neither line may be removed. */
 .route-notice {
   margin: 12px 0 0;
-  color: #5c6068;
+  color: var(--color-ink-subtle);
   font-size: 11px;
   line-height: 1.5;
 }
@@ -351,7 +359,7 @@ button:focus-visible {
   display: block;
   margin-top: 4px;
   font-size: 10px;
-  color: #8a8f98;
+  color: var(--color-ink-muted);
 }
 
 /* Says the forecast is arriving now, not that it was true when the page
@@ -361,10 +369,10 @@ button:focus-visible {
   align-items: center;
   gap: 7px;
   margin: 12px 0 0;
-  padding: 9px 12px;
-  border-radius: 10px;
-  background: #fff7ed;
-  color: #c2410c;
+  padding: 11px 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-ink);
   font-size: 12px;
   font-weight: 600;
 }
@@ -373,25 +381,8 @@ button:focus-visible {
   content: "";
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: live-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.25;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-spread::before {
-    animation: none;
-  }
+  border-radius: 1px;
+  background: var(--color-primary);
 }
 
 .notification-gate-backdrop {
@@ -402,51 +393,23 @@ button:focus-visible {
   padding: var(--space-page);
   place-items: center;
   background: var(--color-scrim);
-  backdrop-filter: blur(8px);
 }
 
 .notification-gate {
   width: min(100%, 350px);
   padding: calc(var(--space-page) * 1.5);
-  border-radius: var(--radius-sheet);
+  border-radius: var(--radius-overlay);
   background: var(--color-surface);
   box-shadow: var(--shadow-overlay);
-  text-align: center;
-}
-
-.notification-gate-icon {
-  display: grid;
-  width: var(--control-height);
-  height: var(--control-height);
-  margin: 0 auto 16px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-}
-
-.notification-gate-icon svg {
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.notification-gate > p {
-  margin: 0 0 5px;
-  color: var(--color-primary);
-  font-size: 12px;
-  font-weight: 700;
+  text-align: left;
 }
 
 .notification-gate h2 {
   margin: 0;
-  font-size: 22px;
-  line-height: 1.25;
+  font-size: 24px;
+  line-height: 1.3;
   letter-spacing: -0.035em;
+  text-wrap: balance;
 }
 
 .notification-gate > span {
@@ -459,15 +422,30 @@ button:focus-visible {
 
 .notification-gate-steps {
   display: grid;
-  gap: 7px;
   margin: 18px 0 0;
-  padding: 14px 14px 14px 34px;
-  border-radius: var(--radius-control);
-  background: var(--color-primary-soft);
+  padding: 0;
+  border-top: 1px solid var(--color-line);
   color: var(--color-ink-subtle);
   font-size: 12px;
   line-height: 1.45;
+  list-style: none;
+  counter-reset: permission-step;
   text-align: left;
+}
+
+.notification-gate-steps li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-line);
+  counter-increment: permission-step;
+}
+
+.notification-gate-steps li::before {
+  color: var(--color-ink-muted);
+  content: counter(permission-step, decimal-leading-zero);
+  font-variant-numeric: tabular-nums;
 }
 
 .notification-gate .notification-gate-error {
@@ -486,6 +464,13 @@ button:focus-visible {
   color: var(--color-surface);
   font-size: 14px;
   font-weight: 700;
+  text-align: center;
+  transition: background-color 120ms ease-out;
+}
+
+.notification-gate > button:hover,
+.notification-gate > button:active {
+  background: var(--color-primary-hover);
 }
 
 .notification-gate > button:disabled {

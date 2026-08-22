@@ -10,6 +10,9 @@
   --action-hover: #2957e8;
   --primary-soft: #f2f5ff;
   --critical: #ef4444;
+  --annotation-line: rgba(23, 23, 25, 0.16);
+  --annotation-shadow: 0 1px 2px rgba(23, 23, 25, 0.12);
+  --annotation-radius: 4px;
   font-family:
     "Pretendard GOV Variable", "Pretendard GOV", Pretendard, -apple-system,
     "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -279,9 +282,6 @@ input:focus-visible {
   inset: 0;
 }
 
-/* One chip style for everything on the map. Colour is carried by the glyph
-   and, where it matters, the border — not by a filled pill, which would
-   compete with the terrain the operator is actually reading. */
 .annotation-chip {
   position: absolute;
   left: 0;
@@ -289,23 +289,36 @@ input:focus-visible {
   transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  border: 1px solid rgba(16, 24, 40, 0.14);
-  border-radius: 6px;
-  background: #fff;
-  box-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.16),
-    0 2px 8px rgba(16, 24, 40, 0.1);
-  color: #171719;
+  gap: 5px;
+  padding: 6px 9px;
+  border: 1px solid var(--annotation-line);
+  border-radius: var(--annotation-radius);
+  background: var(--surface);
+  box-shadow: var(--annotation-shadow);
+  color: var(--ink);
   font-family:
     "Pretendard GOV", "Pretendard GOV Variable", Pretendard, sans-serif;
   font-size: 12px;
   font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   white-space: nowrap;
   pointer-events: none;
+  translate: 0 -13px;
+}
+
+.annotation-chip::after {
+  position: absolute;
+  z-index: -1;
+  bottom: -4px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--annotation-line);
+  border-bottom: 1px solid var(--annotation-line);
+  background: inherit;
+  content: "";
+  transform: translateX(-50%) rotate(45deg);
 }
 
 .annotation-chip[hidden] {
@@ -319,75 +332,62 @@ input:focus-visible {
   color: var(--chip-accent, #3366ff);
 }
 
-/* A hazard alert inverts: dark ground, white text. It is the one thing on
-   the map that must be found before anything else, and inversion separates it
-   from every reference chip without adding another colour. The glyph keeps
-   the severity accent so the level still reads at a glance. */
 .annotation-chip.is-hazard,
 .annotation-chip.is-blocked {
-  border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(12, 14, 18, 0.86);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 4px 14px rgba(0, 0, 0, 0.24);
-  color: #fff;
-}
-
-/* Severity is carried by a leading rule rather than a tinted background,
-   which would fight the terrain underneath. */
-.annotation-chip.is-hazard::before,
-.annotation-chip.is-blocked::before {
-  content: "";
-  flex: none;
-  align-self: stretch;
-  width: 2px;
-  margin: -1px 1px -1px -3px;
-  border-radius: 2px;
-  background: var(--chip-accent, #ef4444);
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .annotation-chip.is-route {
   padding: 4px 8px;
   font-size: 11px;
   font-weight: 550;
-  color: #3f4450;
+  color: var(--ink-subtle);
+  translate: 0 -10px;
 }
 
 .annotation-chip.is-selected {
-  border-color: var(--chip-accent, #3366ff);
-  box-shadow:
-    0 0 0 1px var(--chip-accent, #3366ff),
-    0 2px 10px rgba(16, 24, 40, 0.16);
+  --annotation-line: var(--chip-accent, var(--action));
+  box-shadow: var(--annotation-shadow);
+  translate: 0 20px;
+}
+
+.annotation-chip.is-selected::after {
+  top: -4px;
+  bottom: auto;
+  border: 0;
+  border-top: 1px solid var(--annotation-line);
+  border-left: 1px solid var(--annotation-line);
 }
 
 /* An activatable alert is the only place the overlay takes pointer input:
    pressing it runs the simulation from the predicted origin. Everything else
    stays transparent so the map can still be worked through it. */
 /* The transform is rewritten every frame to track the map, so it must never
-   be transitioned: an eased transform leaves the chip chasing a position that
-   is always one transition behind, which reads as the label detaching from
-   the map. Hover growth goes on the independent `scale` property instead. */
+   be transitioned: only colour, border, and shadow may respond to hover. */
 .annotation-chip.is-actionable {
   pointer-events: auto;
   cursor: pointer;
   transition:
-    scale 0.12s ease-out,
+    background-color 0.12s ease-out,
+    border-color 0.12s ease-out,
     box-shadow 0.12s ease-out;
 }
 
 .annotation-chip.is-actionable:hover,
 .annotation-chip.is-actionable:focus-visible {
-  scale: 1.03;
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--chip-accent, #ef4444) 22%, transparent),
-    0 2px 10px rgba(16, 24, 40, 0.18);
-  outline: none;
+  --annotation-line: var(--chip-accent, var(--critical));
+  background: var(--surface-subtle);
+  box-shadow: var(--annotation-shadow);
 }
 
 .annotation-chip.is-actionable:active {
-  scale: 0.985;
+  background: var(--primary-soft);
+}
+
+.annotation-chip.is-actionable:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {

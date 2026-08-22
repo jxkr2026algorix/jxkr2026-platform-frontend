@@ -47,7 +47,7 @@ const english = {
   "event.simulate": "Simulate {hazard}",
   "event.declareReal": "Declare {hazard}",
   "event.placeArea":
-    "Drag over the map to size the area, then click to place it.",
+    "Click the map where the hazard is — the ring shows the area.",
   "event.reset": "Reset board",
   "district.label": "District",
   "district.province": "Gyeongsangbuk-do",
@@ -173,7 +173,8 @@ const korean: Record<TranslationKey, string> = {
   "event.modeHint.declare": "상황을 기록하고 주민에게 알립니다.",
   "event.simulate": "{hazard} 시뮬레이션",
   "event.declareReal": "{hazard} 상황 선포",
-  "event.placeArea": "지도를 클릭해 영역을 배치하세요.",
+  "event.placeArea":
+    "재난이 발생한 지점을 지도에서 클릭하세요 — 원이 범위입니다.",
   "event.reset": "상황판 초기화",
   "district.label": "지역",
   "district.province": "경상북도",

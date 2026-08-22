@@ -274,8 +274,6 @@ function activateZone(zone: {
 const SPREAD_MINUTES = 120;
 const SPREAD_STEP_MINUTES = 2;
 const SPREAD_FRAME_MS = 90;
-/** Frames the finished extent is held for before the loop restarts. */
-const SPREAD_HOLD_STEPS = 18;
 
 let spreadTimer: number | null = null;
 
@@ -324,20 +322,21 @@ async function playLocalSpread(
   let minutes = 0;
   const step = () => {
     if (!engine) return;
-    // Negative minutes are the hold: keep showing the finished extent.
-    const at = minutes < 0 ? SPREAD_MINUTES : minutes;
     applyHazardField(
       hazard === "wildfire"
-        ? wildfireFieldAt(terrain, origin, { x: 1, y: 0.35 }, at)
-        : floodFieldAt(terrain, rainfall, at),
+        ? wildfireFieldAt(terrain, origin, { x: 1, y: 0.35 }, minutes)
+        : floodFieldAt(terrain, rainfall, minutes),
     );
-    minutes += SPREAD_STEP_MINUTES;
-    if (minutes > SPREAD_MINUTES) {
-      // Hold the full extent before restarting. Snapping from the complete
-      // network back to a bare trunk every few seconds reads as a glitch
-      // rather than as the forecast looping.
-      minutes = -SPREAD_HOLD_STEPS * SPREAD_STEP_MINUTES;
+    if (minutes >= SPREAD_MINUTES) {
+      // Plays once and stops on the two-hour extent. Looping made the fire
+      // grow, vanish and grow again, which reads as a broken animation rather
+      // than a forecast — and a forecast that resets says nothing about what
+      // happens next.
+      stopSpreadPlayback();
+      showStatus(`+${SPREAD_MINUTES} min forecast`, 4000);
+      return;
     }
+    minutes += SPREAD_STEP_MINUTES;
   };
   if (hazard === "wildfire") {
     // The field carries the extent; smoke and embers still come from the
@@ -812,6 +811,9 @@ async function main(): Promise<void> {
   // keeps free navigation so the renderer stays workable in development.
   const navigable = params.get("interaction") !== "0";
   engine.setNavigable(navigable);
+  // Only the standalone dev panel places a hazard by bare tap. Embedded hosts
+  // arm placement explicitly, and the resident view never places anything.
+  engine.setTapTriggers(!bridge.embedded);
   // 2D by default: the operating picture is read as a plan, not a landscape.
   engine.setViewMode("flat");
 

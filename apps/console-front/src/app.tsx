@@ -168,10 +168,16 @@ export function App() {
    * Confirm the pick. Every hazard is placed on the map first — a disaster
    * without a location cannot be simulated or routed around.
    */
+  /**
+   * Picking a hazard arms the map straight away. The mode segment already
+   * says what the click will do, so a second confirm step was a click without
+   * a decision in it.
+   */
   const handleEventDeclare = (
     type: DisasterType,
     mode: "simulate" | "declare",
   ) => {
+    platform.setSelectedType(type);
     setPlacementArmed(true);
     setPlacementMode(mode);
     // The map takes the area; nothing is published until the operator marks

@@ -92,12 +92,6 @@ export function NotificationPermissionGate() {
         aria-describedby="notification-gate-description"
         onKeyDown={handleKeyDown}
       >
-        <div className="notification-gate-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
-          </svg>
-        </div>
-        <p>Emergency alerts</p>
         <h2 id="notification-gate-title">{title}</h2>
         <span id="notification-gate-description">{description}</span>
 

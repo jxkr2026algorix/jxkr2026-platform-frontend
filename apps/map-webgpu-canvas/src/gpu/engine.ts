@@ -205,6 +205,12 @@ export class Engine {
   private armedHazard: TriggerKind | null = null;
   private armedRadius = 6000;
   /**
+   * Whether a bare tap starts a hazard. Off for embedded hosts, which arm
+   * placement explicitly; on standalone, where it is the dev panel's only way
+   * to place one.
+   */
+  private tapTriggers = false;
+  /**
    * Rainfall footprint in normalized coordinates. A radius of 10 means
    * province-wide, which the sim reads as "no footprint".
    */
@@ -288,6 +294,10 @@ export class Engine {
         this.onPlace?.(hazard, point, this.armedRadius);
         return;
       }
+      // Tapping the map only starts a hazard where the host asked for it.
+      // The resident view embeds the same renderer and is read-only: a tap
+      // there was starting a simulation on their phone.
+      if (!this.tapTriggers) return;
       const hazard = CLICK_TRIGGER[this.scenario];
       if (!hazard) return;
       this.triggerAt(hazard, point.x, point.y);
@@ -752,6 +762,11 @@ export class Engine {
 
   setNavigable(navigable: boolean): void {
     this.camera.setNavigable(navigable);
+  }
+
+  /** Allow a bare tap to start a hazard. Read-only hosts leave this off. */
+  setTapTriggers(enabled: boolean): void {
+    this.tapTriggers = enabled;
   }
 
   /** Arm the next map click to place an incident area, or disarm with null. */
