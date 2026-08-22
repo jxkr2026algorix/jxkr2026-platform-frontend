@@ -2,8 +2,10 @@ import {
   createPlatformClient,
   type DisasterType,
   type EventDraft,
+  openSituationStream,
   type PlatformConnection,
   type PlatformEvent,
+  type PredictionFrame,
 } from "@salgil/platform-client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -24,7 +26,28 @@ export function usePlatformStream() {
   const [connection, setConnection] =
     useState<PlatformConnection>("connecting");
   const [publishing, setPublishing] = useState(false);
+  /** Latest hazard-field frame from the platform, with its grid decoded. */
+  const [frame, setFrame] = useState<{
+    readonly frame: PredictionFrame;
+    readonly values: Float32Array;
+  } | null>(null);
+  const [streaming, setStreaming] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Spread arrives as frames on the stream, not in a response body: the
+  // first horizon is worth drawing long before the last one exists.
+  useEffect(() => {
+    const close = openSituationStream({
+      apiUrl: import.meta.env.VITE_PLATFORM_API_URL ?? "/api/platform",
+      onConnectionChange: setStreaming,
+      onEvent: (event) => {
+        if (event.kind === "frame") {
+          setFrame({ frame: event.frame, values: event.values });
+        }
+      },
+    });
+    return close;
+  }, []);
 
   useEffect(() => {
     const unsubscribe = client.subscribe((message) => {
@@ -83,6 +106,8 @@ export function usePlatformStream() {
 
   return {
     client,
+    frame,
+    streaming,
     event,
     previewEvent,
     selectedType,

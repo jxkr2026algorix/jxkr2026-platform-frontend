@@ -171,6 +171,10 @@ export function useMapBridge() {
   const [pointSelection, setPointSelection] = useState<{
     readonly hazard: TriggerKind;
     readonly at: MapPoint;
+    /** Real coordinate of the marked origin, when the map has a georeference. */
+    readonly lat?: number;
+    readonly lon?: number;
+    readonly radiusMeters?: number;
     readonly nonce: number;
   } | null>(null);
   const controlsRef = useRef<MapControlState>(initialMapControls);
@@ -284,6 +288,15 @@ export function useMapBridge() {
         setPointSelection({
           hazard: message.payload.hazard,
           at: message.payload.at,
+          ...(message.payload.lat !== undefined
+            ? { lat: message.payload.lat }
+            : {}),
+          ...(message.payload.lon !== undefined
+            ? { lon: message.payload.lon }
+            : {}),
+          ...(message.payload.radiusMeters !== undefined
+            ? { radiusMeters: message.payload.radiusMeters }
+            : {}),
           nonce: Date.now(),
         });
       }

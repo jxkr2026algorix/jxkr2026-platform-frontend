@@ -44,6 +44,13 @@ export {
   type TransportMode,
   transportModes,
 } from "./routing";
+export {
+  decodeFrameValues,
+  openSituationStream,
+  type PredictionFrame,
+  type SharedRenderState,
+  type StreamEvent,
+} from "./stream";
 
 export type PlatformConnection = "connecting" | "live" | "unavailable";
 
@@ -179,6 +186,64 @@ export class PlatformClient {
       .get(`${this.baseUrl}/shelters?${search}`, { retry: 0, timeout: 8_000 })
       .json<unknown>();
     return z.array(shelterSchema).parse(response);
+  }
+
+  /**
+   * Ask the platform to compute spread for an incident. Frames arrive on the
+   * situation stream, not in this response — the first one is worth showing
+   * before the last one exists.
+   */
+  async startSpread(request: {
+    hazard: string;
+    lat: number;
+    lon: number;
+    incidentId?: string;
+    regionCode?: string;
+    sizeMeters?: number;
+    horizonsMinutes?: readonly number[];
+  }): Promise<{ horizonsMinutes: number[] }> {
+    const response = await ky
+      .post(`${this.baseUrl}/stream/spread`, {
+        json: {
+          hazard: request.hazard,
+          lat: request.lat,
+          lon: request.lon,
+          ...(request.incidentId ? { incident_id: request.incidentId } : {}),
+          ...(request.regionCode ? { region_code: request.regionCode } : {}),
+          ...(request.sizeMeters ? { size_m: request.sizeMeters } : {}),
+          ...(request.horizonsMinutes
+            ? { horizons_minutes: [...request.horizonsMinutes] }
+            : {}),
+        },
+        retry: 0,
+        timeout: 10_000,
+      })
+      .json<{ horizons_minutes?: number[] }>();
+    return { horizonsMinutes: response.horizons_minutes ?? [] };
+  }
+
+  /** Broadcast what this screen is looking at, so the others can follow. */
+  async shareRenderState(state: {
+    districtCode?: string | null;
+    scenario?: string | null;
+    viewMode?: string | null;
+    incidentId?: string | null;
+    source?: "console" | "mobile";
+  }): Promise<void> {
+    await ky
+      .post(`${this.baseUrl}/stream/render-state`, {
+        json: {
+          ...(state.districtCode ? { district_code: state.districtCode } : {}),
+          ...(state.scenario ? { scenario: state.scenario } : {}),
+          ...(state.viewMode ? { view_mode: state.viewMode } : {}),
+          ...(state.incidentId ? { incident_id: state.incidentId } : {}),
+          source: state.source ?? "console",
+        },
+        retry: 0,
+        timeout: 5_000,
+      })
+      .json<unknown>()
+      .catch(() => undefined);
   }
 
   /**

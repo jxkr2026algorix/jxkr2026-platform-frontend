@@ -1,5 +1,9 @@
 import type { DashboardCommand } from "@salgil/map-webgpu-canvas/protocol";
-import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
+import {
+  type DisasterType,
+  type PlatformEvent,
+  SCENARIO_TO_HAZARD,
+} from "@salgil/platform-client";
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import { Navigate, NavLink, Route, Routes } from "react-router";
@@ -103,9 +107,20 @@ export function App() {
     if (!placementArmed || !selection) return;
     if (selection.hazard !== platform.selectedType) return;
     setPlacementArmed(false);
+    const placed = platform.selectedType;
+    if (selection.lat !== undefined && selection.lon !== undefined) {
+      void platform.client
+        .startSpread({
+          hazard: SCENARIO_TO_HAZARD[placed],
+          lat: selection.lat,
+          lon: selection.lon,
+          sizeMeters: (selection.radiusMeters ?? 6000) * 2,
+        })
+        .catch(() => undefined);
+    }
     void platform
       .publish({
-        type: platform.selectedType,
+        type: placed,
         location: {
           x: selection.at.x,
           y: selection.at.y,
@@ -120,6 +135,7 @@ export function App() {
     placementArmed,
     platform.publish,
     platform.selectedType,
+    platform.client.startSpread,
   ]);
 
   /** Pick a hazard. Nothing is published until it is confirmed. */
@@ -165,6 +181,29 @@ export function App() {
     // The district stays: reset clears the incident, not where the operator
     // is looking.
   };
+
+  // Platform-computed spread reaches the map as-is. The renderer draws the
+  // field it is given; it does not decide how a hazard behaves.
+  useEffect(() => {
+    const latest = platform.frame;
+    if (!latest) return;
+    const { frame, values } = latest;
+    const [west, south, east, north] = frame.bbox;
+    map.send({
+      type: "map:set-hazard-field",
+      payload: {
+        field: {
+          hazard: frame.hazard,
+          bbox: [west ?? 0, south ?? 0, east ?? 0, north ?? 0],
+          width: frame.width,
+          height: frame.height,
+          values,
+          horizonMinutes: frame.horizon_minutes,
+          isStub: frame.is_stub,
+        },
+      },
+    });
+  }, [map.send, platform.frame]);
 
   const createTrainingEvent = (type: DisasterType): Promise<PlatformEvent> =>
     platform.publish({ type });
