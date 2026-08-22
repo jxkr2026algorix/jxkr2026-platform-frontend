@@ -1,0 +1,55 @@
+name: jxkr2026-platform-frontend
+
+x-frontend: &frontend
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+    interval: 30s
+    timeout: 3s
+    retries: 3
+    start_period: 5s
+
+services:
+  console:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WORKSPACE: "@salgil/console-front"
+        APP_DIR: apps/console-front
+        # Baked in at build time: the browser loads the map in an iframe,
+        # so this must be the URL the *client* can reach, not a compose hostname.
+        VITE_MAP_URL: ${VITE_MAP_URL:-http://localhost:8082}
+    image: salgil/console-front
+    ports:
+      - "${CONSOLE_PORT:-8080}:80"
+    depends_on:
+      - map
+
+  mobile:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WORKSPACE: "@salgil/mobile"
+        APP_DIR: apps/mobile
+    image: salgil/mobile
+    ports:
+      - "${MOBILE_PORT:-8081}:80"
+
+  map:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WORKSPACE: "@salgil/map-webgpu-canvas"
+        APP_DIR: apps/map-webgpu-canvas
+    image: salgil/map-webgpu-canvas
+    ports:
+      - "${MAP_PORT:-8082}:80"
