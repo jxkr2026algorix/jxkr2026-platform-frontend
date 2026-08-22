@@ -46,6 +46,7 @@ export {
 } from "./routing";
 export {
   decodeFrameValues,
+  type IncidentDeclared,
   openSituationStream,
   type PredictionFrame,
   type SharedRenderState,

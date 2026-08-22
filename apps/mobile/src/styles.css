@@ -4,11 +4,16 @@
   --color-ink-muted: #96999f;
   --color-primary: #2f6ff2;
   --color-primary-soft: #edf3ff;
+  --color-critical: #b91c1c;
   --color-line: #e8e9ec;
   --color-surface: #ffffff;
+  --color-scrim: rgb(23 23 25 / 52%);
   --color-map-fallback: #dfe6e6;
   --space-page: 16px;
+  --control-height: 48px;
+  --radius-control: 10px;
   --radius-sheet: 22px;
+  --shadow-overlay: 0 18px 48px rgb(23 23 25 / 24%);
   color: var(--color-ink);
   background: var(--color-map-fallback);
   font-family:
@@ -396,23 +401,23 @@ button:focus-visible {
   display: grid;
   padding: var(--space-page);
   place-items: center;
-  background: rgb(23 23 25 / 52%);
+  background: var(--color-scrim);
   backdrop-filter: blur(8px);
 }
 
 .notification-gate {
   width: min(100%, 350px);
-  padding: 24px;
-  border-radius: 18px;
+  padding: calc(var(--space-page) * 1.5);
+  border-radius: var(--radius-sheet);
   background: var(--color-surface);
-  box-shadow: 0 18px 48px rgb(23 23 25 / 24%);
+  box-shadow: var(--shadow-overlay);
   text-align: center;
 }
 
 .notification-gate-icon {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: var(--control-height);
+  height: var(--control-height);
   margin: 0 auto 16px;
   place-items: center;
   border-radius: 50%;
@@ -457,7 +462,7 @@ button:focus-visible {
   gap: 7px;
   margin: 18px 0 0;
   padding: 14px 14px 14px 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-primary-soft);
   color: var(--color-ink-subtle);
   font-size: 12px;
@@ -466,17 +471,17 @@ button:focus-visible {
 }
 
 .notification-gate .notification-gate-error {
-  color: #b91c1c;
+  color: var(--color-critical);
   font-weight: 600;
 }
 
 .notification-gate > button {
   width: 100%;
-  min-height: 48px;
+  min-height: var(--control-height);
   margin-top: 20px;
   padding: 0 18px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--color-primary);
   color: var(--color-surface);
   font-size: 14px;

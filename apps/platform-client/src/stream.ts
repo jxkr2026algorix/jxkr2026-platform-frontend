@@ -42,11 +42,31 @@ export const renderStateSchema = z.object({
 
 export type SharedRenderState = z.infer<typeof renderStateSchema>;
 
+export const incidentDeclaredSchema = z.object({
+  incident_id: z.string(),
+  code: z.string().nullish(),
+  title: z.string(),
+  hazard: z.string(),
+  region_name: z.string().nullish(),
+  /**
+   * A drill, not an incident. This has to travel with the event: a screen
+   * showing only the incident list has no other way to tell them apart, and a
+   * drill that looks real teaches people to ignore the next real one.
+   */
+  drill: z.boolean().default(false),
+  mode: z.string().nullish(),
+  lat: z.number().nullish(),
+  lon: z.number().nullish(),
+});
+
+export type IncidentDeclared = z.infer<typeof incidentDeclaredSchema>;
+
 export type StreamEvent =
   | { kind: "open" }
   | { kind: "frame"; frame: PredictionFrame; values: Float32Array }
   | { kind: "render-state"; state: SharedRenderState }
-  | { kind: "spread-complete"; frames: number };
+  | { kind: "spread-complete"; frames: number }
+  | { kind: "incident"; incident: IncidentDeclared };
 
 /** Decode the packed grid. Base64 float32 is six times smaller than JSON. */
 export function decodeFrameValues(frame: PredictionFrame): Float32Array {
@@ -114,6 +134,19 @@ export function openSituationStream(options: StreamOptions): () => void {
       });
     } catch (error) {
       console.warn("discarding malformed render state", error);
+    }
+  });
+
+  source.addEventListener("incident.declared", (event) => {
+    try {
+      options.onEvent({
+        kind: "incident",
+        incident: incidentDeclaredSchema.parse(
+          JSON.parse((event as MessageEvent<string>).data),
+        ),
+      });
+    } catch (error) {
+      console.warn("discarding malformed incident event", error);
     }
   });
 

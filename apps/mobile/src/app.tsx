@@ -20,10 +20,7 @@ import {
 } from "@salgil/platform-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NotificationPermissionGate } from "./notification-permission-gate";
-import {
-  notifyIncident,
-  notifyRouteBlocked,
-} from "./notifications";
+import { notifyIncident, notifyRouteBlocked } from "./notifications";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
@@ -234,6 +231,12 @@ export function App() {
   const [isSheetCollapsed, setIsSheetCollapsed] = useState(false);
   /** Hazard the platform is actively streaming spread for, if any. */
   const [liveHazard, setLiveHazard] = useState<string | null>(null);
+  /**
+   * A drill. Said plainly on screen and in the notification, because a drill
+   * that reads as real teaches people to ignore the next one — and the real
+   * one after that.
+   */
+  const [drill, setDrill] = useState(false);
   const notifiedIncidentRef = useRef("");
   const blockedRouteRef = useRef("");
 
@@ -246,6 +249,8 @@ export function App() {
       onEvent: (streamEvent) => {
         if (streamEvent.kind === "frame")
           setLiveHazard(streamEvent.frame.hazard);
+        if (streamEvent.kind === "incident")
+          setDrill(streamEvent.incident.drill);
       },
     });
     return close;
@@ -464,8 +469,15 @@ export function App() {
     const version = `${event.id}:${event.sequence}`;
     if (notifiedIncidentRef.current === version) return;
     notifiedIncidentRef.current = version;
-    notifyIncident(event.headline, event.instruction);
-  }, [event]);
+    // The notification arrives without the screen around it, so it carries
+    // the marker itself.
+    notifyIncident(
+      drill ? `[훈련] ${event.headline}` : event.headline,
+      drill
+        ? `훈련 상황입니다. 실제 재난이 아닙니다. ${event.instruction}`
+        : event.instruction,
+    );
+  }, [event, drill]);
 
   useEffect(() => {
     if (!plan) return;
@@ -541,6 +553,12 @@ export function App() {
           View full route
         </button>
       </div>
+
+      {drill ? (
+        <p className="drill-strip" role="status">
+          훈련 상황입니다 — 실제 재난이 아닙니다
+        </p>
+      ) : null}
 
       <section
         className={`mobile-sheet${isSheetCollapsed ? " is-collapsed" : ""}`}
@@ -623,7 +641,6 @@ export function App() {
               <small>{plan.attribution}</small>
             </p>
           ) : null}
-
         </div>
       </section>
 

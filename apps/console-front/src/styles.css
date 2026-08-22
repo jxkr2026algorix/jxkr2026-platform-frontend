@@ -2739,3 +2739,37 @@ tbody tr:last-child td {
     color: var(--ink);
   }
 }
+
+/* Across the top of the console. Not a colour tint on a panel: the whole
+   screen has to say this is an exercise, or someone acts on it. */
+.drill-banner {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 7px 16px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #1f2937,
+    #1f2937 14px,
+    #111827 14px,
+    #111827 28px
+  );
+  color: #fde68a;
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+}
+
+.drill-banner strong {
+  font-weight: 700;
+}
+
+.drill-banner span {
+  opacity: 0.72;
+}

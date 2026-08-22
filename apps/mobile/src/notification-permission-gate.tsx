@@ -12,6 +12,7 @@ export function NotificationPermissionGate() {
   const [requestError, setRequestError] = useState("");
   const [hasBypassedUnsupported, setHasBypassedUnsupported] = useState(false);
   const actionRef = useRef<HTMLButtonElement>(null);
+  const isOpen = permission !== "granted" && !hasBypassedUnsupported;
 
   const syncPermission = useCallback(() => {
     setPermission(notificationState());
@@ -29,19 +30,26 @@ export function NotificationPermissionGate() {
     };
   }, [syncPermission]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    actionRef.current?.focus();
+  }, [isOpen]);
+
   const handleRequest = useCallback(async () => {
     setIsRequesting(true);
     setRequestError("");
     try {
       setPermission(await requestNotifications());
     } catch {
-      setRequestError("Notification permission could not be requested. Try again.");
+      setRequestError(
+        "Notification permission could not be requested. Try again.",
+      );
     } finally {
       setIsRequesting(false);
     }
   }, []);
 
-  if (permission === "granted" || hasBypassedUnsupported) return null;
+  if (!isOpen) return null;
 
   const isDenied = permission === "denied";
   const isUnsupported = permission === "unsupported";
@@ -85,7 +93,7 @@ export function NotificationPermissionGate() {
         onKeyDown={handleKeyDown}
       >
         <div className="notification-gate-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
           </svg>
         </div>
@@ -110,7 +118,6 @@ export function NotificationPermissionGate() {
         <button
           ref={actionRef}
           type="button"
-          autoFocus
           disabled={isRequesting}
           onClick={handleAction}
         >

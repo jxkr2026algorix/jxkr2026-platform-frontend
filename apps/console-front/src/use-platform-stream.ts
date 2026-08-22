@@ -32,6 +32,12 @@ export function usePlatformStream() {
     readonly values: Float32Array;
   } | null>(null);
   const [streaming, setStreaming] = useState(false);
+  /**
+   * Set while the open incident is a drill. It rides the stream rather than
+   * being inferred, because a drill that looks real teaches people to ignore
+   * the next real one.
+   */
+  const [drill, setDrill] = useState<{ title: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   // Spread arrives as frames on the stream, not in a response body: the
@@ -43,6 +49,11 @@ export function usePlatformStream() {
       onEvent: (event) => {
         if (event.kind === "frame") {
           setFrame({ frame: event.frame, values: event.values });
+        }
+        if (event.kind === "incident") {
+          setDrill(
+            event.incident.drill ? { title: event.incident.title } : null,
+          );
         }
       },
     });
@@ -107,6 +118,7 @@ export function usePlatformStream() {
 
   return {
     client,
+    drill,
     frame,
     streaming,
     event,

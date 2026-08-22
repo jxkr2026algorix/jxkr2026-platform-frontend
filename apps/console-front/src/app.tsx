@@ -9,12 +9,14 @@ import { Navigate, Route, Routes } from "react-router";
 import { AssistantDrawer } from "./components/AssistantDrawer";
 import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
 import { MapCanvas } from "./components/MapCanvas";
+import { useI18n } from "./i18n";
 import { SituationPage } from "./pages/situation-page";
 import { useSidebarTheme } from "./theme";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
 
 export function App() {
+  const { t } = useI18n();
   const { sidebarTheme } = useSidebarTheme();
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [placementArmed, setPlacementArmed] = useState(false);
@@ -234,6 +236,14 @@ export function App() {
     >
       <MapCanvas map={map} />
       <DashboardBrandHeader mobileUrl={mobileUrl} />
+      {/* Across the top of the screen, not tucked into a panel: if the whole
+          view does not say this is an exercise, someone will act on it. */}
+      {platform.drill ? (
+        <div className="drill-banner" role="status">
+          <strong>{t("drill.banner")}</strong>
+          <span>{platform.drill.title}</span>
+        </div>
+      ) : null}
 
       <div className="workspace">
         <main
