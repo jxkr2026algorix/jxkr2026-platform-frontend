@@ -202,6 +202,8 @@ export class Engine {
   private fieldMeta = { kind: 0, threshold: 0, peak: 1 };
   private fieldBlend = 0;
   private fieldOn = false;
+  private armedHazard: TriggerKind | null = null;
+  private armedRadius = 6000;
   /**
    * Rainfall footprint in normalized coordinates. A radius of 10 means
    * province-wide, which the sim reads as "no footprint".
@@ -235,6 +237,10 @@ export class Engine {
   onError: ((code: "device-lost", message: string) => void) | null = null;
   /** Fired when a map click triggers a hazard (for UI feedback). */
   onTrigger: ((hazard: TriggerKind, at: MapPoint) => void) | null = null;
+  /** Fired when an armed placement click lands. */
+  onPlace:
+    | ((hazard: TriggerKind, at: MapPoint, radiusMeters: number) => void)
+    | null = null;
 
   private msaaTex: GPUTexture | null = null;
   private depthTex: GPUTexture | null = null;
@@ -264,10 +270,18 @@ export class Engine {
     this.camera = new OrbitCamera(terrain.worldSize, terrain.sampleHeight);
     this.camera.attach(canvas);
     this.camera.onTap = (clientX, clientY) => {
-      const hazard = CLICK_TRIGGER[this.scenario];
-      if (!hazard) return;
       const point = this.pick(clientX, clientY);
       if (!point) return;
+      // Armed placement wins: the operator is marking an incident area, not
+      // poking the local simulation.
+      if (this.armedHazard) {
+        const hazard = this.armedHazard;
+        this.armedHazard = null;
+        this.onPlace?.(hazard, point, this.armedRadius);
+        return;
+      }
+      const hazard = CLICK_TRIGGER[this.scenario];
+      if (!hazard) return;
       this.triggerAt(hazard, point.x, point.y);
       this.onTrigger?.(hazard, point);
     };
@@ -723,6 +737,13 @@ export class Engine {
 
   setNavigable(navigable: boolean): void {
     this.camera.setNavigable(navigable);
+  }
+
+  /** Arm the next map click to place an incident area, or disarm with null. */
+  armPlacement(hazard: TriggerKind | null, radiusMeters?: number): void {
+    this.armedHazard = hazard;
+    if (radiusMeters && radiusMeters > 0) this.armedRadius = radiusMeters;
+    this.canvas.classList.toggle("placing", hazard !== null);
   }
 
   /** Step the zoom; the camera clamps so the terrain still covers the view. */

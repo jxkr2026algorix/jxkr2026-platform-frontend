@@ -126,6 +126,7 @@ export function App() {
   const handleEventSelect = (type: DisasterType | null) => {
     platform.setSelectedType(type);
     setPlacementArmed(false);
+    map.send({ type: "map:arm-placement", payload: { hazard: null } });
     if (type)
       map.send({ type: "map:set-scenario", payload: { scenario: type } });
   };
@@ -134,8 +135,17 @@ export function App() {
    * Confirm the pick. Every hazard is placed on the map first — a disaster
    * without a location cannot be simulated or routed around.
    */
-  const handleEventDeclare = (_type: DisasterType) => {
+  const handleEventDeclare = (type: DisasterType) => {
     setPlacementArmed(true);
+    // The map takes the area; nothing is published until the operator marks
+    // where the incident is.
+    map.send({
+      type: "map:arm-placement",
+      payload: {
+        hazard: type as never,
+        radiusMeters: 6000,
+      },
+    });
   };
 
   /**

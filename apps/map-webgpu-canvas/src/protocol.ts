@@ -345,6 +345,16 @@ export type DashboardCommand =
     }
   | {
       /**
+       * Arm the map to take an incident area. The next click places the
+       * origin and reports it back with the radius the operator set; passing
+       * null disarms. Every hazard is placed this way — there is no
+       * area-wide disaster to declare.
+       */
+      type: "map:arm-placement";
+      payload: { hazard: TriggerKind | null; radiusMeters?: number };
+    }
+  | {
+      /**
        * Replace the hazard field with an upstream-computed frame, or clear it
        * with `null`. This is how spread reaches the map: the renderer draws
        * the field it is given rather than simulating one.
@@ -441,7 +451,15 @@ export type MapEvent =
     }
   | {
       type: "map:point-selected";
-      payload: { hazard: TriggerKind; at: MapPoint };
+      payload: {
+        hazard: TriggerKind;
+        at: MapPoint;
+        /** Real coordinate of the origin, for the platform. */
+        lat?: number;
+        lon?: number;
+        /** Radius the operator marked, in metres. */
+        radiusMeters?: number;
+      };
     }
   | {
       /**
@@ -502,6 +520,7 @@ const COMMAND_TYPES: readonly string[] = [
   "map:set-district-overlay",
   "map:zoom",
   "map:set-hazard-field",
+  "map:arm-placement",
   "map:ping",
 ];
 

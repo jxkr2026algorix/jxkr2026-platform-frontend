@@ -256,19 +256,18 @@ function activateZone(zone: {
   showStatus("Simulating from the predicted origin", 3000);
 }
 
-/** Terrain of the loaded region, kept for the interim client-side fields. */
-let terrainRef: TerrainData | null = null;
-
 /**
  * Interim source for the hazard field while the platform's spread stream is
  * being built: compute the drainage-driven flood extent for a window around
  * the camera. Replaced wholesale once `map:set-hazard-field` is fed upstream.
  */
-async function computeLocalFloodField(sizeMeters = 12000): Promise<boolean> {
+async function computeFloodFieldAt(
+  lat: number,
+  lon: number,
+  sizeMeters = 12000,
+): Promise<boolean> {
   if (!engine || !geoRef) return false;
-  const center = engine.cameraCenter;
-  const { lat, lon } = mapPointToLatLon(center.x, center.y, geoRef);
-  const win = windowAround(lat, lon, sizeMeters);
+  const win = windowAround(lat, lon, Math.max(sizeMeters, 4000));
   showStatus("Computing flood extent…", 0);
   const field = await floodField(win, engine.rainfall || 60);
   if (!field) {
@@ -422,6 +421,14 @@ function handleCommand(command: DashboardToMap): void {
           payload: { code: "bad-command", message: String(error) },
         });
       });
+      break;
+    }
+    case "map:arm-placement": {
+      engine.armPlacement(command.payload.hazard, command.payload.radiusMeters);
+      showStatus(
+        command.payload.hazard ? "Click the map to mark the incident area" : "",
+        command.payload.hazard ? 0 : 1,
+      );
       break;
     }
     case "map:set-hazard-field": {
@@ -602,6 +609,30 @@ function wireEngine(target: Engine): void {
     bridge.send({ type: "map:error", payload: { code, message } });
     showFallback();
   };
+  /**
+   * A marked incident: report it with real coordinates and, for hazards the
+   * drainage model covers, compute the extent right there so the operator
+   * sees the consequence of the point they just picked.
+   */
+  target.onPlace = (hazard, at, radiusMeters) => {
+    const geo = geoRef ? mapPointToLatLon(at.x, at.y, geoRef) : null;
+    bridge.send({
+      type: "map:point-selected",
+      payload: {
+        hazard,
+        at,
+        ...(geo ? { lat: geo.lat, lon: geo.lon } : {}),
+        radiusMeters,
+      },
+    });
+    showStatus(`${HAZARD_LABELS[hazard]} area marked`, 2500);
+    if (geo && (hazard === "flood" || hazard === "landslide")) {
+      void computeFloodFieldAt(geo.lat, geo.lon, radiusMeters * 2);
+    } else {
+      engine?.triggerAt(hazard, at.x, at.y);
+    }
+  };
+
   target.onTrigger = (hazard, at) => {
     bridge.send({ type: "map:point-selected", payload: { hazard, at } });
     showStatus(`${HAZARD_LABELS[hazard]} origin selected`, 2500);
@@ -686,7 +717,6 @@ async function main(): Promise<void> {
   const region = initialRegion();
   const { terrain, geo, imagery, street } = await loadTerrain(region);
   geoRef = geo;
-  terrainRef = terrain;
   currentRegion = {
     centerLat: region.centerLat,
     centerLon: region.centerLon,
@@ -756,7 +786,12 @@ async function main(): Promise<void> {
     annotations.onActivateZone = activateZone;
     if (params.get("demo") === "flood") {
       // Give the terrain a moment to settle before the one-off computation.
-      setTimeout(() => void computeLocalFloodField(), 400);
+      setTimeout(() => {
+        if (!engine || !geoRef) return;
+        const c = engine.cameraCenter;
+        const at = mapPointToLatLon(c.x, c.y, geoRef);
+        void computeFloodFieldAt(at.lat, at.lon);
+      }, 400);
     }
     if (params.get("demo") === "annotations") {
       applyZones(DEMO_ZONES);

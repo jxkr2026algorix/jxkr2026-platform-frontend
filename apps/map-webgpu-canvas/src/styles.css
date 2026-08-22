@@ -408,3 +408,8 @@ input:focus-visible {
   border-radius: 4px;
   pointer-events: none;
 }
+
+/* Armed for placement: the cursor says the next click marks a place. */
+#gpu-canvas.placing {
+  cursor: crosshair;
+}

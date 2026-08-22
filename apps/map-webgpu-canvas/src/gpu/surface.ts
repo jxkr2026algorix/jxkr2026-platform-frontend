@@ -286,6 +286,16 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   // local sim, so it resolves at whatever the recipe produced — a stream
   // channel instead of a slab the size of a village.
   let fieldV = hazardField(in.uv);
+  // Feather the window edge. The frame is a rectangle the model happened to
+  // compute over, not a boundary of the hazard, so cutting it square draws a
+  // border that means nothing.
+  let fr = G.fieldRect;
+  var fEdge = 0.0;
+  if (fr.z > 0.0 && fr.w > 0.0) {
+    let fq = (in.uv - fr.xy) / vec2f(fr.z, fr.w);
+    fEdge = smoothstep(0.0, 0.06,
+      min(min(fq.x, 1.0 - fq.x), min(fq.y, 1.0 - fq.y)));
+  }
   let fBlend = G.fieldMeta.x;
   if (fBlend > 0.002 && fieldV > G.fieldMeta.z) {
     let kind = G.fieldMeta.y;
@@ -310,7 +320,7 @@ fn fs(in: VSOut) -> @location(0) vec4f {
     // visible it hazes the whole map; cut it and only the channels the water
     // actually runs down are drawn, which is what makes the branching legible.
     let onset = smoothstep(0.0, 0.13, norm);
-    albedo = mix(albedo, fCol, fBlend * onset * (0.5 + 0.45 * ramp));
+    albedo = mix(albedo, fCol, fBlend * fEdge * onset * (0.5 + 0.45 * ramp));
   }
 
   // Administrative 시/군 boundaries from the national dataset. Independent of
