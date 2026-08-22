@@ -46,8 +46,19 @@ The console uses a restrained floating-blur direction rather than Liquid Glass. 
 | `--critical` | `#ef4444` | SOS, Call 119, and immediate danger only |
 | `--critical-soft` | `#fef2f2` | Urgent feedback support surface |
 | `--critical-ink` | `#b91c1c` | Critical feedback text |
+| `--overlay-scrim` | `rgb(23 23 25 / 44%)` | Mobile permission gate backdrop; solid dimming without blur |
+| `--control-shadow` | `0 1px 2px rgb(23 23 25 / 10%)` | Tight elevation for detached map controls and annotations |
+| `--overlay-shadow` | `0 8px 24px rgb(23 23 25 / 16%)` | Mobile permission dialog elevation |
 
-Floating-shell additions use near-black `#1d1d1f`, secondary neutral `#6e6e73`, and three practical surface levels: 82% for the route dock, 88% for map controls, and 94% for dense operational reading. Floating rails use the same 18px backdrop blur and one restrained shadow; outer borders are omitted when the surface fill already separates them from the map. Inner highlights, refraction effects, and nested translucent containers are excluded.
+The console sidebar theme adds one graphite material family without changing
+the map canvas: `--sidebar-dark-surface`, `--sidebar-dark-surface-strong`,
+`--sidebar-dark-ink`, `--sidebar-dark-ink-secondary`,
+`--sidebar-dark-ink-tertiary`, `--sidebar-dark-line`, and
+`--sidebar-dark-control`. These tokens are scoped to the left operations rail,
+right district rail, and the assistant drawer that replaces the right rail.
+They must never cascade into the map renderer or its zoom controls.
+
+Floating-shell additions use near-black `#1d1d1f`, secondary neutral `#6e6e73`, and three practical surface levels: 82% for the route dock, 80–86% for the sidebar glass, and 88% for compact map controls. Both light and dark floating rails use the same 24px backdrop blur and one restrained shadow so softened map color remains perceptible through the material; outer borders are omitted when the surface fill already separates them from the map. Inner highlights, refraction effects, and nested translucent containers are excluded.
 
 Status is communicated with text and structure, not color alone. Cobalt is not used as a general surface tint, and semantic colors never become a category rainbow.
 
@@ -82,11 +93,32 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Accessibility: navigation has an explicit label and current item uses `aria-current`.
 - Layout owner: the shell never scrolls. Situation overlays own bounded local scrolling; non-map routes use one centered floating work sheet as their sole scroll owner.
 
+### Brand collaboration header
+
+- The console-only header places the locale-specific SALGIL signature and the Gyeongsangbuk-do collaborator signature on one quiet horizontal baseline above the operations heading.
+- The SALGIL signature switches between the supplied Korean and English SVG assets with the dashboard locale. The collaborator signature remains unchanged; neither asset is cropped or reconstructed in CSS, while the documented dark-rail state may render both signatures in monochrome white.
+- A compact `한국어 / EN` segmented control shares the header row. It uses the existing neutral selected-control surface, visible focus, `aria-pressed`, and no decorative motion.
+- The header stays inside the 300px left operations rail, never overlaps the first heading, and preserves readable logo clear space at both supported desktop acceptance widths.
+
+### Console localization
+
+- Supported locales are Korean (`ko`) and English (`en`) on `apps/console-front` only. The mobile client and renderer remain outside this localization boundary.
+- The initial locale follows a saved dashboard preference and otherwise defaults to English. Locale changes update visible console copy, accessible names, document language, document title, district names, and the SALGIL signature together.
+- Platform-provided incident headlines, routing notices, citations, and other source text remain verbatim so localization never changes operational evidence.
+
+### Sidebar appearance
+
+- The console starts with graphite dark rails and stores the operator's light or dark rail preference locally. The map canvas is never dimmed or color-shifted.
+- One compact icon toggle sits at the upper-right of the district rail. It exposes `aria-pressed`, a localized action label, a visible focus ring, and no decorative animation.
+- In dark mode, both supplied collaboration signatures use a white monochrome presentation so their shapes remain crisp on graphite. The QR code retains a white scan field.
+- Dark rail controls use tonal separation rather than luminous borders: quiet white-alpha fields, one brighter selected surface, near-white primary text, and accessible muted text. The rail itself retains enough transparency for the 24px backdrop blur to be visible without competing with content. Semantic green, warning, and critical states remain distinguishable by text and structure.
+- Opening the assistant replaces the right rail with the same selected material. Map zoom, map canvas, and centered map controls remain on the existing light material.
+
 ### Button
 
 - Variants: primary, secondary, text, critical.
 - Height: 40px desktop, 52px field.
-- Radius: all push buttons use a full pill radius. Compact square utility controls remain circular. Data surfaces retain a restrained 10px radius so the interface does not become a field of bubbles.
+- Radius: console push buttons use a full pill radius. Compact square utility controls remain circular. Resident mobile actions use the documented 8px action radius, while data surfaces retain a restrained 10px radius so the interface does not become a field of bubbles.
 - States: hover via small background or border change; focus ring; disabled opacity and cursor.
 - Motion: 110–140ms ease-out feedback. A press may compress to `0.975` and recover immediately; no bounce, elastic overshoot, or `transition: all`.
 
@@ -145,8 +177,9 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Route dock: four routes appear in a compact centered horizontal row near the lower safe area. The dock uses an 82% neutral blurred surface; the active route uses a quiet neutral inset fill and near-black text. Inactive routes remain neutral gray, never blue.
 - Floating work sheets: plan, contact, and field-task routes retain the live map behind a centered, bounded 82–86% white reading lens. The sheet owns its vertical scroll and leaves map context visible around its edges. Existing table boxes are flattened so the lens, not an old page container, owns the visual hierarchy.
 - Map plane: the WebGPU terrain renderer is visually primary. It is isolated in an iframe. The default camera frames the complete mainland Gyeongsangbuk-do operating area, and switching between flat and 3D views preserves that extent. When embedded by the dashboard, local simulation stays paused: the renderer may draw the operator-selected origin immediately, but spread, phase changes, and forecast zones arrive from the platform stream.
+- Map attribution: the console keeps one persistent, non-interactive provider line at the lower edge of the unobstructed map area, outside both side rails. It credits TMAP MOBILITY and the OpenStreetMap/CARTO fallback in 10px tertiary text on one restrained neutral surface; operational panels must never cover it.
 - Overlay groups: communities, multi-hazard exposure, evacuation routes, access constraints, shelters, and field teams. Every group has a labelled checkbox and a numeric count.
-- Map objects: compact square or diamond markers with persistent short labels. Selected communities use a cobalt outline and remain paired with a textual inspector.
+- Map objects: compact square or diamond markers with persistent short labels. Selected communities use a cobalt outline and remain paired with a textual inspector. Labels use a Wanted-inspired tooltip anatomy: solid white, 4px radius, one neutral hairline, one tight contact shadow, 12px Pretendard, and a short centered tail that ties the label to its coordinate. A selected origin anchors below its coordinate with an upward tail while ordinary destinations anchor above with a downward tail, preventing same-row overlap in the route overview. Hazard and closure labels stay white and carry urgency only through the semantic glyph and weight; dark glass, blur, coloured leading rails, hover scale, and diffuse shadows are excluded. Actionable labels change border and surface tone on hover/focus without moving away from the map point.
 - Hazard areas: translucent geometry plus a named legend item; never color alone. Routes use safe green when open, action blue when selected, and dashed critical red only for a blocked segment.
 - Incident details appear only when supplied by the platform event; the console does not carry a static selected-community inspector.
 - Timeline: latest four decision events in time order. It uses one structural divider and no individual cards.
@@ -184,8 +217,10 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - **Alert:** one orange warning and one directive, “Move to higher ground now.” The dominant action reveals a safe route; Call 119 is the only red control.
 - **Route:** a green route, nearest safe shelter, travel time, ordered checklist, and a single evacuation progress action.
 - The demo mode switch exposes all three states for judging, but the content itself remains usable without understanding the switch.
-- QR entrants are assigned to the shared `청송군 진보면 공동 데모 지점` rather than GPS. Every mobile demo client therefore receives the same platform event, location summary, safety steps, and acknowledgement action.
-- The mobile shell contains only a viewport-filling conventional 2D street map and one white bottom sheet; it has no product header, floating logo, satellite view, or terrain presentation. The sheet owns bounded scrolling, uses row separators instead of nested cards, and carries one cobalt acknowledgement action. Current platform events remain the authoritative source of disaster state and supply the incident origin, risk zones, shelter, and route shown on the map.
+- QR entrants are assigned to the shared `청송군 진보면 공동 데모 지점` rather than GPS. Every mobile demo client therefore receives the same platform event, location summary, and safety steps; notification permission is handled by the entry gate below.
+- The mobile shell uses a stable map-and-sheet split: the interactive 2D map owns the upper 58dvh and the white guidance sheet owns the remainder with bounded scrolling. The 44px sheet handle toggles between the expanded guidance view and a 64px collapsed affordance; collapsing gives the map the full viewport and expanding restores the route framing. The transition uses a 150ms transform-only ease-out and becomes immediate under reduced motion. Drag and pinch gestures remain enabled, 44px zoom controls provide an accessible fallback, and a `View full route` action restores the computed route bounds. The fixed Jinbo-myeon demo coordinate is explicit and never presented as a live GPS fix. The screen has no product header, floating logo, satellite view, terrain presentation, or acknowledgement-only action; row separators replace nested cards. Current platform events remain the authoritative source of disaster state, while a clearly labelled fixed demo route is used only when the demo backend cannot return routing data.
+- On first mobile entry, notification permission gates the demo unless system notifications are already granted. The modal cannot dismiss a default or denied permission state: its primary action requests permission from a user gesture, prevents duplicate requests while pending, and turns into browser-settings recovery instructions after denial. Unsupported browsers may continue to the demo because no permission path exists. Browser permission remains authoritative; the app never claims it can force a user or browser to grant notifications.
+- Mobile surfaces follow the Wanted-inspired product grammar recorded in the research log: left-aligned intent-first typography, solid white layers, neutral row rules, an 8px action radius, a 12px permission-dialog radius, and a 16px top-sheet radius. Decorative eyebrow labels, tinted icon tiles, blurred controls, pulsing status dots, one-hue status cards, and diffuse shadows are excluded. The permission gate has no decorative icon; its title, direct explanation, recovery rows, and one action form the entire hierarchy.
 
 ## 7. Depth & Surface
 
@@ -196,7 +231,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Resident status surfaces use a neutral white surface and one quiet border. Safety or warning color belongs to the status label, not simultaneously to border, background, and text.
 - Diffuse card shadows are excluded. The only retained shadow is the tight selected-segment shadow because it communicates control state.
 - Panels never contain independent card grids. Summary values share one quiet band without individual boxes.
-- Full-map floating surfaces use 18px backdrop blur and one restrained shadow. A quiet border is added only where the map and surface would otherwise merge; side rails and the route dock normally rely on fill and shadow. They do not use refractive rims, glow, colored glass, or nested translucent containers.
+- Full-map floating surfaces use 24px backdrop blur and one restrained shadow. A quiet border is added only where the map and surface would otherwise merge; side rails and the route dock normally rely on fill and shadow. They do not use refractive rims, glow, colored glass, or nested translucent containers.
 
 ## 8. Accessibility Constraints & Accepted Debt
 
