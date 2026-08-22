@@ -1,0 +1,21 @@
+{
+  "name": "@salgil/map-webgpu-canvas",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./protocol": "./src/protocol.ts"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@webgpu/types": "^0.1.64",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

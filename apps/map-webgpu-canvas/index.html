@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SALGIL 재난 시뮬레이션 지도</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="gpu-canvas" aria-label="재난 시뮬레이션 3D 지도"></canvas>
+      <div id="fallback" hidden>
+        <h1>3D 지도를 표시할 수 없습니다</h1>
+        <p>
+          이 브라우저는 WebGPU를 지원하지 않습니다. 최신 Chrome, Edge 또는
+          Safari에서 다시 열어 주세요.
+        </p>
+      </div>
+      <div id="zone-labels" aria-hidden="true"></div>
+      <aside id="panel" hidden aria-label="시뮬레이션 컨트롤"></aside>
+      <div id="status" role="status" aria-live="polite"></div>
+      <div id="attribution">
+        © OpenStreetMap contributors © CARTO · Imagery © Esri · Terrain:
+        Mapzen/AWS
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
