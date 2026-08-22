@@ -16,9 +16,9 @@
   --on-dark: #fff;
   --button-dark: rgba(29, 29, 31, 0.92);
   --button-dark-hover: #000;
-  --floating-bg: rgba(248, 250, 252, 0.88);
+  --floating-bg: rgba(248, 250, 252, 0.8);
   --floating-bg-soft: rgba(248, 250, 252, 0.82);
-  --floating-bg-strong: rgba(248, 250, 252, 0.94);
+  --floating-bg-strong: rgba(248, 250, 252, 0.86);
   --floating-border: rgba(255, 255, 255, 0.74);
   --floating-border-strong: rgba(60, 60, 67, 0.3);
   --floating-control: rgba(255, 255, 255, 0.64);
@@ -33,8 +33,8 @@
   --nav-text-hover: rgba(29, 29, 31, 0.78);
   --dark-divider: rgba(0, 0, 0, 0.1);
   --button-border: rgba(0, 0, 0, 0.08);
-  --sidebar-dark-surface: rgba(17, 18, 22, 0.94);
-  --sidebar-dark-surface-strong: rgba(12, 13, 16, 0.97);
+  --sidebar-dark-surface: rgba(17, 18, 22, 0.8);
+  --sidebar-dark-surface-strong: rgba(12, 13, 16, 0.86);
   --sidebar-dark-ink: #f5f7fa;
   --sidebar-dark-ink-secondary: rgba(245, 247, 250, 0.7);
   --sidebar-dark-ink-tertiary: rgba(245, 247, 250, 0.48);
@@ -529,6 +529,8 @@ p {
   overflow: visible;
   border-radius: var(--radius-layer);
   background: var(--floating-bg);
+  backdrop-filter: blur(24px) saturate(0.92);
+  -webkit-backdrop-filter: blur(24px) saturate(0.92);
   pointer-events: auto;
 }
 
@@ -1241,8 +1243,8 @@ textarea {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-strong);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: blur(24px) saturate(0.92);
+  -webkit-backdrop-filter: blur(24px) saturate(0.92);
 }
 
 .view-situation .assistant-drawer {
@@ -2039,8 +2041,8 @@ tbody tr:last-child td {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-strong);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: blur(24px) saturate(0.92);
+  -webkit-backdrop-filter: blur(24px) saturate(0.92);
   pointer-events: auto;
   transition:
     background-color 160ms ease-out,
@@ -2620,18 +2622,16 @@ tbody tr:last-child td {
 }
 
 .event-confirm .button {
-  display: grid;
-  gap: 1px;
   width: 100%;
-  padding: 8px 10px;
-  text-align: center;
+  padding: 9px 10px;
 }
 
-.event-confirm .button small {
-  color: currentColor;
+/* Says what the armed mode will do, in place of a second button. */
+.event-mode-hint {
+  margin: 6px 0 0;
+  color: var(--ink-tertiary);
   font-size: 10px;
-  font-weight: 450;
-  opacity: 0.68;
+  line-height: 1.45;
 }
 
 .button.critical {

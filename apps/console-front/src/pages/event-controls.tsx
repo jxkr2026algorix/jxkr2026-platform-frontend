@@ -27,6 +27,8 @@ type EventControlsProps = {
   readonly latestEvent: PlatformEvent | null;
   readonly onSelect: (type: DisasterType | null) => void;
   /** "simulate" rehearses locally; "declare" records a real incident. */
+  readonly mode: "simulate" | "declare";
+  readonly onModeChange: (mode: "simulate" | "declare") => void;
   readonly onDeclare: (
     type: DisasterType,
     mode: "simulate" | "declare",
@@ -48,6 +50,8 @@ export function EventControls({
   publishing,
   errorMessage,
   latestEvent,
+  mode,
+  onModeChange,
   onSelect,
   onDeclare,
   onReset,
@@ -64,6 +68,28 @@ export function EventControls({
       <div className="event-control-heading">
         <p className="rail-section-label">{t("event.declare")}</p>
       </div>
+      {/* The mode is chosen before the hazard, and it stays visible while the
+          hazard is picked. Rehearsing a scenario and telling the county a fire
+          is burning are different acts, and which one is armed must be legible
+          at the moment of the click, not inferable from a button colour. */}
+      <fieldset className="compact-controls">
+        <legend className="sr-only">{t("event.declare")}</legend>
+        <div className="segmented-track segmented-track-two">
+          {(["simulate", "declare"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={mode === option}
+              onClick={() => onModeChange(option)}
+            >
+              <span className="segmented-label">
+                {t(`event.mode.${option}`)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <p className="event-mode-hint">{t(`event.modeHint.${mode}`)}</p>
       <fieldset className="event-grid" disabled={publishing}>
         <legend className="sr-only">{t("event.type")}</legend>
         {eventOptions.map((option) => (
@@ -82,30 +108,17 @@ export function EventControls({
 
       {selected ? (
         <div className="event-confirm">
-          {/* Rehearsing a scenario and telling the county a fire is burning
-              are not the same act, and the difference has to be visible
-              before the click rather than after it. */}
           <button
-            className="button secondary"
+            className={mode === "declare" ? "button critical" : "button"}
             type="button"
             disabled={publishing}
-            onClick={() => onDeclare(selected.type, "simulate")}
+            onClick={() => onDeclare(selected.type, mode)}
           >
-            <span>{t("event.simulate", { hazard: hazardLabel })}</span>
-            <small>{t("event.simulateHint")}</small>
-          </button>
-          <button
-            className="button critical"
-            type="button"
-            disabled={publishing}
-            onClick={() => onDeclare(selected.type, "declare")}
-          >
-            <span>
-              {publishing
-                ? t("event.declaring")
-                : t("event.declareReal", { hazard: hazardLabel })}
-            </span>
-            <small>{t("event.declareHint")}</small>
+            {publishing
+              ? t("event.declaring")
+              : t(mode === "declare" ? "event.declareReal" : "event.simulate", {
+                  hazard: hazardLabel,
+                })}
           </button>
         </div>
       ) : null}

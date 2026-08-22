@@ -18,6 +18,12 @@ import {
   type Shelter,
 } from "@salgil/platform-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  notificationState,
+  notifyIncident,
+  notifyRouteBlocked,
+  requestNotifications,
+} from "./notifications";
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
@@ -125,6 +131,9 @@ export function App() {
   const [acknowledged, setAcknowledged] = useState(false);
   /** Hazard the platform is actively streaming spread for, if any. */
   const [liveHazard, setLiveHazard] = useState<string | null>(null);
+  const [alertsOn, setAlertsOn] = useState(notificationState() === "granted");
+  const notifiedIncidentRef = useRef("");
+  const blockedRouteRef = useRef("");
 
   // The stream is what makes this a warning rather than a page someone has to
   // refresh. Polling still runs underneath as the fallback: a resident whose
@@ -330,6 +339,33 @@ export function App() {
   }, [event, mapReady, plan, postMapCommand, shelters]);
 
   const best = plan ? recommendedLeg(plan) : undefined;
+
+  useEffect(() => {
+    if (!event) return;
+    const version = `${event.id}:${event.sequence}`;
+    if (notifiedIncidentRef.current === version) return;
+    notifiedIncidentRef.current = version;
+    notifyIncident(event.headline, event.instruction);
+  }, [event]);
+
+  useEffect(() => {
+    if (!plan) return;
+    // Only the closures that actually sit on a route matter here. A hazard
+    // somewhere in the county is not a reason to interrupt someone walking.
+    const blocked = plan.routes
+      .flatMap((leg) => leg.blocked_by_reports)
+      .map((block) => block.detail ?? block.kind)
+      .join("|");
+    if (!blocked || blockedRouteRef.current === blocked) return;
+    const previous = blockedRouteRef.current;
+    blockedRouteRef.current = blocked;
+    // Silent on the first plan: that is the route being given, not changed.
+    if (!previous) return;
+    notifyRouteBlocked(
+      blocked.split("|")[0] ?? "A road on your route is closed",
+      recommendedLeg(plan)?.shelter_name ?? "the nearest shelter",
+    );
+  }, [plan]);
   const instruction =
     event?.instruction ??
     "Stay clear of hazard zones and follow official evacuation guidance.";
@@ -414,6 +450,21 @@ export function App() {
             {plan.notice}
             <small>{plan.attribution}</small>
           </p>
+        ) : null}
+
+        {!alertsOn && notificationState() !== "unsupported" ? (
+          <button
+            className="enable-alerts"
+            type="button"
+            onClick={() => {
+              void requestNotifications().then((state) =>
+                setAlertsOn(state === "granted"),
+              );
+            }}
+          >
+            Turn on emergency alerts
+            <small>So you are told even with the screen off</small>
+          </button>
         ) : null}
 
         <button

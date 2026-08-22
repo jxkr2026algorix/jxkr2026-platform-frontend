@@ -21,6 +21,8 @@ interface SituationControlsProps {
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
   readonly onEventSelect: (type: DisasterType | null) => void;
+  readonly eventMode: "simulate" | "declare";
+  readonly onEventModeChange: (mode: "simulate" | "declare") => void;
   readonly onEventDeclare: (
     type: DisasterType,
     mode: "simulate" | "declare",
@@ -45,6 +47,8 @@ export function SituationControls({
   latestEvent,
   onMapCommand,
   onEventSelect,
+  eventMode,
+  onEventModeChange,
   onEventDeclare,
   onReset,
 }: SituationControlsProps) {
@@ -71,6 +75,8 @@ export function SituationControls({
           errorMessage={errorMessage}
           latestEvent={latestEvent}
           onSelect={onEventSelect}
+          mode={eventMode}
+          onModeChange={onEventModeChange}
           onDeclare={onEventDeclare}
           onReset={onReset}
         />

@@ -255,6 +255,8 @@ export function App() {
                   latestEvent={platform.event}
                   onMapCommand={handleMapCommand}
                   onEventSelect={handleEventSelect}
+                  eventMode={placementMode}
+                  onEventModeChange={setPlacementMode}
                   onEventDeclare={handleEventDeclare}
                   onPreviewEvent={platform.previewEvent}
                   onReset={handleReset}

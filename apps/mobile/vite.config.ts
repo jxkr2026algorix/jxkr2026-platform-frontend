@@ -17,6 +17,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // The worker is what makes an emergency alert land on a locked phone,
+      // so it has to be exercisable in development rather than only in a
+      // production build.
+      devOptions: { enabled: true, type: "module" },
       includeAssets: ["salgil-mark.svg", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
         name: "SALGIL Mobile",

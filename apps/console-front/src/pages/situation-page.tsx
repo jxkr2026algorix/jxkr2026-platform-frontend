@@ -23,6 +23,8 @@ interface SituationPageProps {
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
   readonly onEventSelect: (type: DisasterType | null) => void;
+  readonly eventMode: "simulate" | "declare";
+  readonly onEventModeChange: (mode: "simulate" | "declare") => void;
   readonly onEventDeclare: (
     type: DisasterType,
     mode: "simulate" | "declare",
@@ -41,6 +43,8 @@ export function SituationPage({
   latestEvent,
   onMapCommand,
   onEventSelect,
+  eventMode,
+  onEventModeChange,
   onEventDeclare,
   onPreviewEvent,
   onReset,
@@ -60,6 +64,8 @@ export function SituationPage({
           latestEvent={latestEvent}
           onMapCommand={onMapCommand}
           onEventSelect={onEventSelect}
+          eventMode={eventMode}
+          onEventModeChange={onEventModeChange}
           onEventDeclare={onEventDeclare}
           onReset={onReset}
         />
