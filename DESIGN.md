@@ -94,6 +94,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 - Structure: route tabs use a flat row; compact map controls pair a labeled three-segment camera track with a labeled two-segment basemap track so neither surface spreads behind its label.
 - Selected state: compact modes use one quiet inset surface and tight shadow; inactive items remain transparent.
+- Motion: the selected surface glides between options with a shared-position spring (`stiffness: 420`, `damping: 36`, `mass: 0.55`). It retargets immediately without bounce; reduced-motion mode switches the surface with zero-duration motion.
 - Accessibility: implemented as buttons with `aria-pressed`.
 - Hierarchy rule: only route or content-state navigation may use the full-width underlined row. A secondary context switch such as `Resident / Field team` is a compact, right-aligned control with a quiet selected fill and no divider, so two tab bars never stack.
 - The content immediately following a tab row must not add another top divider. The tab row owns that boundary.
@@ -165,6 +166,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Route navigation uses React Router and retains the shared shell. Route content crossfades by 4px over 130ms; reduced-motion preferences make the transition immediate.
 - Sidebar navigation stays neutral: inactive labels use muted neutral ink and the current route uses primary ink weight only, with no brand-tinted background.
 - Navigation, buttons, and compact map controls compress to `0.975` for roughly 100ms while pressed. Selection and disclosure transitions are limited to 110–160ms opacity, transform, or background color.
+- Camera and basemap segments use the beui.dev tabs mechanism: one shared `layoutId` selection surface moves with the compact `420 / 36 / 0.55` spring. Only the position changes; the label never slides or blurs.
 - Map control values, including camera and basemap selection, update optimistically in the console. Continuous rainfall input is coalesced to one renderer command per animation frame so the thumb and numeric label never wait for iframe state acknowledgement.
 - Plan approval, contact completion, and field reporting update persistent state within the session and announce the change.
 - Reduced-motion preferences remove nonessential transitions.

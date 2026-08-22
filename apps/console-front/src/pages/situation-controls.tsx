@@ -3,7 +3,9 @@ import type {
   DashboardCommand,
   ViewMode,
 } from "@salgil/map-webgpu-canvas/protocol";
+import { motion } from "motion/react";
 import { FloatingSelect } from "../components/FloatingSelect";
+import { SegmentIndicator } from "../components/SegmentIndicator";
 import {
   type CommunityName,
   communities,
@@ -115,7 +117,7 @@ export function SituationControls({
         <div className="map-display-controls">
           <fieldset className="compact-controls">
             <legend>Map view</legend>
-            <div className="segmented-track">
+            <motion.div className="segmented-track" layoutRoot>
               {(["flat", "tilted", "auto"] as const).map((mode) => (
                 <button
                   key={mode}
@@ -125,14 +127,20 @@ export function SituationControls({
                     onMapCommand({ type: "map:set-view", payload: { mode } })
                   }
                 >
-                  {viewLabels[mode]}
+                  {controls.viewMode === mode ? (
+                    <SegmentIndicator layoutId="map-view-segment" />
+                  ) : null}
+                  <span className="segmented-label">{viewLabels[mode]}</span>
                 </button>
               ))}
-            </div>
+            </motion.div>
           </fieldset>
           <fieldset className="compact-controls">
             <legend>Basemap</legend>
-            <div className="segmented-track segmented-track-two">
+            <motion.div
+              className="segmented-track segmented-track-two"
+              layoutRoot
+            >
               {(["satellite", "map"] as const).map((style) => (
                 <button
                   key={style}
@@ -145,10 +153,15 @@ export function SituationControls({
                     })
                   }
                 >
-                  {basemapLabels[style]}
+                  {controls.basemap === style ? (
+                    <SegmentIndicator layoutId="basemap-segment" />
+                  ) : null}
+                  <span className="segmented-label">
+                    {basemapLabels[style]}
+                  </span>
                 </button>
               ))}
-            </div>
+            </motion.div>
           </fieldset>
         </div>
         <label className="check-row">
