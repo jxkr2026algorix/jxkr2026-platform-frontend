@@ -110,6 +110,12 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Native checkbox semantics remain in the DOM. A 16px square neutral control and explicit checkmark provide the visible state.
 - Focus is shown around the control, not the entire row. The label and count remain separately readable.
 
+### Range slider
+
+- The native range input retains pointer and keyboard semantics while a dedicated visual track renders the value continuously.
+- The track is a slim neutral capsule with one solid ink fill. The circular thumb uses the strong floating surface, one quiet highlight edge, and the existing control shadow for a restrained glass cue; it grows slightly only while grabbed and never adds blur, glow, or a decorative gradient.
+- The fill follows optimistic state without an easing delay. Reduced-motion mode removes the thumb transform while preserving immediate value feedback.
+
 ### Data surface
 
 - Structure: one tonal region with header, rows, and optional footer. A boundary is added only when a data grid genuinely needs an outside edge.

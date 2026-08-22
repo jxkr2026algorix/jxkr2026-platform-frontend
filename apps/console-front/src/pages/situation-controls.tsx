@@ -5,6 +5,7 @@ import type {
 } from "@salgil/map-webgpu-canvas/protocol";
 import { motion } from "motion/react";
 import { FloatingSelect } from "../components/FloatingSelect";
+import { RangeControl } from "../components/RangeControl";
 import { SegmentIndicator } from "../components/SegmentIndicator";
 import {
   type CommunityName,
@@ -96,24 +97,19 @@ export function SituationControls({
           onValueChange={selectScenario}
         />
         <p className="scenario-summary">{selectedScenario.summary}</p>
-        <label className="range-field">
-          <span>
-            <b>Rainfall</b>
-            <strong>{Math.round(controls.rainfallMmPerHour)} mm/h</strong>
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="120"
-            value={controls.rainfallMmPerHour}
-            onChange={(event) =>
-              onMapCommand({
-                type: "map:set-rainfall",
-                payload: { mmPerHour: Number(event.target.value) },
-              })
-            }
-          />
-        </label>
+        <RangeControl
+          label="Rainfall"
+          min={0}
+          max={120}
+          unit="mm/h"
+          value={controls.rainfallMmPerHour}
+          onValueChange={(mmPerHour) =>
+            onMapCommand({
+              type: "map:set-rainfall",
+              payload: { mmPerHour },
+            })
+          }
+        />
         <div className="map-display-controls">
           <fieldset className="compact-controls">
             <legend>Map view</legend>

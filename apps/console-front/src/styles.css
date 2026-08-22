@@ -586,13 +586,6 @@ textarea {
   resize: vertical;
 }
 
-input[type="range"] {
-  width: 100%;
-  min-height: 18px;
-  padding: 0;
-  accent-color: var(--ink);
-}
-
 .scenario-summary {
   margin: 6px 0 9px;
   color: var(--ink-secondary);
@@ -729,6 +722,103 @@ input[type="range"] {
 .range-field strong {
   font-size: 11px;
   font-weight: 550;
+}
+
+.range-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: var(--radius-pill);
+}
+
+.range-control-track {
+  position: absolute;
+  right: 8px;
+  left: 8px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  pointer-events: none;
+}
+
+.range-control-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--button-dark);
+  transform-origin: left center;
+}
+
+.range-control input[type="range"] {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  cursor: grab;
+}
+
+.range-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 0;
+  background: transparent;
+}
+
+.range-control input[type="range"]::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 1px solid var(--floating-border);
+  border-radius: var(--radius-pill);
+  appearance: none;
+  background: var(--floating-bg-strong);
+  box-shadow: var(--control-shadow);
+  transition: transform 120ms ease-out;
+}
+
+.range-control input[type="range"]::-moz-range-track {
+  height: 6px;
+  border: 0;
+  background: transparent;
+}
+
+.range-control input[type="range"]::-moz-range-progress {
+  height: 6px;
+  background: transparent;
+}
+
+.range-control input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--floating-border);
+  border-radius: var(--radius-pill);
+  background: var(--floating-bg-strong);
+  box-shadow: var(--control-shadow);
+  transition: transform 120ms ease-out;
+}
+
+.range-control input[type="range"]:active {
+  cursor: grabbing;
+}
+
+.range-control input[type="range"]:active::-webkit-slider-thumb,
+.range-control input[type="range"]:active::-moz-range-thumb {
+  transform: scale(1.14);
+}
+
+.range-control input[type="range"]:focus-visible {
+  outline: 0;
+}
+
+.range-control:has(input[type="range"]:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .map-display-controls {
@@ -1839,5 +1929,10 @@ tbody tr:last-child td {
   .assistant-pending i {
     animation: none;
     opacity: 0.7;
+  }
+
+  .range-control input[type="range"]:active::-webkit-slider-thumb,
+  .range-control input[type="range"]:active::-moz-range-thumb {
+    transform: none;
   }
 }
