@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import { Navigate, NavLink, Route, Routes } from "react-router";
 import { AssistantDrawer } from "./components/AssistantDrawer";
+import { DEFAULT_DISTRICT_CODE } from "./domain";
 import { SituationPage } from "./pages/situation-page";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
@@ -50,6 +51,10 @@ export function App() {
           ...(zone.hazard !== undefined ? { hazard: zone.hazard } : {}),
           ...(zone.severity !== undefined ? { severity: zone.severity } : {}),
           ...(zone.color !== undefined ? { color: zone.color } : {}),
+          ...(zone.origin !== undefined ? { origin: zone.origin } : {}),
+          ...(zone.activatable !== undefined
+            ? { activatable: zone.activatable }
+            : {}),
         })),
       },
     });
@@ -100,7 +105,6 @@ export function App() {
     void platform
       .publish({
         type: platform.selectedType,
-        mode: platform.mode,
         location: {
           x: selection.at.x,
           y: selection.at.y,
@@ -113,7 +117,6 @@ export function App() {
   }, [
     map.status.pointSelection,
     placementArmed,
-    platform.mode,
     platform.publish,
     platform.selectedType,
   ]);
@@ -131,7 +134,6 @@ export function App() {
     void platform
       .publish({
         type,
-        mode: platform.mode,
         ...(type === "rain" ? { rainfallMmPerHour: 72 } : {}),
       })
       .catch((error: unknown) => {
@@ -139,8 +141,28 @@ export function App() {
       });
   };
 
+  /**
+   * Put the board back to how it opened: no alert, no annotations, the
+   * simulation stopped, and the camera on the default district. Anything an
+   * operator did during a walkthrough is cleared in one action.
+   */
+  const handleReset = () => {
+    setPlacementArmed(false);
+    platform.previewEvent(null);
+    map.send({ type: "map:set-zones", payload: { zones: [] } });
+    map.send({ type: "map:set-markers", payload: { markers: [] } });
+    map.send({ type: "map:set-routes", payload: { routes: [] } });
+    map.send({ type: "map:sim-control", payload: { action: "reset" } });
+    map.send({ type: "map:set-scenario", payload: { scenario: "clear" } });
+    map.send({ type: "map:set-view", payload: { mode: "flat" } });
+    map.send({
+      type: "map:focus-district",
+      payload: { code: DEFAULT_DISTRICT_CODE },
+    });
+  };
+
   const createTrainingEvent = (type: DisasterType): Promise<PlatformEvent> =>
-    platform.publish({ type, mode: "training" });
+    platform.publish({ type });
 
   return (
     <div
@@ -198,15 +220,16 @@ export function App() {
               element={
                 <SituationPage
                   map={map}
-                  mode={platform.mode}
+                  client={platform.client}
                   selectedType={platform.selectedType}
                   placementArmed={placementArmed}
                   publishing={platform.publishing}
                   errorMessage={platform.errorMessage}
                   latestEvent={platform.event}
                   onMapCommand={handleMapCommand}
-                  onModeChange={platform.setMode}
                   onEventSelect={handleEventSelect}
+                  onPreviewEvent={platform.previewEvent}
+                  onReset={handleReset}
                 />
               }
             />

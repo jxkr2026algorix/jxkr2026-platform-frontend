@@ -1,16 +1,23 @@
 /**
- * Map annotation overlay: the static UI drawn above the 3D canvas from
- * front-end or platform signals.
+ * Map annotation overlay: the operating picture drawn above the 3D canvas
+ * from front-end or platform signals.
  *
- * Geometry (zone outlines, route polylines) is an SVG layer; labels are HTML
- * chips so they keep the product's type and blur treatment, which SVG text
- * cannot reproduce. Both are re-projected every frame through the engine, so
- * annotations stay pinned to the terrain as the camera moves.
+ * Geometry (zone outlines, route lines) is an SVG layer; labels are HTML
+ * chips, because they need the product's Pretendard GOV stack and a real
+ * shadow, neither of which SVG text gives us. Both are re-projected every
+ * frame through the engine, so annotations stay pinned to the terrain.
  *
- * Nothing here touches the renderer: annotations are a presentation layer, and
- * the simulation neither reads nor is affected by them.
+ * The visual language is deliberately quiet: white label chips with a hairline
+ * border and a small colour-carrying glyph, thin outlines, and a light tint
+ * inside hazard areas. The basemap underneath has to stay readable — the
+ * operator is reading terrain and roads *through* the hazard, not instead of
+ * it — so nothing here floods an area with colour.
+ *
+ * Nothing here touches the renderer: annotations are presentation, and the
+ * simulation neither reads them nor is affected by them.
  */
 
+import { GLYPHS, type GlyphName, glyphForHazard } from "./glyphs";
 import type {
   AnyPoint,
   MapMarker,
@@ -33,12 +40,21 @@ export interface Projector {
   readonly viewportSize: { width: number; height: number };
 }
 
+/** Fired when an operator activates a predicted risk zone's badge. */
+export type ZoneActivateHandler = (zone: {
+  id: string;
+  hazard: string | undefined;
+  /** Predicted origin in normalized map coordinates. */
+  at: Projected;
+}) => void;
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
+/** Semantic tokens from the design contract. Severity is a scale, not a set. */
 const SEVERITY_COLORS: Record<string, string> = {
   warning: "#ef4444",
   watch: "#f97316",
-  advisory: "#eab308",
+  advisory: "#d97706",
   none: "#3366ff",
 };
 
@@ -51,22 +67,18 @@ const ROUTE_COLORS: Record<string, string> = {
 const MARKER_COLORS: Record<MarkerKind, string> = {
   shelter: "#3366ff",
   community: "#3366ff",
-  facility: "#5c6068",
+  facility: "#3366ff",
   incident: "#ef4444",
   responder: "#22c55e",
 };
 
-/**
- * Glyph paths in a 16x16 box, centered on (8,8). Shapes rather than emoji:
- * they stay legible at chip size and inherit the accent color.
- */
-const MARKER_GLYPHS: Record<MarkerKind, string> = {
-  shelter: "M8 2.4 13.6 8 8 13.6 2.4 8Z",
-  community: "M3.4 3.4h9.2v9.2H3.4Z",
-  facility: "M8 3a5 5 0 1 0 0 10A5 5 0 0 0 8 3Z",
-  incident: "M8 2.6 14 13.2H2Z",
-  responder:
-    "M8 2.2a5.8 5.8 0 1 0 0 11.6A5.8 5.8 0 0 0 8 2.2Zm0 3.4a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8Z",
+/** Places get the mark for what they are, hazards for what they do. */
+const MARKER_GLYPHS: Record<MarkerKind, GlyphName> = {
+  shelter: "shelter",
+  community: "community",
+  facility: "community",
+  incident: "warning",
+  responder: "responder",
 };
 
 const HEX = /^#?([0-9a-f]{6})$/i;
@@ -88,6 +100,45 @@ function markerKind(marker: MapMarker): MarkerKind {
   return kind && kind in MARKER_COLORS ? kind : "facility";
 }
 
+/** One stroke weight across the whole set; see glyphs.ts. */
+function glyphNode(name: GlyphName): SVGSVGElement {
+  const node = document.createElementNS(SVG_NS, "svg");
+  node.setAttribute("viewBox", "0 0 16 16");
+  node.setAttribute("class", "annotation-chip-glyph");
+  node.append(
+    el("path", {
+      d: GLYPHS[name],
+      fill: "none",
+      stroke: "currentColor",
+      "stroke-width": 1.6,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+    }),
+  );
+  return node;
+}
+
+function el<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string | number>,
+): SVGElementTagNameMap[K] {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    node.setAttribute(key, String(value));
+  }
+  return node;
+}
+
+function toPath(points: Projected[]): string {
+  let d = "";
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (!point) continue;
+    d += `${i === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 /** One resolved annotation: normalized geometry plus its rendered nodes. */
 interface ZoneItem {
   points: Projected[];
@@ -98,9 +149,10 @@ interface ZoneItem {
 
 interface RouteItem {
   points: Projected[];
+  /** Casing under the coloured core, so the line survives satellite imagery. */
+  casing: SVGPathElement;
   path: SVGPathElement;
   chip: HTMLElement | null;
-  /** Index into `points` where the label sits. */
   labelIndex: number;
 }
 
@@ -119,6 +171,9 @@ export class MapAnnotations {
   private routes: RouteItem[] = [];
   private markers: MarkerItem[] = [];
   private viewport = { width: 0, height: 0 };
+
+  /** Set by the host to run the simulation from an activated zone. */
+  onActivateZone: ZoneActivateHandler | null = null;
 
   constructor(
     private readonly container: HTMLElement,
@@ -157,17 +212,22 @@ export class MapAnnotations {
         .filter((point): point is Projected => point !== null);
       if (points.length < 3) continue;
 
+      const severity = zone.severity ?? "none";
       const color =
         normalizeHex(zone.color) ??
-        SEVERITY_COLORS[zone.severity ?? "none"] ??
+        SEVERITY_COLORS[severity] ??
         SEVERITY_COLORS.none ??
         "#3366ff";
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("fill", withAlpha(color, 0.16));
-      path.setAttribute("stroke", color);
-      path.setAttribute("stroke-width", "2");
-      path.setAttribute("stroke-dasharray", "8 6");
-      path.setAttribute("stroke-linejoin", "round");
+      // Dashed while the hazard is still a forecast, solid once it is a
+      // warning: the outline itself says how sure we are.
+      const predicted = severity !== "warning";
+      const path = el("path", {
+        fill: withAlpha(color, 0.13),
+        stroke: color,
+        "stroke-width": 1.75,
+        "stroke-linejoin": "round",
+        ...(predicted ? { "stroke-dasharray": "7 5" } : {}),
+      });
       this.zoneGroup.append(path);
 
       let cx = 0;
@@ -176,14 +236,39 @@ export class MapAnnotations {
         cx += point.x;
         cy += point.y;
       }
-      this.zones.push({
-        points,
-        path,
-        chip: zone.label
-          ? this.addChip("hazard", zone.label, color, false)
-          : null,
-        centroid: { x: cx / points.length, y: cy / points.length },
-      });
+      const centroid = { x: cx / points.length, y: cy / points.length };
+
+      // A predicted zone the operator cannot run is of little use, so badges
+      // are actionable unless the payload opts out.
+      const activatable = zone.activatable !== false;
+      const chip = zone.label
+        ? this.addChip(zone.label, color, {
+            glyph: glyphForHazard(zone.hazard),
+            tone: "hazard",
+          })
+        : null;
+      if (chip && activatable) {
+        const origin =
+          (zone.origin ? this.resolve(zone.origin) : null) ?? centroid;
+        chip.classList.add("is-actionable");
+        chip.setAttribute("role", "button");
+        chip.setAttribute("tabindex", "0");
+        chip.title = "Run the simulation from this predicted origin";
+        const activate = () =>
+          this.onActivateZone?.({
+            id: zone.id,
+            hazard: zone.hazard,
+            at: origin,
+          });
+        chip.addEventListener("click", activate);
+        chip.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            activate();
+          }
+        });
+      }
+      this.zones.push({ points, path, chip, centroid });
     }
     this.update();
   }
@@ -199,26 +284,38 @@ export class MapAnnotations {
 
       const state = route.state ?? "open";
       const color =
-        normalizeHex(route.color) ?? ROUTE_COLORS[state] ?? ROUTE_COLORS.open;
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", color ?? "#22c55e");
-      path.setAttribute("stroke-width", state === "blocked" ? "5" : "4");
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-linejoin", "round");
-      if (state === "blocked") path.setAttribute("stroke-dasharray", "10 8");
-      this.routeGroup.append(path);
+        normalizeHex(route.color) ??
+        ROUTE_COLORS[state] ??
+        ROUTE_COLORS.open ??
+        "#22c55e";
+      const blocked = state === "blocked";
+      const width = blocked ? 3 : 3.5;
+      const casing = el("path", {
+        fill: "none",
+        stroke: "rgba(255, 255, 255, 0.9)",
+        "stroke-width": width + 3,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+      });
+      const path = el("path", {
+        fill: "none",
+        stroke: color,
+        "stroke-width": width,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+        ...(blocked ? { "stroke-dasharray": "2 6" } : {}),
+      });
+      this.routeGroup.append(casing, path);
 
       this.routes.push({
         points,
+        casing,
         path,
         chip: route.label
-          ? this.addChip(
-              state === "blocked" ? "blocked" : "route",
-              route.label,
-              color ?? "#22c55e",
-              false,
-            )
+          ? this.addChip(route.label, color, {
+              ...(blocked ? { glyph: "warning" as const } : {}),
+              tone: blocked ? "blocked" : "route",
+            })
           : null,
         labelIndex: Math.floor((points.length - 1) / 2),
       });
@@ -237,13 +334,11 @@ export class MapAnnotations {
         normalizeHex(marker.color) ?? MARKER_COLORS[kind] ?? "#3366ff";
       this.markers.push({
         at,
-        chip: this.addChip(
-          "place",
-          marker.label ?? "",
-          color,
-          marker.selected === true,
-          kind,
-        ),
+        chip: this.addChip(marker.label ?? "", color, {
+          glyph: MARKER_GLYPHS[kind],
+          tone: "place",
+          selected: marker.selected === true,
+        }),
       });
     }
     this.update();
@@ -257,38 +352,38 @@ export class MapAnnotations {
   }
 
   // -------------------------------------------------------------------------
-  // Per-frame projection
+  // Chips
   // -------------------------------------------------------------------------
 
   private addChip(
-    variant: "hazard" | "place" | "route" | "blocked",
     label: string,
     color: string,
-    selected: boolean,
-    glyph?: MarkerKind,
+    options: {
+      glyph?: GlyphName | undefined;
+      tone: "place" | "hazard" | "route" | "blocked";
+      selected?: boolean;
+    },
   ): HTMLElement {
-    const el = document.createElement("div");
-    el.className = `annotation-chip is-${variant}${selected ? " is-selected" : ""}`;
-    el.hidden = true;
-    el.style.setProperty("--chip-accent", color);
+    const chip = document.createElement("div");
+    chip.className = `annotation-chip is-${options.tone}${
+      options.selected ? " is-selected" : ""
+    }`;
+    chip.hidden = true;
+    chip.style.setProperty("--chip-accent", color);
 
-    if (glyph) {
-      const svg = document.createElementNS(SVG_NS, "svg");
-      svg.setAttribute("viewBox", "0 0 16 16");
-      svg.setAttribute("class", "annotation-chip-glyph");
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", MARKER_GLYPHS[glyph]);
-      svg.append(path);
-      el.append(svg);
-    }
+    if (options.glyph) chip.append(glyphNode(options.glyph));
     if (label) {
       const text = document.createElement("span");
       text.textContent = label;
-      el.append(text);
+      chip.append(text);
     }
-    this.chips.append(el);
-    return el;
+    this.chips.append(chip);
+    return chip;
   }
+
+  // -------------------------------------------------------------------------
+  // Per-frame projection
+  // -------------------------------------------------------------------------
 
   private place(chip: HTMLElement | null, at: Projected | null): void {
     if (!chip) return;
@@ -300,7 +395,9 @@ export class MapAnnotations {
       return;
     }
     chip.hidden = false;
-    chip.style.transform = `translate(-50%, -50%) translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px)`;
+    // The independent `translate` property, not `transform`: an inline
+    // transform would override the stylesheet's hover and press states.
+    chip.style.translate = `${at.x.toFixed(1)}px ${at.y.toFixed(1)}px`;
   }
 
   /** Project one normalized point, or null if it is behind the camera. */
@@ -335,10 +432,13 @@ export class MapAnnotations {
       const screen = route.points.map((point) => this.screen(point));
       if (screen.some((point) => point === null)) {
         route.path.setAttribute("d", "");
+        route.casing.setAttribute("d", "");
         this.place(route.chip, null);
         continue;
       }
-      route.path.setAttribute("d", toPath(screen as Projected[]));
+      const d = toPath(screen as Projected[]);
+      route.path.setAttribute("d", d);
+      route.casing.setAttribute("d", d);
       this.place(route.chip, screen[route.labelIndex] ?? null);
     }
 
@@ -346,14 +446,4 @@ export class MapAnnotations {
       this.place(marker.chip, this.screen(marker.at));
     }
   }
-}
-
-function toPath(points: Projected[]): string {
-  let d = "";
-  for (let i = 0; i < points.length; i++) {
-    const point = points[i];
-    if (!point) continue;
-    d += `${i === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-  }
-  return d;
 }

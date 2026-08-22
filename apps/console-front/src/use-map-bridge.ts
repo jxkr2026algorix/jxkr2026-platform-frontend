@@ -11,7 +11,11 @@ import {
   type TriggerKind,
 } from "@salgil/map-webgpu-canvas/protocol";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_MAP_SCENARIO, DEFAULT_RAINFALL_MM_PER_HOUR } from "./domain";
+import {
+  DEFAULT_DISTRICT_CODE,
+  DEFAULT_MAP_SCENARIO,
+  DEFAULT_RAINFALL_MM_PER_HOUR,
+} from "./domain";
 import {
   applyOptimisticControlCommand,
   initialMapControls,
@@ -155,6 +159,7 @@ function getMapLocation(): { src: string; origin: string } {
   url.searchParams.set("ui", "0");
   url.searchParams.set("scenario", DEFAULT_MAP_SCENARIO);
   url.searchParams.set("rain", String(DEFAULT_RAINFALL_MM_PER_HOUR));
+  url.searchParams.set("district", DEFAULT_DISTRICT_CODE);
   return { src: url.toString(), origin: url.origin };
 }
 
@@ -245,7 +250,11 @@ export function useMapBridge() {
             rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
           },
         });
-        send({ type: "map:set-view", payload: { mode: "tilted" } });
+        send({ type: "map:set-view", payload: { mode: "flat" } });
+        send({
+          type: "map:focus-district",
+          payload: { code: DEFAULT_DISTRICT_CODE },
+        });
       };
       if (message.type === "map:ready") {
         setConnection(

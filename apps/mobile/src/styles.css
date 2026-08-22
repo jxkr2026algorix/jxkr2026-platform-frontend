@@ -212,3 +212,47 @@ button:focus-visible {
     grid-template-columns: 92px minmax(0, 1fr);
   }
 }
+
+/* Shelters the router could not reach, kept visible with their reason:
+   "none nearby" and "roads blocked" call for different actions. */
+.blocked-routes {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blocked-routes li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+}
+
+.blocked-routes strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.blocked-routes span {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+/* Required alongside any computed route: it is a suggestion, and the road
+   network it came from is an ODbL derivative. Neither line may be removed. */
+.route-notice {
+  margin: 12px 0 0;
+  color: #5c6068;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.route-notice small {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #8a8f98;
+}

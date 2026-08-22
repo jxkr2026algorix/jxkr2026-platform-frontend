@@ -3,11 +3,14 @@ import {
   PROVINCE_CODE,
 } from "@salgil/map-webgpu-canvas/districts";
 import type { PlatformEvent } from "@salgil/platform-client";
+import type { ReactNode } from "react";
 
 interface DistrictStatusPanelProps {
   readonly districtCode: string | null;
   readonly loading: boolean;
   readonly event: PlatformEvent | null;
+  /** Rendered below the status sections, e.g. the evacuation routing panel. */
+  readonly children?: ReactNode;
 }
 
 type WeatherSnapshot = {
@@ -102,6 +105,7 @@ export function DistrictStatusPanel({
   districtCode,
   loading,
   event,
+  children,
 }: DistrictStatusPanelProps) {
   const weather = districtCode
     ? (weatherByDistrict[districtCode] ?? defaultWeather)
@@ -159,6 +163,7 @@ export function DistrictStatusPanel({
           ))}
         </ol>
       </section>
+      {children}
     </aside>
   );
 }

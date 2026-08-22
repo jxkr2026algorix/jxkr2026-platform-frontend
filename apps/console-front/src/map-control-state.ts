@@ -6,7 +6,11 @@ import type {
   Scenario,
   ViewMode,
 } from "@salgil/map-webgpu-canvas/protocol";
-import { DEFAULT_MAP_SCENARIO, DEFAULT_RAINFALL_MM_PER_HOUR } from "./domain";
+import {
+  DEFAULT_DISTRICT_CODE,
+  DEFAULT_MAP_SCENARIO,
+  DEFAULT_RAINFALL_MM_PER_HOUR,
+} from "./domain";
 
 export interface MapControlState {
   readonly basemap: BasemapStyle;
@@ -44,10 +48,10 @@ export const initialMapControls: MapControlState = {
   basemap: "satellite",
   scenario: DEFAULT_MAP_SCENARIO,
   rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
-  viewMode: "tilted",
+  viewMode: "flat",
   playing: false,
   overlayEnabled: true,
-  districtCode: null,
+  districtCode: DEFAULT_DISTRICT_CODE,
   districtOverlay: true,
   districtLoading: false,
 };
@@ -128,6 +132,7 @@ export function applyOptimisticControlCommand(
     case "map:set-markers":
     case "map:set-routes":
     case "map:set-camera":
+    case "map:zoom":
     case "map:ping":
       return { controls, pending };
   }

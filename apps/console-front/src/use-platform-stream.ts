@@ -2,7 +2,6 @@ import {
   createPlatformClient,
   type DisasterType,
   type EventDraft,
-  type IncidentMode,
   type PlatformConnection,
   type PlatformEvent,
 } from "@salgil/platform-client";
@@ -18,7 +17,7 @@ export function usePlatformStream() {
     [],
   );
   const [event, setEvent] = useState<PlatformEvent | null>(null);
-  const [mode, setMode] = useState<IncidentMode>("training");
+
   const [selectedType, setSelectedType] = useState<DisasterType>("landslide");
   const [connection, setConnection] =
     useState<PlatformConnection>("connecting");
@@ -30,14 +29,12 @@ export function usePlatformStream() {
       switch (message.kind) {
         case "disaster.event":
           setEvent(message.event);
-          setMode(message.event.mode);
           setSelectedType(message.event.type);
           return;
         case "incident.clear":
           setEvent(null);
           return;
         case "control.sync":
-          setMode(message.mode);
           setSelectedType(message.selectedType);
           return;
       }
@@ -52,11 +49,12 @@ export function usePlatformStream() {
   }, [client]);
 
   const publish = useCallback(
-    async (draft: EventDraft) => {
+    async (draft: Omit<EventDraft, "mode">) => {
       setPublishing(true);
       setErrorMessage("");
       try {
-        return await client.publish(draft);
+        // The live/training split is gone: every incident is a real one.
+        return await client.publish({ ...draft, mode: "live" });
       } catch (error) {
         if (error instanceof Error) {
           setErrorMessage(
@@ -72,14 +70,23 @@ export function usePlatformStream() {
     [client],
   );
 
+  /**
+   * Push an event into the dashboard without the backend. Used to verify
+   * alert, zone, shelter, and route rendering while those endpoints are
+   * still being built; it never reaches the platform.
+   */
+  const previewEvent = useCallback((next: PlatformEvent | null) => {
+    setEvent(next);
+  }, []);
+
   return {
+    client,
     event,
-    mode,
+    previewEvent,
     selectedType,
     connection,
     publishing,
     errorMessage,
-    setMode,
     setSelectedType,
     publish,
   };

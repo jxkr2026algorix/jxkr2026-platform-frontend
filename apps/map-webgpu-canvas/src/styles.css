@@ -279,8 +279,9 @@ input:focus-visible {
   inset: 0;
 }
 
-/* Labels are HTML, not SVG text: chips need the product's Pretendard GOV
-   stack and a backdrop blur, neither of which SVG gives us. */
+/* One chip style for everything on the map. Colour is carried by the glyph
+   and, where it matters, the border — not by a filled pill, which would
+   compete with the terrain the operator is actually reading. */
 .annotation-chip {
   position: absolute;
   left: 0;
@@ -288,15 +289,21 @@ input:focus-visible {
   transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
-  border-radius: 9px;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid rgba(16, 24, 40, 0.14);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.16),
+    0 2px 8px rgba(16, 24, 40, 0.1);
+  color: #171719;
   font-family:
     "Pretendard GOV", "Pretendard GOV Variable", Pretendard, sans-serif;
   font-size: 12px;
-  font-weight: 500;
-  line-height: normal;
-  letter-spacing: -0.36px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -307,51 +314,82 @@ input:focus-visible {
 
 .annotation-chip-glyph {
   flex: none;
-  width: 13px;
-  height: 13px;
-  fill: var(--chip-accent, #3366ff);
+  width: 11px;
+  height: 11px;
+  color: var(--chip-accent, #3366ff);
 }
 
-/* A hazard area is an alert, so its badge stays the dark chip. */
+/* A hazard alert inverts: dark ground, white text. It is the one thing on
+   the map that must be found before anything else, and inversion separates it
+   from every reference chip without adding another colour. The glyph keeps
+   the severity accent so the level still reads at a glance. */
 .annotation-chip.is-hazard,
 .annotation-chip.is-blocked {
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(12, 14, 18, 0.86);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 4px 14px rgba(0, 0, 0, 0.24);
   color: #fff;
 }
 
-.annotation-chip.is-blocked {
-  color: #fecaca;
-}
-
-/* A place is reference information, so its chip is light and recedes. */
-.annotation-chip.is-place,
-.annotation-chip.is-route {
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  box-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.18),
-    0 4px 12px rgba(16, 24, 40, 0.12);
-  color: #171719;
+/* Severity is carried by a leading rule rather than a tinted background,
+   which would fight the terrain underneath. */
+.annotation-chip.is-hazard::before,
+.annotation-chip.is-blocked::before {
+  content: "";
+  flex: none;
+  align-self: stretch;
+  width: 2px;
+  margin: -1px 1px -1px -3px;
+  border-radius: 2px;
+  background: var(--chip-accent, #ef4444);
 }
 
 .annotation-chip.is-route {
-  padding: 5px 9px;
+  padding: 4px 8px;
   font-size: 11px;
+  font-weight: 550;
+  color: #3f4450;
 }
 
 .annotation-chip.is-selected {
-  font-weight: 650;
+  border-color: var(--chip-accent, #3366ff);
   box-shadow:
-    0 0 0 2px var(--chip-accent, #3366ff),
-    0 4px 12px rgba(16, 24, 40, 0.18);
+    0 0 0 1px var(--chip-accent, #3366ff),
+    0 2px 10px rgba(16, 24, 40, 0.16);
 }
 
-.annotation-chip.is-selected .annotation-chip-glyph {
-  width: 15px;
-  height: 15px;
+/* An activatable alert is the only place the overlay takes pointer input:
+   pressing it runs the simulation from the predicted origin. Everything else
+   stays transparent so the map can still be worked through it. */
+.annotation-chip.is-actionable {
+  pointer-events: auto;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+
+.annotation-chip.is-actionable:hover,
+.annotation-chip.is-actionable:focus-visible {
+  transform: translate(-50%, -50%) scale(1.03);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--chip-accent, #ef4444) 22%, transparent),
+    0 2px 10px rgba(16, 24, 40, 0.18);
+  outline: none;
+}
+
+.annotation-chip.is-actionable:active {
+  transform: translate(-50%, -50%) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .annotation-chip.is-actionable {
+    transition: none;
+  }
 }
 
 #attribution {

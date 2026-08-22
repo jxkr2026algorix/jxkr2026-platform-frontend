@@ -3,6 +3,9 @@ import type { MapPoint, Scenario } from "@salgil/map-webgpu-canvas/protocol";
 export type View = "situation" | "plan" | "contact" | "patrol";
 export type CommunityName = "Sangchon" | "Wolwe" | "Bunam" | "Juwangsan";
 
+/** Cheongsong-gun: the district the console opens on. */
+export const DEFAULT_DISTRICT_CODE = "47750";
+
 export const DEFAULT_MAP_SCENARIO: Scenario = "landslide";
 export const DEFAULT_RAINFALL_MM_PER_HOUR = 72;
 

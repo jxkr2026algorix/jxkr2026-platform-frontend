@@ -111,6 +111,18 @@ export interface RiskZone {
   /** Fill/badge accent override, "#rrggbb". Defaults by severity. */
   color?: string;
   polygon: RiskZonePoint[];
+  /**
+   * Predicted point of origin — where the model expects the hazard to start.
+   * Activating the zone's badge runs the simulation from here, so this is the
+   * hand-off from the backend's prediction to the renderer. Defaults to the
+   * polygon centroid when omitted.
+   */
+  origin?: AnyPoint;
+  /**
+   * False to render the zone as a read-only annotation. Zones are activatable
+   * by default: a predicted hazard the operator cannot run is of little use.
+   */
+  activatable?: boolean;
 }
 
 /**
@@ -281,6 +293,15 @@ export type DashboardCommand =
       payload: { code: string | null };
     }
   | {
+      /**
+       * Zoom relative to wherever the camera currently is: below 1 moves in,
+       * above 1 moves out. Relative because the dashboard's copy of the
+       * distance is up to half a second stale.
+       */
+      type: "map:zoom";
+      payload: { factor: number };
+    }
+  | {
       /** Toggle the 시/군 boundary overlay drawn from the national dataset. */
       type: "map:set-district-overlay";
       payload: { enabled: boolean };
@@ -377,6 +398,15 @@ export type MapEvent =
       payload: { hazard: TriggerKind; at: MapPoint };
     }
   | {
+      /**
+       * An operator activated a predicted risk zone on the map. The renderer
+       * has already switched to that scenario and started the simulation from
+       * the zone's origin; this reports it so the dashboard can follow.
+       */
+      type: "map:alert-activated";
+      payload: { id: string; hazard: TriggerKind; at: MapPoint };
+    }
+  | {
       /** Edge-triggered hazard lifecycle notification. */
       type: "map:hazard";
       payload: {
@@ -424,6 +454,7 @@ const COMMAND_TYPES: readonly string[] = [
   "map:set-routes",
   "map:focus-district",
   "map:set-district-overlay",
+  "map:zoom",
   "map:ping",
 ];
 

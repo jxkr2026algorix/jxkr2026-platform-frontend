@@ -10,8 +10,11 @@ import {
 import {
   createPlatformClient,
   type DisasterType,
-  type MobileSession,
   type PlatformEvent,
+  type RoutePlan,
+  recommendedLeg,
+  SCENARIO_TO_HAZARD,
+  type Shelter,
 } from "@salgil/platform-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -56,10 +59,21 @@ function getMapLocation(): { src: string; origin: string } {
   url.searchParams.set("origin", window.location.origin);
   url.searchParams.set("ui", "0");
   url.searchParams.set("scenario", "clear");
+  // Residents read a plan of their own area; they do not pan the province.
+  url.searchParams.set("district", "47750");
+  url.searchParams.set("interaction", "0");
   return { src: url.toString(), origin: url.origin };
 }
 
-function toMapRiskZone(zone: MobileSession["riskZones"][number]): RiskZone {
+/**
+ * Where the resident is. The device has no fix in the prototype, so this is
+ * the shared demo site; a real build reads geolocation.
+ */
+const ORIGIN = { lat: 36.5012, lon: 129.0332, label: "Sangchon" } as const;
+
+type PlatformRiskZone = NonNullable<PlatformEvent["zones"]>[number];
+
+function toMapRiskZone(zone: PlatformRiskZone): RiskZone {
   return {
     id: zone.id,
     polygon: zone.polygon,
@@ -83,7 +97,8 @@ export function App() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const lastTriggeredEventRef = useRef("");
   const [event, setEvent] = useState<PlatformEvent | null>(null);
-  const [session, setSession] = useState<MobileSession | null>(null);
+  const [plan, setPlan] = useState<RoutePlan | null>(null);
+  const [shelters, setShelters] = useState<Shelter[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -96,10 +111,6 @@ export function App() {
       if (message.kind === "incident.clear") setEvent(null);
     });
     client.start();
-    client
-      .getMobileSession()
-      .then(setSession)
-      .catch(() => undefined);
     return () => {
       unsubscribe();
       client.stop();
@@ -129,6 +140,33 @@ export function App() {
     return () => window.removeEventListener("message", handleMessage);
   }, [mapLocation.origin]);
 
+  useEffect(() => {
+    if (!event) {
+      setPlan(null);
+      setShelters([]);
+      return;
+    }
+    let cancelled = false;
+    const hazard = SCENARIO_TO_HAZARD[event.type];
+    void Promise.all([
+      client.planEvacuation({ hazard, ...ORIGIN, mode: "foot" }),
+      client
+        .findShelters({ hazard, lat: ORIGIN.lat, lon: ORIGIN.lon, limit: 6 })
+        .catch(() => [] as Shelter[]),
+    ])
+      .then(([nextPlan, nextShelters]) => {
+        if (cancelled) return;
+        setPlan(nextPlan);
+        setShelters(nextShelters);
+      })
+      .catch(() => {
+        if (!cancelled) setPlan(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [client, event]);
+
   const postMapCommand = useCallback(
     (command: DashboardCommand) => {
       frameRef.current?.contentWindow?.postMessage(
@@ -156,16 +194,23 @@ export function App() {
       type: "map:set-markers",
       payload: {
         markers: [
-          ...(session
-            ? [
-                {
-                  id: "assigned-shelter",
-                  at: session.shelter,
-                  label: session.shelter.label,
-                  kind: "shelter" as const,
-                },
-              ]
-            : []),
+          {
+            id: "current-location",
+            at: { lat: ORIGIN.lat, lon: ORIGIN.lon },
+            label: ORIGIN.label,
+            kind: "community" as const,
+            selected: true,
+          },
+          ...shelters
+            .filter(
+              (s) => typeof s.lat === "number" && typeof s.lon === "number",
+            )
+            .map((s) => ({
+              id: s.id,
+              at: { lat: s.lat as number, lon: s.lon as number },
+              label: s.name,
+              kind: "shelter" as const,
+            })),
           ...(event?.location
             ? [
                 {
@@ -183,22 +228,26 @@ export function App() {
     postMapCommand({
       type: "map:set-routes",
       payload: {
-        routes: session
-          ? [
-              {
-                id: "assigned-route",
-                path: session.route,
-                label: "Evacuation route",
-                state: "advised",
-              },
-            ]
-          : [],
+        routes: (plan?.routes ?? [])
+          .filter((leg) => leg.found && leg.geometry.length >= 2)
+          .map((leg) => ({
+            id: leg.shelter_id,
+            // GeoJSON order is [lon, lat].
+            path: leg.geometry.map(([lon, lat]) => ({
+              lat: lat ?? 0,
+              lon: lon ?? 0,
+            })),
+            label: leg.shelter_name,
+            // "advised", never "open": this is a suggested route, not a
+            // verified official safe route.
+            state: "advised" as const,
+          })),
       },
     });
     postMapCommand({
       type: "map:set-zones",
       payload: {
-        zones: (event?.zones ?? session?.riskZones ?? []).map(toMapRiskZone),
+        zones: (event?.zones ?? []).map(toMapRiskZone),
       },
     });
 
@@ -218,14 +267,18 @@ export function App() {
         },
       });
     }
-  }, [event, mapReady, postMapCommand, session]);
+  }, [event, mapReady, plan, postMapCommand, shelters]);
 
+  const best = plan ? recommendedLeg(plan) : undefined;
   const instruction =
     event?.instruction ??
-    session?.caution ??
     "Stay clear of hazard zones and follow official evacuation guidance.";
-  const shelter = session?.shelter.label ?? "Assignment pending";
-  const travelTime = session ? `${session.estimatedMinutes} min` : "—";
+  const shelter = best?.shelter_name ?? "No reachable shelter yet";
+  const travelTime =
+    best?.duration_minutes === null || best?.duration_minutes === undefined
+      ? "—"
+      : `${Math.round(best.duration_minutes)} min`;
+  const blocked = plan?.routes.filter((leg) => !leg.found) ?? [];
 
   return (
     <main className="mobile-shell">
@@ -265,13 +318,37 @@ export function App() {
           </div>
           <div>
             <dt>Route</dt>
-            <dd>{session ? "Official blue route" : "Awaiting assignment"}</dd>
+            {/* Never "official": the backend's data contract forbids
+                presenting a computed route as a verified safe route. */}
+            <dd>
+              {best
+                ? "Suggested route, avoiding predicted risk"
+                : "Awaiting a reachable route"}
+            </dd>
           </div>
           <div>
             <dt>Guidance</dt>
             <dd>{instruction}</dd>
           </div>
         </dl>
+
+        {blocked.length > 0 ? (
+          <ul className="blocked-routes">
+            {blocked.map((leg) => (
+              <li key={leg.shelter_id}>
+                <strong>{leg.shelter_name}</strong>
+                <span>{leg.reason ?? "Unreachable"}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {plan ? (
+          <p className="route-notice">
+            {plan.notice}
+            <small>{plan.attribution}</small>
+          </p>
+        ) : null}
 
         <button
           className="acknowledge-button"

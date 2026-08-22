@@ -3,11 +3,7 @@ import type {
   DashboardCommand,
   ViewMode,
 } from "@salgil/map-webgpu-canvas/protocol";
-import type {
-  DisasterType,
-  IncidentMode,
-  PlatformEvent,
-} from "@salgil/platform-client";
+import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 import { motion } from "motion/react";
 import { SegmentIndicator } from "../components/SegmentIndicator";
 import type { useMapBridge } from "../use-map-bridge";
@@ -18,15 +14,14 @@ type MapBridge = ReturnType<typeof useMapBridge>;
 
 interface SituationControlsProps {
   readonly map: MapBridge;
-  readonly mode: IncidentMode;
   readonly selectedType: DisasterType;
   readonly placementArmed: boolean;
   readonly publishing: boolean;
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
-  readonly onModeChange: (mode: IncidentMode) => void;
   readonly onEventSelect: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onReset: () => void;
 }
 
 const viewLabels: Record<ViewMode, string> = {
@@ -42,15 +37,14 @@ const basemapLabels: Record<BasemapStyle, string> = {
 
 export function SituationControls({
   map,
-  mode,
   selectedType,
   placementArmed,
   publishing,
   errorMessage,
   latestEvent,
   onMapCommand,
-  onModeChange,
   onEventSelect,
+  onReset,
 }: SituationControlsProps) {
   const controls = map.status.controls;
 
@@ -64,14 +58,13 @@ export function SituationControls({
       </div>
       <div className="rail-section">
         <EventControls
-          mode={mode}
           selectedType={selectedType}
           placementArmed={placementArmed}
           publishing={publishing}
           errorMessage={errorMessage}
           latestEvent={latestEvent}
-          onModeChange={onModeChange}
           onSelect={onEventSelect}
+          onReset={onReset}
         />
         <div className="map-display-controls">
           <fieldset className="compact-controls">

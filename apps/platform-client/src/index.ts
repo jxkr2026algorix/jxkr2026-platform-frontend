@@ -1,4 +1,5 @@
 import ky from "ky";
+import { z } from "zod";
 import {
   type EventDraft,
   type MobileSession,
@@ -14,6 +15,14 @@ import {
   incidentPageSchema,
   incidentToPlatformEvent,
 } from "./incidents";
+import {
+  type RoutePlan,
+  type RouteRequest,
+  routePlanSchema,
+  type Shelter,
+  shelterSchema,
+  toRouteRequestBody,
+} from "./routing";
 
 export {
   DEMO_LOCATION,
@@ -25,6 +34,16 @@ export {
   type PlatformEvent,
   type PlatformMessage,
 } from "./contracts";
+export { SCENARIO_TO_HAZARD } from "./incidents";
+export {
+  type RouteLeg,
+  type RoutePlan,
+  type RouteRequest,
+  recommendedLeg,
+  type Shelter,
+  type TransportMode,
+  transportModes,
+} from "./routing";
 
 export type PlatformConnection = "connecting" | "live" | "unavailable";
 
@@ -139,6 +158,49 @@ export class PlatformClient {
     }
   }
 
+  /**
+   * Shelters usable for one hazard. `hazard` is required by the backend on
+   * purpose: an earthquake shelter is not a flood shelter, and letting the
+   * question be asked without it invites exactly that substitution.
+   */
+  async findShelters(options: {
+    hazard: string;
+    regionCode?: string;
+    lat?: number;
+    lon?: number;
+    limit?: number;
+  }): Promise<Shelter[]> {
+    const search = new URLSearchParams({ hazard: options.hazard });
+    if (options.regionCode) search.set("region_code", options.regionCode);
+    if (options.lat !== undefined) search.set("lat", String(options.lat));
+    if (options.lon !== undefined) search.set("lon", String(options.lon));
+    if (options.limit) search.set("limit", String(options.limit));
+    const response = await ky
+      .get(`${this.baseUrl}/shelters?${search}`, { retry: 0, timeout: 8_000 })
+      .json<unknown>();
+    return z.array(shelterSchema).parse(response);
+  }
+
+  /**
+   * Evacuation routes that avoid the predicted hazard. The result is a
+   * suggestion: callers must surface `notice` and `attribution` rather than
+   * presenting it as an official safe route.
+   */
+  async planEvacuation(request: RouteRequest): Promise<RoutePlan> {
+    const response = await ky
+      .post(`${this.baseUrl}/routing/evacuation`, {
+        json: toRouteRequestBody(request),
+        retry: 0,
+        timeout: 20_000,
+      })
+      .json<unknown>();
+    return routePlanSchema.parse(response);
+  }
+
+  private get baseUrl(): string {
+    return this.config.apiUrl.replace(/\/+$/, "");
+  }
+
   async getMobileSession(): Promise<MobileSession> {
     const response = await ky
       .get(`${this.config.apiUrl}/mobile/session`, { retry: 0, timeout: 4_000 })
@@ -147,7 +209,7 @@ export class PlatformClient {
   }
 
   private get incidentsUrl(): string {
-    return `${this.config.apiUrl.replace(/\/+$/, "")}/incidents`;
+    return `${this.baseUrl}/incidents`;
   }
 
   private async pollIncidents(): Promise<void> {

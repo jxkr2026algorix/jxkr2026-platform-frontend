@@ -17,6 +17,10 @@ import {
 
 export type CameraMode = "flat" | "tilted";
 
+/** Vertical field of view; must match the mat4Perspective call in update(). */
+const FOV_Y_RADIANS = (40 * Math.PI) / 180;
+const HALF_FOV_TAN = Math.tan(FOV_Y_RADIANS / 2);
+
 const DEFAULT_DISTANCE_FACTOR = 1.65;
 const MAX_DISTANCE_FACTOR = 1.8;
 
@@ -49,6 +53,14 @@ export class OrbitCamera {
 
   private pointers: PointerState[] = [];
   private detachController: AbortController | null = null;
+  /**
+   * When false, drag and wheel do nothing: the camera is driven only by
+   * district selection. An operator who has panned off into terrain with no
+   * operational meaning has lost the plot they came here to read, so the
+   * embedded map does not offer that. Taps still report, because placing an
+   * incident is a different act from moving the view.
+   */
+  private navigable = true;
   private pinchDistance = 0;
   private shakeAmp = 0;
   onUserInteraction: (() => void) | null = null;
@@ -72,14 +84,21 @@ export class OrbitCamera {
     }
     this.mode = mode;
     this.flatGoal = mode === "flat" ? 1 : 0;
+    // Distance is deliberately preserved across the switch, so 2D and 3D stay
+    // framed on the same district. The old flat-mode floor pulled the camera
+    // back to the whole region, which broke that sync. The far end is bounded
+    // by the cover clamp in update().
     this.distanceGoal = clamp(
       this.distanceGoal,
-      this.worldSize * 0.08,
+      this.worldSize * 0.008,
       this.worldSize * MAX_DISTANCE_FACTOR,
     );
-    if (mode === "flat") {
-      this.distanceGoal = Math.max(this.distanceGoal, this.worldSize * 0.7);
-    }
+  }
+
+  /** Enable or disable manual pan, orbit, and zoom. Taps are unaffected. */
+  setNavigable(navigable: boolean): void {
+    this.navigable = navigable;
+    if (!navigable) this.pointers = [];
   }
 
   get blend(): number {
@@ -136,7 +155,7 @@ export class OrbitCamera {
       "pointerdown",
       (event) => {
         canvas.setPointerCapture(event.pointerId);
-        canvas.classList.add("dragging");
+        if (this.navigable) canvas.classList.add("dragging");
         this.pointers.push({
           id: event.pointerId,
           x: event.clientX,
@@ -161,6 +180,7 @@ export class OrbitCamera {
         const dy = event.clientY - pointer.y;
         pointer.x = event.clientX;
         pointer.y = event.clientY;
+        if (!this.navigable) return;
         this.onUserInteraction?.();
 
         if (this.pointers.length === 2) {
@@ -214,6 +234,7 @@ export class OrbitCamera {
       "wheel",
       (event) => {
         event.preventDefault();
+        if (!this.navigable) return;
         this.onUserInteraction?.();
         this.zoomBy(Math.exp(event.deltaY * 0.0012));
       },
@@ -231,7 +252,7 @@ export class OrbitCamera {
     this.pointers = [];
   }
 
-  private zoomBy(factor: number): void {
+  zoomBy(factor: number): void {
     // Deep zoom allowed: the detail LOD swaps in building-level tiles.
     this.distanceGoal = clamp(
       this.distanceGoal * factor,
@@ -269,7 +290,24 @@ export class OrbitCamera {
     );
   }
 
+  /**
+   * Furthest the camera may sit before the viewport shows ground beyond the
+   * terrain. The visible rectangle at the look-at plane is
+   * `2·d·tan(fov/2)` tall and `aspect` times that wide, so the wider
+   * dimension is what has to fit inside the square world.
+   */
+  private coverDistance(aspect: number): number {
+    return this.worldSize / (2 * HALF_FOV_TAN * Math.max(aspect, 1));
+  }
+
   update(dt: number, aspect: number): void {
+    // An operational map must never show void past the map edge, so zooming
+    // out stops where the terrain still covers the viewport. This is a hard
+    // cap on top of the mode-specific limits in setMode()/zoomBy().
+    const maxDistance = this.coverDistance(aspect);
+    this.distanceGoal = Math.min(this.distanceGoal, maxDistance);
+    this.distance = Math.min(this.distance, maxDistance);
+
     this.flatBlend = damp(this.flatBlend, this.flatGoal, 3.2, dt);
     this.yaw = damp(this.yaw, this.yawGoal, 2.6, dt);
     this.distance = damp(this.distance, this.distanceGoal, 5, dt);
@@ -277,16 +315,18 @@ export class OrbitCamera {
     // Keep the visible area inside the map: in flat mode the margin equals
     // the half-extent of the viewport, so dragging stops at the map edge
     // instead of revealing the void beyond it.
-    const halfH = Math.tan((20 * Math.PI) / 180) * this.distanceGoal;
+    const halfH = HALF_FOV_TAN * this.distanceGoal;
     const halfW = halfH * Math.max(aspect, 0.5);
     const base = this.worldSize * 0.02;
+    // The margin is the full half-extent: panning stops with the view edge
+    // exactly on the map edge. Anything less lets the viewport overhang.
     const marginX = Math.min(
       this.worldSize * 0.5,
-      base + (halfW * 0.95 - base) * this.flatBlend,
+      base + (halfW - base) * this.flatBlend,
     );
     const marginZ = Math.min(
       this.worldSize * 0.5,
-      base + (halfH * 0.95 - base) * this.flatBlend,
+      base + (halfH - base) * this.flatBlend,
     );
     this.targetGoal[0] = clamp(
       this.targetGoal[0],
@@ -325,7 +365,7 @@ export class OrbitCamera {
     mat4LookAt(this.view, this.eye, this.target, [0, 1, 0]);
     mat4Perspective(
       this.proj,
-      (40 * Math.PI) / 180,
+      FOV_Y_RADIANS,
       aspect,
       Math.max(2, this.worldSize * 0.001),
       this.worldSize * 5,

@@ -9,7 +9,13 @@
 
 import { GLOBALS_WGSL, GRID_WGSL, UTIL_WGSL } from "./common";
 
-export const RAIN_COUNT = 40000;
+/**
+ * Particle counts are per-screenful, not per-region. Everything here is only
+ * drawn once the camera is close enough for an individual drop or ember to
+ * mean something (see G.district.y), so these are sized for a town-scale view
+ * rather than for covering a province.
+ */
+export const RAIN_COUNT = 14000;
 export const FIRE_PARTICLE_COUNT = 8192;
 export const DEBRIS_COUNT = 16384;
 
@@ -107,8 +113,8 @@ fn vs(
     snow,
   );
   let dir = normalize(vec3f(G.rain.z * fall * 0.03, -fall, G.rain.w * fall * 0.03));
-  let width = world * 0.00022 * (1.0 + 2.5 * snow);
-  let halfLen = mix(fall * 0.045, width * 1.6, snow);
+  let width = world * 0.00013 * (1.0 + 4.0 * snow);
+  let halfLen = mix(fall * 0.115, width * 1.6, snow);
 
   let toCam = normalize(G.camPos.xyz - p.xyz);
   var side = cross(dir, toCam);
@@ -118,7 +124,7 @@ fn vs(
 
   var out : VSOut;
   out.pos = G.viewProj * vec4f(pos, 1.0);
-  out.alpha = mix(0.09 + 0.15 * G.rain.x, 0.42, snow);
+  out.alpha = mix(0.09 + 0.15 * G.rain.x, 0.42, snow) * G.district.y;
   out.uv = corner;
   return out;
 }
@@ -234,6 +240,7 @@ fn vs(
     size = world * 0.0007;
     alpha = 0.9 * lifeFrac;
   }
+  alpha *= G.district.y;
 
   // Smoke puffs tumble slowly as they rise.
   let ang = seed * 6.2831 + age * (seed - 0.5) * 1.6;
@@ -395,7 +402,7 @@ fn vs(
   out.pos = G.viewProj * vec4f(pos, 1.0);
   out.color = vec4f(
     applyFog(tonemap(vec3f(0.30, 0.24, 0.17) * shade), pos),
-    clamp(p.w / 1.5, 0.0, 1.0) * fadeIn,
+    clamp(p.w / 1.5, 0.0, 1.0) * fadeIn * G.district.y,
   );
   out.uv = ruv;
   out.seed = seed;

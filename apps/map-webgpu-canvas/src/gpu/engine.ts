@@ -5,7 +5,7 @@
  */
 
 import { OrbitCamera } from "../camera";
-import { clamp, damp, mat4Identity, mat4Inverse } from "../math";
+import { clamp, damp, mat4Identity, mat4Inverse, smoothstep } from "../math";
 import type {
   HazardKind,
   HazardMetrics,
@@ -196,6 +196,8 @@ export class Engine {
   private districtTexRef: GPUTexture | null = null;
   private districtOn = true;
   private districtBlend = 0;
+  /** 0..1 fade applied to every particle system; see renderFrame. */
+  private particleVisibility = 0;
 
   private readonly debrisQueue: {
     start: number;
@@ -511,8 +513,11 @@ export class Engine {
     if (this.viewMode === "auto") {
       // Only water hazards benefit from the 3D view (terrain + water depth);
       // everything else reads better as a top-down map. Manual 2D/3D wins.
+      // 3D earns its cost only where water depth over terrain is the thing
+      // being read: heavy rain, flood, landslide, tsunami. Wildfire, typhoon,
+      // heat, cold, snow, and drought are spatial extent questions and read
+      // better as a plan, so they stay in 2D.
       const wants3d =
-        this.scenario === "wildfire" ||
         WATER_3D_SCENARIOS.includes(this.scenario) ||
         (this.scenario === "clear" && this.rainTarget > 0);
       this.camera.setMode(wants3d ? "tilted" : "flat");
@@ -603,6 +608,19 @@ export class Engine {
 
   setCamera(center?: MapPoint, distanceMeters?: number): void {
     this.camera.flyTo(center?.x, center?.y, distanceMeters);
+  }
+
+  /**
+   * Allow or block manual pan/orbit/zoom. Embedded maps are driven by
+   * district selection only, so the view always frames somewhere meaningful.
+   */
+  setNavigable(navigable: boolean): void {
+    this.camera.setNavigable(navigable);
+  }
+
+  /** Step the zoom; the camera clamps so the terrain still covers the view. */
+  zoomBy(factor: number): void {
+    this.camera.zoomBy(factor);
   }
 
   /** Normalized look-at point the camera is easing toward. */
@@ -1190,7 +1208,10 @@ export class Engine {
     const rainInstances = Math.floor(
       clamp(this.rainCurrent / 120, 0, 1) * RAIN_COUNT,
     );
-    this.particles.draw(pass, rainInstances, fireActive);
+    // Below this the systems contribute nothing visible, so skip the draws.
+    if (this.particleVisibility > 0.01) {
+      this.particles.draw(pass, rainInstances, fireActive);
+    }
     pass.end();
 
     this.device.queue.submit([encoder.finish()]);
@@ -1341,7 +1362,15 @@ export class Engine {
     );
     const districtGoal = this.districtOn && this.districtTexRef ? 1 : 0;
     this.districtBlend = damp(this.districtBlend, districtGoal, 5, realDt);
-    g.setVec4(ROW.district, this.districtBlend, 0, 0, 0);
+    // Particles only mean something at town scale. Framed on a district they
+    // are sub-pixel specks — tens of thousands of them — which reads as noise
+    // over the terrain rather than as weather. Fade them in as the camera
+    // closes, and drop them entirely in the flat plan view.
+    this.particleVisibility =
+      (1 -
+        smoothstep(world * 0.035, world * 0.1, this.camera.currentDistance)) *
+      (1 - cam.blend * 0.92);
+    g.setVec4(ROW.district, this.districtBlend, this.particleVisibility, 0, 0);
     this.detailBlend = damp(this.detailBlend, this.detailOn ? 1 : 0, 4, realDt);
     g.setVec4(
       ROW.detail,

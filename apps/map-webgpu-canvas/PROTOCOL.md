@@ -56,7 +56,7 @@
 | `map:set-overlay` | `{ enabled }` | 위험 지역 오버레이 토글(기본 켜짐). 시나리오별 취약지(침수·산불·산사태·액상화·해안 침수·온열/한랭/고립/용수)를 해칭으로 표시. |
 | `map:set-basemap` | `{ style }` | 바닥 지도 전환: `satellite`(위성, 기본) \| `map`(구글맵풍 일반 지도, CARTO Voyager). 지도 타일은 백그라운드 로드되며 준비되는 즉시 크로스페이드. 현재 스타일은 `map:state.basemap`으로 보고. |
 | `map:set-camera` | `{ center?, distanceMeters? }` | 3D 카메라 이동. `center`는 정규화 `{x,y}` 또는 실좌표 `{lat,lon}` 둘 다 허용(실좌표는 georeference 기준으로 변환하며, 실측 지형이 없으면 `map:ack`에 `no-georeference` 오류). 2D 맵과의 실시간 동기화 훅(아래 참조). 역방향 동기화는 `map:state.camera`로 제공. |
-| `map:set-zones` | `{ zones: RiskZone[] }` | **(초안)** 서버에서 내려오는 위험 지역 폴리곤 표시. 전체 교체 방식이며 `[]`는 클리어. 각 zone은 주석 오버레이에 **점선 외곽선 + 옅은 채움**으로 그려지고, 중심점에 다크 블러 배지(아이콘+라벨, Pretendard GOV 12px)가 뜬다. 지형 셰이더에 칠하지 않고 캔버스 위 SVG로 그리므로 카메라 거리와 무관하게 선 두께가 일정하다. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. **서버 데이터 스키마 확정 시 `applyZones()`(main.ts) 한 곳만 어댑터로 수정하면 된다.** |
+| `map:set-zones` | `{ zones: RiskZone[] }` | **(초안)** 서버에서 내려오는 위험 지역 폴리곤 표시. 전체 교체 방식이며 `[]`는 클리어. 각 zone은 주석 오버레이에 **점선 외곽선 + 옅은 채움**으로 그려지고, 중심점에 다크 블러 배지(아이콘+라벨, Pretendard GOV 12px)가 뜬다. 지형 셰이더에 칠하지 않고 캔버스 위 SVG로 그리므로 카메라 거리와 무관하게 선 두께가 일정하다. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. `origin`(정규화 또는 위경도)은 모델이 예측한 발생 지점으로, 배지를 눌렀을 때 시뮬레이션이 시작되는 자리다 — 없으면 폴리곤 중심을 쓴다. `activatable: false` 를 주면 읽기 전용 주석이 된다. `polygon` 꼭짓점은 정규화 `{x,y}` 또는 위경도 `{lat,lon}` 둘 다 허용. `severity`(advisory/watch/warning)별 기본색 또는 `color: "#rrggbb"` 지정. **서버 데이터 스키마 확정 시 `applyZones()`(main.ts) 한 곳만 어댑터로 수정하면 된다.** |
 | `map:set-markers` | `{ markers: MapMarker[] }` | 지점 주석(대피소·마을·시설·현장) 전체 교체. `[]`는 클리어. 각 marker는 `at`(정규화 또는 위경도), `label?`, `kind?`(`shelter`\|`community`\|`facility`\|`incident`\|`responder`), `color?`, `selected?`. 글리프+라벨 칩이 지형 위 해당 지점을 매 프레임 따라간다. |
 | `map:set-routes` | `{ routes: MapRoute[] }` | 경로 주석(대피 경로·통제 도로) 전체 교체. `[]`는 클리어. 각 route는 `path`(꼭짓점 2개 이상), `label?`, `state?`(`open` 초록 실선 \| `advised` 주황 \| `blocked` 빨강 점선), `color?`. 라벨 칩은 경로 중간점에 붙는다. |
 | `map:focus-district` | `{ code }` | 경북 시·군 선거구 포커스. `code`는 5자리 행정표준코드(예: 포항시 `47110`), `null` 또는 도 전체 코드 `47000`이면 비례대표(=도 전역) 뷰로 복귀. 해당 시·군의 실측 경계 상자에 맞춰 카메라를 이동하고 경계 오버레이에서 강조한다. 현재 로드된 지형 영역 밖의 시·군(현재는 울릉군뿐)은 지형을 다시 받아오므로 즉시 이동하지 않으며, 진행 중에는 `map:state.district.loading`이 `true`가 된다. |
@@ -95,6 +95,7 @@
 | --- | --- | --- |
 | `map:ready` | 초기화 완료 시, 그리고 `map:focus-district`로 지형 영역이 바뀔 때마다 | `{ protocolVersion, webgpuSupported, world: { gridSize, sizeMeters }, capabilities }`. **대시보드는 이 이벤트 수신 후에 명령을 보낸다.** 초기화 실패 시에도 `webgpuSupported: false`로 전송된다. |
 | `map:state` | 약 2 Hz 스로틀 | `{ scenario, viewMode, rainfallMmPerHour, playing, speed, simTimeSeconds, fps, basemap, camera, district, hazards }`. `hazards`는 침수 면적비·연소 셀 수·산사태 위험지수와 각 심각도(`none`/`advisory`/`watch`/`warning`). `district`는 `{ selected, overlay, loading }`으로, 현재 포커스된 시·군 코드(도 전역이면 `null`)·경계 오버레이 표시 여부·지형 재로드 진행 여부. |
+| `map:alert-activated` | 지도의 위험 경보 배지를 눌렀을 때 | `{ id, hazard, at }`. 예측 구역의 배지를 누르면 렌더러가 해당 시나리오로 전환하고 `origin`(없으면 폴리곤 중심)에서 시뮬레이션을 시작한 뒤 이 이벤트를 보낸다. **예측값이 시뮬레이션의 입력이 되는 지점이다.** |
 | `map:point-selected` | 지도에서 지점 재난을 클릭했을 때 | `{ hazard, at }`. 대시보드는 이 좌표를 플랫폼 이벤트 POST에 사용한다. iframe 임베드 상태에서는 로컬 시뮬레이션이 기본 정지되어 최초 지점만 즉시 렌더링하며, 확산 상태는 서버 스트림 명령으로 갱신한다. |
 | `map:hazard` | 심각도 단계 변화 시(에지 트리거) | `{ hazard, phase, severity, at? }`. `phase`: `started` \| `escalated` \| `deescalated` \| `ended`. `at`은 정규화 좌표. |
 | `map:ack` | `id` 있는 명령 처리 직후 | `{ id, ok, error? }` |
@@ -144,6 +145,13 @@ function send(command: { type: string; payload?: unknown }) {
 두 층 모두 매 프레임 `engine.projectPointUnclipped()`로 재투영되므로 카메라가 움직여도
 지형에 붙어 있다. 폴리곤은 화면 밖 꼭짓점도 유지하고(잘라내면 도형이 찢어진다), 칩만 화면
 경계에서 숨긴다. 카메라 뒤로 넘어간 꼭짓점이 하나라도 있으면 그 도형 전체를 숨긴다.
+
+### 위험 경보를 눌러 시뮬레이션 실행
+
+`label` 이 있는 위험 구역 배지는 기본으로 **누를 수 있다**. 오버레이에서 포인터 입력을 받는
+곳은 이 배지뿐이고, 나머지는 투명해서 지도를 그대로 끌 수 있다. 누르면 렌더러가
+`hazard` 에 맞는 시나리오로 전환하고 `origin` 에서 재난을 발생시킨 뒤 재생을 시작한다.
+시뮬레이션이 없는 재난이면 배지는 눌러도 아무 일도 하지 않고 상태 메시지만 띄운다.
 
 `?demo=annotations`로 열면 청송군 진보면 기준 샘플 주석(위험 구역 2, 마커 4, 경로 2)이
 실좌표로 로드된다. `src/demo-annotations.ts`는 개발용 픽스처이므로 플랫폼 스트림이 marker와

@@ -40,6 +40,18 @@ export const riskZoneSchema = z.object({
       z.object({ lat: z.number(), lon: z.number() }),
     ]),
   ),
+  /**
+   * Predicted point of origin. Activating the zone on the map runs the
+   * simulation from here, so this is where a prediction becomes a scenario.
+   */
+  origin: z
+    .union([
+      z.object({ x: z.number(), y: z.number() }),
+      z.object({ lat: z.number(), lon: z.number() }),
+    ])
+    .optional(),
+  /** False for a read-only annotation, e.g. a confirmed road closure. */
+  activatable: z.boolean().optional(),
 });
 
 export const platformEventSchema = z.object({

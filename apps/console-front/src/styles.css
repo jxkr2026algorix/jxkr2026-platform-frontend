@@ -2271,3 +2271,183 @@ tbody tr:last-child td {
     display: none;
   }
 }
+
+/* --- Evacuation routing ------------------------------------------------- */
+
+.evacuation-panel {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.evacuation-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.evacuation-actions .button {
+  flex: 1;
+  min-width: 0;
+}
+
+.evacuation-error {
+  margin-top: 8px;
+  color: var(--critical-ink, #b91c1c);
+  font-size: 11px;
+}
+
+.evacuation-result {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.evacuation-metrics {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.evacuation-metrics div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.evacuation-metrics dt {
+  color: var(--ink-tertiary);
+  font-size: 11px;
+}
+
+.evacuation-metrics dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 550;
+  text-align: right;
+}
+
+.evacuation-metrics dd small {
+  display: block;
+  color: var(--ink-tertiary);
+  font-size: 10px;
+  font-weight: 450;
+}
+
+/* Unreachable shelters stay listed: "none nearby" and "all roads blocked"
+   are different states and the operator has to be able to tell them apart. */
+.evacuation-blocked {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evacuation-blocked li {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--critical-soft, #fef2f2);
+}
+
+.evacuation-blocked strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.evacuation-blocked span {
+  color: var(--ink-tertiary);
+  font-size: 10px;
+}
+
+.evacuation-flag {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--alert-soft, #fff7ed);
+  color: var(--alert-ink, #c2410c);
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.evacuation-note {
+  margin: 0;
+  color: var(--ink-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.evacuation-note.is-warning {
+  color: var(--alert-ink, #c2410c);
+}
+
+/* The data contract requires both of these on screen with any route. */
+.evacuation-notice {
+  margin: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-tertiary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.evacuation-attribution {
+  margin: 0;
+  color: var(--ink-tertiary);
+  font-size: 9px;
+}
+
+.event-reset {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Zoom control, clear of the left rail. Pan stays on the canvas. */
+.map-zoom {
+  position: fixed;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  z-index: 14;
+  top: 16px;
+  left: 332px;
+  display: grid;
+  border-radius: 8px;
+  background: var(--floating-bg-strong);
+  box-shadow: var(--floating-shadow);
+  backdrop-filter: blur(18px) saturate(0.96);
+  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.map-zoom button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.map-zoom button + button {
+  border-top: 1px solid var(--line);
+}
+
+.map-zoom button:hover {
+  background: var(--floating-control-weak);
+}
+
+.map-zoom svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}

@@ -102,7 +102,7 @@ const EVENT_COPY: Record<
   },
 };
 
-const SCENARIO_TO_HAZARD: Record<DisasterType, string> = {
+export const SCENARIO_TO_HAZARD: Record<DisasterType, string> = {
   rain: "heavy_rain",
   flood: "flood",
   wildfire: "wildfire",

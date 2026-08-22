@@ -22,6 +22,7 @@ import {
   PROVINCE_BBOX,
   PROVINCE_CODE,
   PROVINCE_REGION,
+  provinceRegionForAspect,
   regionForDistrict,
 } from "./districts";
 import type { RegionBox } from "./geo";
@@ -39,11 +40,21 @@ import {
   type RiskZonePoint,
   SCENARIOS,
   type Scenario,
+  type TriggerKind,
 } from "./protocol";
 import { GRID_SIZE, generateTerrain, type TerrainData } from "./terrain-gen";
 import { ControlPanel, showStatus } from "./ui";
 
 const params = new URLSearchParams(location.search);
+
+/**
+ * Cheongsong-gun. The map opens framed on a district rather than the whole
+ * province: a province-wide first frame is mostly terrain with no operational
+ * meaning, and on a wide window it puts the map's own edge on screen.
+ * Override with `?district=<행정표준코드>`, or `?district=47000` for the
+ * province view.
+ */
+const DEFAULT_DISTRICT_CODE = "47750";
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 const fallbackBox = document.getElementById("fallback") as HTMLElement;
 const panelBox = document.getElementById("panel") as HTMLElement;
@@ -72,6 +83,12 @@ let geoRef: GeoReference | null = null;
 
 /** Terrain region currently loaded, and the district framed inside it. */
 let currentRegion: RegionBox = PROVINCE_REGION;
+/**
+ * The province region this session booted with. It is sized to the console's
+ * viewport rather than being `PROVINCE_REGION`, so returning to the
+ * whole-province view has to remember it instead of recomputing it.
+ */
+let homeRegion: RegionBox = PROVINCE_REGION;
 let selectedDistrict: string | null = null;
 let districtOverlayOn = true;
 let regionLoading = false;
@@ -154,19 +171,22 @@ async function focusDistrict(code: string | null): Promise<void> {
   const target = district
     ? regionForDistrict(district, currentRegion)
     : {
-        region: PROVINCE_REGION,
-        reload: !sameRegion(currentRegion, PROVINCE_REGION),
+        region: homeRegion,
+        reload: !sameRegion(currentRegion, homeRegion),
       };
   if (target.reload) await switchRegion(target.region);
 
   refreshDistrictOverlay();
   if (!engine) return;
   if (!district) {
-    // 비례대표 / province view: pull all the way back to the full extent.
-    engine.setCamera(
-      { x: 0.5, y: 0.5 },
-      cameraForBbox(PROVINCE_BBOX).distanceMeters,
-    );
+    // 비례대표 / province view: frame Gyeongbuk itself rather than the loaded
+    // square. The surrounding terrain exists only so a wide viewport has real
+    // ground in it instead of void.
+    const province = cameraForBbox(PROVINCE_BBOX, 40, 0.95);
+    const center = geoRef
+      ? latLonToMapPoint(province.lat, province.lon, geoRef)
+      : { x: 0.5, y: 0.5 };
+    engine.setCamera(center, province.distanceMeters);
     return;
   }
   const framing = cameraForBbox(district.bbox);
@@ -174,6 +194,50 @@ async function focusDistrict(code: string | null): Promise<void> {
     ? latLonToMapPoint(framing.lat, framing.lon, geoRef)
     : { x: 0.5, y: 0.5 };
   engine.setCamera(center, framing.distanceMeters);
+}
+
+/**
+ * Backend hazard slugs to the renderer's simulated hazards. Anything not
+ * listed has no point-source simulation, so its badge stays inert rather
+ * than pretending to run something.
+ */
+const HAZARD_TO_TRIGGER: Record<string, TriggerKind> = {
+  flood: "flood",
+  wildfire: "wildfire",
+  landslide: "landslide",
+  earthquake: "earthquake",
+  tsunami: "tsunami",
+  nuclear: "nuclear",
+  chemical: "chemical",
+  chemical_accident: "chemical",
+  heavy_rain: "flood",
+  typhoon: "flood",
+};
+
+/**
+ * An operator activated a predicted risk zone. The prediction is the input to
+ * the simulation: switch to that scenario, seed it at the predicted origin,
+ * and start running so the spread can be watched from there.
+ */
+function activateZone(zone: {
+  id: string;
+  hazard: string | undefined;
+  at: { x: number; y: number };
+}): void {
+  if (!engine) return;
+  const hazard = HAZARD_TO_TRIGGER[zone.hazard ?? ""];
+  if (!hazard) {
+    showStatus("No simulation is available for this hazard.", 3000);
+    return;
+  }
+  engine.setScenario(hazard === "flood" ? "flood" : hazard);
+  engine.triggerAt(hazard, zone.at.x, zone.at.y);
+  engine.simControl("play");
+  bridge.send({
+    type: "map:alert-activated",
+    payload: { id: zone.id, hazard, at: zone.at },
+  });
+  showStatus("Simulating from the predicted origin", 3000);
 }
 
 function handleCommand(command: DashboardToMap): void {
@@ -260,6 +324,15 @@ function handleCommand(command: DashboardToMap): void {
       });
       break;
     }
+    case "map:zoom": {
+      const factor = command.payload.factor;
+      if (!Number.isFinite(factor) || factor <= 0) {
+        ack(false, "bad-factor");
+        return;
+      }
+      engine.zoomBy(factor);
+      break;
+    }
     case "map:set-district-overlay":
       districtOverlayOn = command.payload.enabled;
       engine.setDistrictOverlayEnabled(districtOverlayOn);
@@ -337,9 +410,23 @@ function exaggerationFor(sizeMeters: number): number {
   return sizeMeters >= 80000 ? PROVINCE_EXAGGERATION : 1.6;
 }
 
-/** The region to load at startup: the whole province unless overridden. */
+/**
+ * The region to load at startup. The province square is widened to the
+ * viewport's aspect ratio, so a wide console window is filled with real
+ * ground and no district sits on the edge of the loaded data. Explicit
+ * `?lat/lon/km` still wins.
+ */
 function initialRegion(): RealTerrainOptions {
-  const options = { ...DEFAULT_REGION };
+  const sized = provinceRegionForAspect(
+    window.innerWidth / Math.max(window.innerHeight, 1),
+  );
+  const options: RealTerrainOptions = {
+    ...DEFAULT_REGION,
+    centerLat: sized.centerLat,
+    centerLon: sized.centerLon,
+    sizeMeters: sized.sizeMeters,
+    exaggeration: exaggerationFor(sized.sizeMeters),
+  };
   const lat = Number(params.get("lat"));
   const lon = Number(params.get("lon"));
   const km = Number(params.get("km"));
@@ -497,6 +584,7 @@ async function main(): Promise<void> {
     centerLon: region.centerLon,
     sizeMeters: region.sizeMeters,
   };
+  homeRegion = currentRegion;
 
   try {
     engine = await Engine.create(canvas, terrain, imagery, street);
@@ -512,6 +600,13 @@ async function main(): Promise<void> {
 
   wireEngine(engine);
   refreshDistrictOverlay();
+
+  // Embedded maps are driven by district selection, not by hand. Standalone
+  // keeps free navigation so the renderer stays workable in development.
+  const navigable = params.get("interaction") !== "0";
+  engine.setNavigable(navigable);
+  // 2D by default: the operating picture is read as a plan, not a landscape.
+  engine.setViewMode("flat");
 
   const initialScenario = params.get("scenario") as Scenario | null;
   if (initialScenario && SCENARIOS.includes(initialScenario)) {
@@ -547,6 +642,7 @@ async function main(): Promise<void> {
       },
       toNormalized,
     );
+    annotations.onActivateZone = activateZone;
     if (params.get("demo") === "annotations") {
       applyZones(DEMO_ZONES);
       applyMarkers(DEMO_MARKERS);
@@ -556,6 +652,11 @@ async function main(): Promise<void> {
     }
   }
   sendReady(true, geo);
+  // Frame the opening district once the georeference exists, so the first
+  // thing on screen is a place rather than the whole loaded square.
+  void focusDistrict(params.get("district") ?? DEFAULT_DISTRICT_CODE).catch(
+    () => undefined,
+  );
   setInterval(() => {
     if (!engine) return;
     const payload: MapStatePayload = {

@@ -80,6 +80,31 @@ export const PROVINCE_BBOX: Bbox = [
  */
 export const PROVINCE_REGION: RegionBox = regionForBbox(PROVINCE_BBOX);
 
+/**
+ * How much wider than the province the terrain has to be so a wide console
+ * viewport is covered while the whole province is still framed. The terrain
+ * is a square, so a 16:9 window would otherwise either crop Gyeongbuk
+ * top-to-bottom or show void left and right — this trades a coarser basemap
+ * for having real ground under every district edge.
+ *
+ * Capped so an ultrawide window cannot balloon the tile fetch; past the cap
+ * the camera's cover clamp crops instead of leaving void.
+ */
+const MAX_ASPECT_MARGIN = 2.5;
+
+/**
+ * Province region sized for a viewport of the given aspect ratio. At 1:1 this
+ * is {@link PROVINCE_REGION}; wider viewports get a proportionally wider
+ * square so no district runs off the edge of the loaded data.
+ */
+export function provinceRegionForAspect(aspect: number): RegionBox {
+  const safe = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  return regionForBbox(
+    PROVINCE_BBOX,
+    1.06 * Math.min(Math.max(safe, 1), MAX_ASPECT_MARGIN),
+  );
+}
+
 export const DATA_SOURCE = dataset.source;
 
 const BY_CODE = new Map(DISTRICTS.map((district) => [district.code, district]));

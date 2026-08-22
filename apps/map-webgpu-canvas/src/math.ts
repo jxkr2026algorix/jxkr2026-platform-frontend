@@ -174,3 +174,10 @@ export function mat4Inverse(out: Mat4, m: Mat4): boolean {
   out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * d;
   return true;
 }
+
+/** GLSL-style smoothstep, for CPU-side fades that mirror shader curves. */
+export function smoothstep(edge0: number, edge1: number, x: number): number {
+  if (edge1 === edge0) return x < edge0 ? 0 : 1;
+  const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}

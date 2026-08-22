@@ -367,10 +367,218 @@ export async function loadBasemap(
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Composited-region cache.
+//
+// The tile cache below already skips the network on a repeat load, but the
+// expensive part is what happens after: compositing ~150 tiles, decoding a
+// 1024x1024 terrarium image into heights, and deriving the fuel map. Caching
+// the finished product instead turns a multi-second load into a few hundred
+// milliseconds.
+// ---------------------------------------------------------------------------
+
+const REGION_CACHE_NAME = "salgil-region-v2";
+let regionCachePromise: Promise<Cache | null> | undefined;
+
+function getRegionCache(): Promise<Cache | null> {
+  regionCachePromise ??= (async () => {
+    try {
+      return await caches.open(REGION_CACHE_NAME);
+    } catch {
+      return null;
+    }
+  })();
+  return regionCachePromise;
+}
+
+/** Cache key for one region. Rounded so float drift cannot miss a hit. */
+function regionKey(options: RealTerrainOptions, part: string): string {
+  const { centerLat, centerLon, sizeMeters, exaggeration } = options;
+  return (
+    `https://salgil.local/region/${centerLat.toFixed(4)}/` +
+    `${centerLon.toFixed(4)}/${Math.round(sizeMeters)}/` +
+    `${exaggeration.toFixed(2)}/${GRID_SIZE}/${part}`
+  );
+}
+
+interface RegionMeta {
+  minHeight: number;
+  maxHeight: number;
+  west: number;
+  east: number;
+  north: number;
+  south: number;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/webp", 0.86);
+  });
+}
+
+async function blobToCanvas(blob: Blob): Promise<HTMLCanvasElement | null> {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return canvas;
+  } catch {
+    return null;
+  }
+}
+
+/** Rebuild a whole region from cache, or null if anything is missing. */
+async function readCachedRegion(
+  options: RealTerrainOptions,
+): Promise<RealTerrainResult | null> {
+  const cache = await getRegionCache();
+  if (!cache) return null;
+  try {
+    const [metaRes, heightsRes, fuelRes] = await Promise.all([
+      cache.match(regionKey(options, "meta")),
+      cache.match(regionKey(options, "heights")),
+      cache.match(regionKey(options, "fuel")),
+    ]);
+    if (!metaRes || !heightsRes || !fuelRes) return null;
+
+    const meta = (await metaRes.json()) as RegionMeta;
+    const heights = new Float32Array(await heightsRes.arrayBuffer());
+    const fuel = new Float32Array(await fuelRes.arrayBuffer());
+    const n = GRID_SIZE;
+    if (heights.length !== n * n || fuel.length !== n * n) return null;
+
+    // Imagery is optional: a region is still usable with untextured terrain.
+    const [imageryRes, streetRes] = await Promise.all([
+      cache.match(regionKey(options, "imagery")),
+      cache.match(regionKey(options, "street")),
+    ]);
+    const [imagery, street] = await Promise.all([
+      imageryRes ? blobToCanvas(await imageryRes.blob()) : null,
+      streetRes ? blobToCanvas(await streetRes.blob()) : null,
+    ]);
+
+    return {
+      terrain: {
+        gridSize: n,
+        worldSize: options.sizeMeters,
+        heights,
+        fuel,
+        minHeight: meta.minHeight,
+        maxHeight: meta.maxHeight,
+        sampleHeight: makeHeightSampler(heights, n),
+      },
+      geo: {
+        centerLat: options.centerLat,
+        centerLon: options.centerLon,
+        sizeMeters: options.sizeMeters,
+        west: meta.west,
+        east: meta.east,
+        north: meta.north,
+        south: meta.south,
+        source: "aws-terrain-tiles",
+      },
+      imagery,
+      street,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Store a freshly built region. Failures are silent: the map already works. */
+async function writeCachedRegion(
+  options: RealTerrainOptions,
+  result: RealTerrainResult,
+): Promise<void> {
+  const cache = await getRegionCache();
+  if (!cache) return;
+  const meta: RegionMeta = {
+    minHeight: result.terrain.minHeight,
+    maxHeight: result.terrain.maxHeight,
+    west: result.geo.west,
+    east: result.geo.east,
+    north: result.geo.north,
+    south: result.geo.south,
+  };
+  const put = (part: string, body: BodyInit, type: string) =>
+    cache
+      .put(
+        regionKey(options, part),
+        new Response(body, { headers: { "Content-Type": type } }),
+      )
+      .catch(() => undefined);
+  try {
+    await Promise.all([
+      put("meta", JSON.stringify(meta), "application/json"),
+      put(
+        "heights",
+        result.terrain.heights.buffer as ArrayBuffer,
+        "application/octet-stream",
+      ),
+      put(
+        "fuel",
+        result.terrain.fuel.buffer as ArrayBuffer,
+        "application/octet-stream",
+      ),
+      ...(result.imagery
+        ? [
+            canvasToBlob(result.imagery).then((blob) =>
+              blob ? put("imagery", blob, "image/webp") : undefined,
+            ),
+          ]
+        : []),
+      ...(result.street
+        ? [
+            canvasToBlob(result.street).then((blob) =>
+              blob ? put("street", blob, "image/webp") : undefined,
+            ),
+          ]
+        : []),
+    ]);
+  } catch {
+    // Quota or a serialization failure; the region is already loaded.
+  }
+}
+
+/** Bilinear height lookup over the grid, shared by fresh and cached loads. */
+function makeHeightSampler(
+  heights: Float32Array,
+  n: number,
+): (u: number, v: number) => number {
+  return (u: number, v: number): number => {
+    const x = clamp(u, 0, 1) * (n - 1);
+    const y = clamp(v, 0, 1) * (n - 1);
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const x1 = Math.min(x0 + 1, n - 1);
+    const y1 = Math.min(y0 + 1, n - 1);
+    const fx = x - x0;
+    const fy = y - y0;
+    return lerp(
+      lerp(heights[y0 * n + x0] ?? 0, heights[y0 * n + x1] ?? 0, fx),
+      lerp(heights[y1 * n + x0] ?? 0, heights[y1 * n + x1] ?? 0, fx),
+      fy,
+    );
+  };
+}
+
 export async function loadRealTerrain(
   options: RealTerrainOptions,
 ): Promise<RealTerrainResult> {
-  const work = loadRealTerrainInner(options);
+  const cached = await readCachedRegion(options);
+  if (cached) return cached;
+
+  const work = loadRealTerrainInner(options).then((result) => {
+    // Cache after returning control, so the first paint is not held up by
+    // WebP encoding two multi-megapixel canvases.
+    setTimeout(() => void writeCachedRegion(options, result), 0);
+    return result;
+  });
   const timeout = new Promise<never>((_, reject) => {
     setTimeout(
       () => reject(new Error("terrain tile load timed out")),
@@ -387,8 +595,11 @@ async function loadRealTerrainInner(
   const n = GRID_SIZE;
 
   const targetMpp = sizeMeters / n;
+  // One zoom finer than the grid strictly needs: the 1024-px DEM composite
+  // then downsamples real detail into the grid rather than upsampling a
+  // coarser source, which matters now the province region is viewport-wide.
   let demZoom = Math.ceil(Math.log2(metersPerPixel(centerLat, 0) / targetMpp));
-  demZoom = clamp(demZoom, 8, 13);
+  demZoom = clamp(demZoom + 1, 8, 13);
   const demMpp = metersPerPixel(centerLat, demZoom);
   const demPxSize = sizeMeters / demMpp;
   const demMinX = lonToGlobalPx(centerLon, demZoom) - demPxSize / 2;
@@ -442,21 +653,7 @@ async function loadRealTerrainInner(
     ? fuelFromImagery(imagery)
     : fuelFromSlope(heights, cellSize);
 
-  const sampleHeight = (u: number, v: number): number => {
-    const x = clamp(u, 0, 1) * (n - 1);
-    const y = clamp(v, 0, 1) * (n - 1);
-    const x0 = Math.floor(x);
-    const y0 = Math.floor(y);
-    const x1 = Math.min(x0 + 1, n - 1);
-    const y1 = Math.min(y0 + 1, n - 1);
-    const fx = x - x0;
-    const fy = y - y0;
-    return lerp(
-      lerp(heights[y0 * n + x0] ?? 0, heights[y0 * n + x1] ?? 0, fx),
-      lerp(heights[y1 * n + x0] ?? 0, heights[y1 * n + x1] ?? 0, fx),
-      fy,
-    );
-  };
+  const sampleHeight = makeHeightSampler(heights, n);
 
   const geo: GeoReference = {
     centerLat,
