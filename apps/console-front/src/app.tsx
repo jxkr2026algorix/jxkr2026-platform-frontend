@@ -17,6 +17,7 @@ import {
   navItems,
   type View,
 } from "./domain";
+import { getPressTransition } from "./motion";
 import { ContactPage } from "./pages/contact-page";
 import { PatrolPage } from "./pages/patrol-page";
 import { PlanPage } from "./pages/plan-page";
@@ -134,6 +135,7 @@ export function App() {
           className="brand"
           to="/situation"
           whileTap={reduceMotion ? {} : { scale: 0.975 }}
+          transition={getPressTransition(reduceMotion)}
           aria-label="SALGIL operations home"
         >
           <span className="brand-lockup">
@@ -149,6 +151,7 @@ export function App() {
               className="nav-item"
               to={item.path}
               whileTap={reduceMotion ? {} : { scale: 0.975 }}
+              transition={getPressTransition(reduceMotion)}
             >
               <span className="nav-label-full">{item.label}</span>
               <span className="nav-label-short">{item.shortLabel}</span>
@@ -177,6 +180,7 @@ export function App() {
               type="button"
               onClick={handleReset}
               whileTap={reduceMotion ? {} : { scale: 0.975 }}
+              transition={getPressTransition(reduceMotion)}
             >
               Reset exercise
             </motion.button>

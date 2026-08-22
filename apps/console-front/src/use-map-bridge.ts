@@ -87,7 +87,6 @@ function isMapMessage(value: unknown): value is MapToDashboard {
       isFiniteNumber(capabilities.maxRainfallMmPerHour);
     return (
       hasValidProtocol &&
-      payload.protocolVersion === PROTOCOL_VERSION &&
       typeof payload.webgpuSupported === "boolean" &&
       hasValidWorld &&
       hasValidCapabilities

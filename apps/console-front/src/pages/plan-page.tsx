@@ -33,7 +33,7 @@ export function PlanPage({
 
   return (
     <section className="view workflow-view" aria-labelledby="plan-title">
-      <div className="workflow-heading liquid-layer layer-soft">
+      <div className="workflow-heading floating-surface surface-soft">
         <div>
           <p className="breadcrumb">Incident 2026-0822-01</p>
           <h1 id="plan-title">Review evacuation plan</h1>
@@ -47,7 +47,7 @@ export function PlanPage({
           {planStatus}
         </span>
       </div>
-      <section className="workflow-body liquid-layer layer-strong">
+      <section className="workflow-body floating-surface surface-strong">
         <div className="lens-heading">
           <div>
             <h2>Community assignments</h2>
@@ -131,7 +131,7 @@ export function PlanPage({
       <AnimatePresence>
         {approved && (
           <motion.div
-            className="workflow-feedback liquid-layer"
+            className="workflow-feedback floating-surface"
             role="status"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

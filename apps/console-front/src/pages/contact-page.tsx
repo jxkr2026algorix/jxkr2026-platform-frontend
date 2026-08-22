@@ -63,7 +63,7 @@ export function ContactPage({
 
   return (
     <section className="view workflow-view" aria-labelledby="contact-title">
-      <div className="workflow-heading liquid-layer layer-soft">
+      <div className="workflow-heading floating-surface surface-soft">
         <div>
           <p className="breadcrumb">
             {approved ? "Approved plan" : "Plan approval required"}
@@ -83,7 +83,7 @@ export function ContactPage({
         </button>
       </div>
       <section
-        className="metric-lens liquid-layer"
+        className="metric-lens floating-surface"
         aria-label="Contact result summary"
       >
         <div>
@@ -103,7 +103,7 @@ export function ContactPage({
           <strong>{contacted ? 2 : 0}</strong>
         </div>
       </section>
-      <section className="workflow-body liquid-layer layer-strong">
+      <section className="workflow-body floating-surface surface-strong">
         <div className="lens-heading">
           <div>
             <h2>Contact roster</h2>
@@ -152,7 +152,7 @@ export function ContactPage({
       <AnimatePresence>
         {contacted && (
           <motion.div
-            className="workflow-feedback feedback-action liquid-layer"
+            className="workflow-feedback feedback-action floating-surface"
             role="status"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

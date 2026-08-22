@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import type { FormEvent } from "react";
+import { type FormEvent, useState } from "react";
+import { FloatingSelect } from "../components/FloatingSelect";
 import type { View } from "../domain";
 import { getFeedbackTransition } from "../motion";
 
@@ -11,6 +12,12 @@ interface PatrolPageProps {
   onSubmitReport: () => void;
   onNavigate: (view: View) => void;
 }
+
+const REPORT_TYPE_OPTIONS = [
+  { value: "Access blocked", label: "Access blocked" },
+  { value: "Household status", label: "Household status" },
+  { value: "Support required", label: "Support required" },
+] as const;
 
 function getTaskStatus(contacted: boolean, reported: boolean): string {
   if (reported) return "Report submitted";
@@ -27,6 +34,7 @@ export function PatrolPage({
   onNavigate,
 }: PatrolPageProps) {
   const reduceMotion = useReducedMotion();
+  const [reportType, setReportType] = useState("Access blocked");
   const taskStatus = getTaskStatus(contacted, reported);
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -35,7 +43,7 @@ export function PatrolPage({
 
   return (
     <section className="view workflow-view" aria-labelledby="patrol-title">
-      <div className="workflow-heading liquid-layer layer-soft">
+      <div className="workflow-heading floating-surface surface-soft">
         <div>
           <p className="breadcrumb">Field handoff</p>
           <h1 id="patrol-title">Field tasks</h1>
@@ -45,7 +53,7 @@ export function PatrolPage({
           Open field view
         </a>
       </div>
-      <section className="task-workspace liquid-layer layer-strong">
+      <section className="task-workspace floating-surface surface-strong">
         <div className="task-queue">
           <div className="lens-heading">
             <div>
@@ -103,7 +111,7 @@ export function PatrolPage({
       <AnimatePresence>
         {reportOpen && (
           <motion.section
-            className="report-lens liquid-layer layer-strong"
+            className="report-lens floating-surface surface-strong"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -123,14 +131,13 @@ export function PatrolPage({
               </button>
             </div>
             <form onSubmit={handleSubmit}>
-              <label>
-                Report type
-                <select defaultValue="Access blocked">
-                  <option>Access blocked</option>
-                  <option>Household status</option>
-                  <option>Support required</option>
-                </select>
-              </label>
+              <FloatingSelect
+                label="Report type"
+                value={reportType}
+                options={REPORT_TYPE_OPTIONS}
+                preferredPlacement="top"
+                onValueChange={setReportType}
+              />
               <label>
                 Location
                 <input defaultValue="Sangchon access junction" required />
@@ -150,7 +157,10 @@ export function PatrolPage({
         )}
       </AnimatePresence>
       {reported && (
-        <div className="workflow-feedback critical liquid-layer" role="alert">
+        <div
+          className="workflow-feedback critical floating-surface"
+          role="alert"
+        >
           <span>
             The Sangchon access report changed the route to the north bypass.
           </span>
