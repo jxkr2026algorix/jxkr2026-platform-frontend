@@ -16,9 +16,12 @@
     "dev:map": "yarn workspace @salgil/map-webgpu-canvas dev",
     "dev:platform": "node scripts/platform-demo-server.mjs",
     "lint": "biome check apps",
-    "typecheck": "yarn workspace @salgil/console-front typecheck && yarn workspace @salgil/mobile typecheck && yarn workspace @salgil/map-webgpu-canvas typecheck"
+    "typecheck": "yarn workspace @salgil/console-front typecheck && yarn workspace @salgil/mobile typecheck && yarn workspace @salgil/map-webgpu-canvas typecheck",
+    "qa:map": "node scripts/qa-map.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.9"
+    "@biomejs/biome": "^2.5.9",
+    "playwright": "^1.62.1",
+    "pngjs": "^7.0.0"
   }
 }

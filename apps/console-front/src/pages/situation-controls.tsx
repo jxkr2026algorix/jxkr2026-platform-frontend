@@ -21,7 +21,7 @@ interface SituationControlsProps {
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
   readonly onEventSelect: (type: DisasterType | null) => void;
-  readonly onEventDeclare: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onEventDeclare: (type: DisasterType) => void;
   readonly onReset: () => void;
 }
 

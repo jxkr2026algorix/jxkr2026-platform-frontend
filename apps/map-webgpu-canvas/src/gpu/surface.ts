@@ -26,6 +26,19 @@ ${GLOBALS_WGSL}
 ${GRID_WGSL}
 ${UTIL_WGSL}
 
+/** Bilinear read of the water depth grid. */
+fn waterBilinear(uv : vec2f) -> f32 {
+  let n = gridN();
+  let p = clamp(uv, vec2f(0.0), vec2f(1.0)) * f32(n - 1);
+  let i0 = vec2i(floor(p));
+  let f = fract(p);
+  let a = textureLoad(waterTex, clampCell(i0), 0).r;
+  let b = textureLoad(waterTex, clampCell(i0 + vec2i(1, 0)), 0).r;
+  let c = textureLoad(waterTex, clampCell(i0 + vec2i(0, 1)), 0).r;
+  let d = textureLoad(waterTex, clampCell(i0 + vec2i(1, 1)), 0).r;
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
 struct VSOut {
   @builtin(position) clip : vec4f,
   @location(0) worldPos : vec3f,
@@ -59,7 +72,11 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   let n = i32(G.world.z);
   let cell = clampCell(vec2i(in.uv * f32(n - 1) + 0.5));
   let fire = textureLoad(fireTex, cell, 0);
-  let water = textureLoad(waterTex, cell, 0).r;
+  // Interpolated by hand: r32float is not filterable without an optional
+  // device feature, and point-sampling the depth field draws every simulation
+  // cell as a hard square — at this scale, a flat slab hundreds of metres
+  // across, which is what the giant blue rectangles were.
+  let water = waterBilinear(in.uv);
   let normal = normalize(in.normal);
   let heightNorm = clamp(
     (in.worldPos.y - G.layers.z) / max(G.layers.w - G.layers.z, 1.0), 0.0, 1.0);
@@ -345,6 +362,9 @@ ${GLOBALS_WGSL}
 ${GRID_WGSL}
 ${UTIL_WGSL}
 
+/** Ankle depth. Anything shallower is wet ground, not flooding. */
+const WATER_MIN_DEPTH : f32 = 0.12;
+
 struct VSOut {
   @builtin(position) clip : vec4f,
   @location(0) worldPos : vec3f,
@@ -367,7 +387,10 @@ fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
   let w = textureLoad(waterTex, vec2i(i, j), 0).r;
 
   var y = h + w;
-  if (w < 0.02) {
+  // Below ankle depth this is wet ground, not inundation. Rendering it filled
+  // the whole map with a flat blue wash instead of showing where water
+  // actually collects.
+  if (w < WATER_MIN_DEPTH) {
     y = h - G.world.x * 0.002;
   }
 
@@ -386,7 +409,7 @@ fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
 
 @fragment
 fn fs(in: VSOut) -> @location(0) vec4f {
-  if (in.depth < 0.015) { discard; }
+  if (in.depth < WATER_MIN_DEPTH) { discard; }
   // Animated ripples perturb the analytic surface normal.
   let k = 6.2831 / (G.world.x / 300.0);
   let t = G.camPos.w;
@@ -418,7 +441,11 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   let foam = smoothstep(0.30, 0.05, in.depth) * smoothstep(0.015, 0.04, in.depth);
   lit += vec3f(0.85, 0.88, 0.9) * foam * 0.30;
   lit = applyFog(lit, in.worldPos);
-  let alpha = clamp(0.42 + 0.55 * depthFactor + G.world.w * 0.2, 0.0, 0.94);
+  // Ramped from the threshold rather than starting at 0.42: an opacity floor
+  // is what turned every shallow cell opaque. Now the edge of a flooded
+  // channel fades and the deep line through it reads.
+  let onset = smoothstep(WATER_MIN_DEPTH, WATER_MIN_DEPTH + 0.35, in.depth);
+  let alpha = clamp(onset * (0.30 + 0.62 * depthFactor) + G.world.w * 0.12, 0.0, 0.94);
   return vec4f(tonemap(lit), alpha);
 }
 `;

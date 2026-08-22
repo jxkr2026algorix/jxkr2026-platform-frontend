@@ -100,11 +100,10 @@ export function renderDistrictOverlay(
     if (rings.length === 0 || !intersectsCanvas(rings)) continue;
     const isSelected = district.code === selected;
 
-    if (isSelected) {
-      trace(ctx, rings, size);
-      ctx.fillStyle = "rgba(51, 102, 255, 0.16)";
-      ctx.fill("evenodd");
-    }
+    // No fill on the selected district. The map is always framed on one, so a
+    // tint across it covered most of the screen in flat blue — which read as
+    // standing water and washed out the terrain underneath. The weight of the
+    // outline is enough to say which district is selected.
 
     trace(ctx, rings, size);
     // A dark halo first, so the hairline stays readable over both the

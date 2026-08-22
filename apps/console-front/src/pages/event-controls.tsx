@@ -1,16 +1,19 @@
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 
+/**
+ * Every hazard happens in a place. There is no area-wide disaster to declare:
+ * the operator always marks where it is before it can be simulated.
+ */
 const eventOptions: readonly {
   readonly type: DisasterType;
   readonly label: string;
-  readonly needsLocation: boolean;
 }[] = [
-  { type: "rain", label: "Heavy rain", needsLocation: false },
-  { type: "heatwave", label: "Heatwave", needsLocation: false },
-  { type: "wildfire", label: "Wildfire", needsLocation: true },
-  { type: "flood", label: "Flood", needsLocation: true },
-  { type: "landslide", label: "Landslide", needsLocation: true },
-  { type: "earthquake", label: "Earthquake", needsLocation: true },
+  { type: "rain", label: "Heavy rain" },
+  { type: "flood", label: "Flood" },
+  { type: "landslide", label: "Landslide" },
+  { type: "wildfire", label: "Wildfire" },
+  { type: "earthquake", label: "Earthquake" },
+  { type: "heatwave", label: "Heatwave" },
 ];
 
 type EventControlsProps = {
@@ -21,7 +24,7 @@ type EventControlsProps = {
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
   readonly onSelect: (type: DisasterType | null) => void;
-  readonly onDeclare: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onDeclare: (type: DisasterType) => void;
   readonly onReset: () => void;
 };
 
@@ -62,7 +65,7 @@ export function EventControls({
             }
           >
             <span>{option.label}</span>
-            <small>{option.needsLocation ? "Pick on map" : "Area-wide"}</small>
+            <small>Mark the area</small>
           </button>
         ))}
       </fieldset>
@@ -73,25 +76,16 @@ export function EventControls({
             className="button"
             type="button"
             disabled={publishing}
-            onClick={() => onDeclare(selected.type, selected.needsLocation)}
+            onClick={() => onDeclare(selected.type)}
           >
             {publishing
               ? "Declaring…"
-              : selected.needsLocation
-                ? `Declare ${selected.label.toLowerCase()} — pick the origin`
-                : `Declare ${selected.label.toLowerCase()}`}
-          </button>
-          <button
-            className="link-button"
-            type="button"
-            onClick={() => onSelect(null)}
-          >
-            Cancel
+              : `Mark ${selected.label.toLowerCase()} area on the map`}
           </button>
         </div>
       ) : (
         <p className="placement-prompt">
-          Pick a hazard to declare one, or use Sample data to check the display.
+          Pick a hazard, then mark its area on the map.
         </p>
       )}
 

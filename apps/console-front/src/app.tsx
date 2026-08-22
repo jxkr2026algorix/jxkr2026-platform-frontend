@@ -130,21 +130,12 @@ export function App() {
       map.send({ type: "map:set-scenario", payload: { scenario: type } });
   };
 
-  /** Confirm the pick: publish it, or arm the map for the origin first. */
-  const handleEventDeclare = (type: DisasterType, needsLocation: boolean) => {
-    if (needsLocation) {
-      setPlacementArmed(true);
-      return;
-    }
-    setPlacementArmed(false);
-    void platform
-      .publish({
-        type,
-        ...(type === "rain" ? { rainfallMmPerHour: 72 } : {}),
-      })
-      .catch((error: unknown) => {
-        if (!(error instanceof Error)) throw error;
-      });
+  /**
+   * Confirm the pick. Every hazard is placed on the map first — a disaster
+   * without a location cannot be simulated or routed around.
+   */
+  const handleEventDeclare = (_type: DisasterType) => {
+    setPlacementArmed(true);
   };
 
   /**
