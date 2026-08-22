@@ -266,8 +266,16 @@ function activateZone(zone: {
  * being built: compute the drainage-driven flood extent for a window around
  * the camera. Replaced wholesale once `map:set-hazard-field` is fed upstream.
  */
-/** Horizons the interim player steps through, matching the platform's. */
-const DEMO_HORIZONS = [0, 15, 30, 60, 120] as const;
+/**
+ * Playback runs to two hours in two-minute steps. Five discrete horizons read
+ * as a slideshow; the point of watching spread is seeing it move, so frames
+ * are computed lazily just before each one is shown rather than all at once.
+ */
+const SPREAD_MINUTES = 120;
+const SPREAD_STEP_MINUTES = 2;
+const SPREAD_FRAME_MS = 90;
+/** Frames the finished extent is held for before the loop restarts. */
+const SPREAD_HOLD_STEPS = 18;
 
 let spreadTimer: number | null = null;
 
@@ -279,10 +287,9 @@ function stopSpreadPlayback(): void {
 }
 
 /**
- * Interim spread while the platform's stream is being wired up: compute the
- * terrain once, then publish one frame per horizon on a timer. The frames are
- * the same shape the backend sends, so the renderer cannot tell the
- * difference — only the source changes.
+ * Interim spread while the platform's stream is wired up. The frames are the
+ * same shape the backend sends, so the renderer cannot tell the difference —
+ * only the source changes.
  */
 async function playLocalSpread(
   hazard: "flood" | "wildfire",
@@ -303,24 +310,38 @@ async function playLocalSpread(
     u: (lon - win.west) / (win.east - win.west),
     v: (win.north - lat) / (win.north - win.south),
   };
-  const frames = DEMO_HORIZONS.map((h) =>
-    hazard === "wildfire"
-      ? wildfireFieldAt(terrain, origin, { x: 1, y: 0.35 }, h)
-      : floodFieldAt(terrain, engine?.rainfall || 60, h),
+  const rainfall = engine.rainfall || 60;
+
+  // Frame the window. Spread at 23 m cells is invisible from the district
+  // view it was placed in, so the camera goes where the detail is.
+  const centre = latLonToMapPoint(lat, lon, geoRef);
+  engine.setCamera(
+    centre,
+    ((win.east - win.west) * 111_320 * Math.cos((lat * Math.PI) / 180) * 0.62) /
+      (2 * Math.tan((20 * Math.PI) / 180)),
   );
 
-  let index = 0;
+  let minutes = 0;
   const step = () => {
-    const frame = frames[index];
-    if (frame) {
-      applyHazardField(frame);
-      showStatus(`+${frame.horizonMinutes} min`, 2200);
+    if (!engine) return;
+    // Negative minutes are the hold: keep showing the finished extent.
+    const at = minutes < 0 ? SPREAD_MINUTES : minutes;
+    applyHazardField(
+      hazard === "wildfire"
+        ? wildfireFieldAt(terrain, origin, { x: 1, y: 0.35 }, at)
+        : floodFieldAt(terrain, rainfall, at),
+    );
+    minutes += SPREAD_STEP_MINUTES;
+    if (minutes > SPREAD_MINUTES) {
+      // Hold the full extent before restarting. Snapping from the complete
+      // network back to a bare trunk every few seconds reads as a glitch
+      // rather than as the forecast looping.
+      minutes = -SPREAD_HOLD_STEPS * SPREAD_STEP_MINUTES;
     }
-    index = (index + 1) % frames.length;
   };
+  showStatus(`${HAZARD_LABELS[hazard]} spread`, 2500);
   step();
-  // Loops, so the operator can watch the progression without re-triggering.
-  spreadTimer = window.setInterval(step, 2200);
+  spreadTimer = window.setInterval(step, SPREAD_FRAME_MS);
   return true;
 }
 
@@ -824,9 +845,17 @@ async function main(): Promise<void> {
       toNormalized,
     );
     annotations.onActivateZone = activateZone;
+    engine.onHoverPlacement = (at, radiusMeters) => {
+      annotations?.setPlacementPreview(
+        at,
+        radiusMeters / (engine?.worldSizeMeters ?? 1),
+      );
+    };
+    // `?demo=` is opt-in and only for development. Nothing runs on open:
+    // a map that is already simulating when the page loads tells the operator
+    // an incident is happening when none is.
     const spreadDemo = params.get("demo");
     if (spreadDemo === "flood" || spreadDemo === "wildfire") {
-      // Give the terrain a moment to settle before the one-off computation.
       setTimeout(() => {
         if (!engine || !geoRef) return;
         const c = engine.cameraCenter;

@@ -65,7 +65,6 @@ export function EventControls({
             }
           >
             <span>{option.label}</span>
-            <small>Mark the area</small>
           </button>
         ))}
       </fieldset>
@@ -83,15 +82,11 @@ export function EventControls({
               : `Mark ${selected.label.toLowerCase()} area on the map`}
           </button>
         </div>
-      ) : (
-        <p className="placement-prompt">
-          Pick a hazard, then mark its area on the map.
-        </p>
-      )}
+      ) : null}
 
       {placementArmed ? (
         <p className="placement-prompt" role="status">
-          Select the origin on the map.
+          Drag over the map to size the area, then click to place it.
         </p>
       ) : null}
       {errorMessage ? (

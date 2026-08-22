@@ -66,6 +66,8 @@ export class OrbitCamera {
   onUserInteraction: (() => void) | null = null;
   /** Fired on a short, motionless click/tap with client coordinates. */
   onTap: ((clientX: number, clientY: number) => void) | null = null;
+  /** Fired as the pointer moves, so a placement preview can follow it. */
+  onHover: ((clientX: number, clientY: number) => void) | null = null;
 
   constructor(
     private readonly worldSize: number,
@@ -174,6 +176,7 @@ export class OrbitCamera {
     canvas.addEventListener(
       "pointermove",
       (event) => {
+        this.onHover?.(event.clientX, event.clientY);
         const pointer = this.pointers.find((p) => p.id === event.pointerId);
         if (!pointer) return;
         const dx = event.clientX - pointer.x;

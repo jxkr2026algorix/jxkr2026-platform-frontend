@@ -168,6 +168,10 @@ export class MapAnnotations {
   private readonly zoneGroup: SVGGElement;
   private readonly routeGroup: SVGGElement;
   private readonly chips: HTMLDivElement;
+  /** Ring that follows the pointer while a hazard area is being placed. */
+  private readonly placement: SVGCircleElement;
+  private placementAt: Projected | null = null;
+  private placementRadius = 0;
 
   private zones: ZoneItem[] = [];
   private routes: RouteItem[] = [];
@@ -188,7 +192,16 @@ export class MapAnnotations {
     // Routes read as being on the ground, so they sit under the zone tints.
     this.routeGroup = document.createElementNS(SVG_NS, "g");
     this.zoneGroup = document.createElementNS(SVG_NS, "g");
-    this.svg.append(this.routeGroup, this.zoneGroup);
+    // Above the annotations: it is the thing the operator is aiming.
+    this.placement = el("circle", {
+      r: 0,
+      fill: "rgba(239, 68, 68, 0.12)",
+      stroke: "#ef4444",
+      "stroke-width": 2,
+      "stroke-dasharray": "8 6",
+      visibility: "hidden",
+    });
+    this.svg.append(this.routeGroup, this.zoneGroup, this.placement);
 
     this.chips = document.createElement("div");
     this.chips.className = "annotation-chips";
@@ -207,6 +220,10 @@ export class MapAnnotations {
 
   setZones(zones: RiskZone[]): void {
     this.zoneGroup.replaceChildren();
+    // The chips are separate DOM nodes, so clearing the SVG group is not
+    // enough: leaving them behind left stale labels frozen on screen while the
+    // live ones tracked the map, which looked like the tooltips duplicating.
+    for (const zone of this.zones) zone.chip?.remove();
     this.zones = [];
     for (const zone of zones) {
       const points = zone.polygon
@@ -287,6 +304,7 @@ export class MapAnnotations {
 
   setRoutes(routes: MapRoute[]): void {
     this.routeGroup.replaceChildren();
+    for (const route of this.routes) route.chip?.remove();
     this.routes = [];
     for (const route of routes) {
       const points = route.path
@@ -354,6 +372,16 @@ export class MapAnnotations {
       });
     }
     this.update();
+  }
+
+  /**
+   * Move the placement ring, or hide it with null. Radius is in normalized
+   * map units so it scales with the camera the way the ground does.
+   */
+  setPlacementPreview(at: Projected | null, radiusNormalized: number): void {
+    this.placementAt = at;
+    this.placementRadius = radiusNormalized;
+    if (!at) this.placement.setAttribute("visibility", "hidden");
   }
 
   /** Drop every layer, e.g. before a terrain region swap. */
@@ -457,6 +485,27 @@ export class MapAnnotations {
 
     for (const marker of this.markers) {
       this.place(marker.chip, this.screen(marker.at));
+    }
+
+    if (this.placementAt) {
+      const centre = this.screen(this.placementAt);
+      // Radius measured on screen from a point one radius east, so the ring
+      // matches the ground distance at whatever the camera is doing.
+      const edge = this.screen({
+        x: this.placementAt.x + this.placementRadius,
+        y: this.placementAt.y,
+      });
+      if (centre && edge) {
+        this.placement.setAttribute("cx", centre.x.toFixed(1));
+        this.placement.setAttribute("cy", centre.y.toFixed(1));
+        this.placement.setAttribute(
+          "r",
+          Math.abs(edge.x - centre.x).toFixed(1),
+        );
+        this.placement.setAttribute("visibility", "visible");
+      } else {
+        this.placement.setAttribute("visibility", "hidden");
+      }
     }
   }
 }

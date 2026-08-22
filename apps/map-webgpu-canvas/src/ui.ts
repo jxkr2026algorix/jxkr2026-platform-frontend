@@ -227,7 +227,7 @@ export class ControlPanel {
     this.hint.textContent =
       state.scenario === "clear"
         ? "Rain, flood, landslide, and tsunami scenarios switch to 3D automatically"
-        : "Click the map to set the incident origin";
+        : "Pick a hazard, then click the map";
     const h = state.hazards;
     this.metricsBox.innerHTML = "";
     const lines: [string, string][] = [

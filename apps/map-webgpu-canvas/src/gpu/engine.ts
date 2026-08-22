@@ -241,6 +241,10 @@ export class Engine {
   onPlace:
     | ((hazard: TriggerKind, at: MapPoint, radiusMeters: number) => void)
     | null = null;
+  /** Where the pointer is while armed, so a preview ring can follow it. */
+  onHoverPlacement:
+    | ((at: MapPoint | null, radiusMeters: number) => void)
+    | null = null;
 
   private msaaTex: GPUTexture | null = null;
   private depthTex: GPUTexture | null = null;
@@ -277,6 +281,8 @@ export class Engine {
       if (this.armedHazard) {
         const hazard = this.armedHazard;
         this.armedHazard = null;
+        this.canvas.classList.remove("placing");
+        this.onHoverPlacement?.(null, this.armedRadius);
         this.onPlace?.(hazard, point, this.armedRadius);
         return;
       }
@@ -284,6 +290,13 @@ export class Engine {
       if (!hazard) return;
       this.triggerAt(hazard, point.x, point.y);
       this.onTrigger?.(hazard, point);
+    };
+    // While armed, the pointer drags a ring showing what area the click will
+    // cover. Placing a hazard blind and finding out afterwards is worse than
+    // a moment of preview.
+    this.camera.onHover = (clientX, clientY) => {
+      if (!this.armedHazard) return;
+      this.onHoverPlacement?.(this.pick(clientX, clientY), this.armedRadius);
     };
     this.satBlendTarget = hasImagery ? 1 : 0;
     this.satBlend = this.satBlendTarget;
@@ -744,6 +757,12 @@ export class Engine {
     this.armedHazard = hazard;
     if (radiusMeters && radiusMeters > 0) this.armedRadius = radiusMeters;
     this.canvas.classList.toggle("placing", hazard !== null);
+    if (!hazard) this.onHoverPlacement?.(null, this.armedRadius);
+  }
+
+  /** Metres per normalized map unit, for sizing an overlay in ground terms. */
+  get worldSizeMeters(): number {
+    return this.terrain.worldSize;
   }
 
   /** Step the zoom; the camera clamps so the terrain still covers the view. */
