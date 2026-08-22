@@ -168,6 +168,21 @@ p {
   border: 0;
 }
 
+.map-provider-attribution {
+  position: fixed;
+  z-index: 10;
+  right: 320px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--floating-border);
+  border-radius: 4px;
+  background: var(--floating-bg-strong);
+  color: var(--ink-tertiary);
+  font-size: 10px;
+  line-height: 14px;
+  pointer-events: none;
+}
+
 .map-feedback {
   position: fixed;
   z-index: 40;

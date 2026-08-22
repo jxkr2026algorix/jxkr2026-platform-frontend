@@ -14,6 +14,9 @@ export function MapCanvas({ map }: { readonly map: MapBridge }) {
         title={t("map.frameTitle")}
         allow="fullscreen"
       />
+      <small className="map-provider-attribution">
+        Map © TMAP MOBILITY · © OpenStreetMap contributors · © CARTO
+      </small>
       {map.status.connection !== "ready" ? (
         <div
           className="map-feedback"
