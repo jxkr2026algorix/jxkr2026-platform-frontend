@@ -10,6 +10,7 @@ import {
 import {
   createPlatformClient,
   type DisasterType,
+  openSituationStream,
   type PlatformEvent,
   type RoutePlan,
   recommendedLeg,
@@ -69,9 +70,30 @@ function getMapLocation(): { src: string; origin: string } {
  * Where the resident is. The device has no fix in the prototype, so this is
  * the shared demo site; a real build reads geolocation.
  */
-const ORIGIN = { lat: 36.5012, lon: 129.0332, label: "Sangchon" } as const;
+const ORIGIN = {
+  lat: 36.43,
+  lon: 129.05,
+  label: "Jinbo-myeon, Cheongsong",
+} as const;
 
 type PlatformRiskZone = NonNullable<PlatformEvent["zones"]>[number];
+
+/** A radius as a polygon ring, since the zone contract has no circle form. */
+function ringAround(
+  lat: number,
+  lon: number,
+  radiusMeters: number,
+): { lat: number; lon: number }[] {
+  const dLat = radiusMeters / 110574;
+  const dLon = radiusMeters / (111320 * Math.cos((lat * Math.PI) / 180));
+  return Array.from({ length: 24 }, (_, i) => {
+    const angle = (i / 24) * Math.PI * 2;
+    return {
+      lat: lat + Math.sin(angle) * dLat,
+      lon: lon + Math.cos(angle) * dLon,
+    };
+  });
+}
 
 function toMapRiskZone(zone: PlatformRiskZone): RiskZone {
   return {
@@ -101,6 +123,22 @@ export function App() {
   const [shelters, setShelters] = useState<Shelter[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  /** Hazard the platform is actively streaming spread for, if any. */
+  const [liveHazard, setLiveHazard] = useState<string | null>(null);
+
+  // The stream is what makes this a warning rather than a page someone has to
+  // refresh. Polling still runs underneath as the fallback: a resident whose
+  // connection drops the SSE must not stop being told there is a fire.
+  useEffect(() => {
+    const close = openSituationStream({
+      apiUrl: import.meta.env.VITE_PLATFORM_API_URL ?? "/api/platform",
+      onEvent: (streamEvent) => {
+        if (streamEvent.kind === "frame")
+          setLiveHazard(streamEvent.frame.hazard);
+      },
+    });
+    return close;
+  }, []);
 
   useEffect(() => {
     const unsubscribe = client.subscribe((message) => {
@@ -149,7 +187,15 @@ export function App() {
     let cancelled = false;
     const hazard = SCENARIO_TO_HAZARD[event.type];
     void Promise.all([
-      client.planEvacuation({ hazard, ...ORIGIN, mode: "foot" }),
+      client.planEvacuation({
+        hazard,
+        ...ORIGIN,
+        mode: "foot",
+        // The inference server is in stub mode, whose synthetic risk is not on
+        // the model's scale: at the default threshold it marks every road
+        // impassable. Drop this once a calibrated model is serving.
+        blockThreshold: 0.8,
+      }),
       client
         .findShelters({ hazard, lat: ORIGIN.lat, lon: ORIGIN.lon, limit: 6 })
         .catch(() => [] as Shelter[]),
@@ -247,7 +293,21 @@ export function App() {
     postMapCommand({
       type: "map:set-zones",
       payload: {
-        zones: (event?.zones ?? []).map(toMapRiskZone),
+        zones: [
+          ...(event?.zones ?? []).map(toMapRiskZone),
+          // Confirmed closures from field reports. These are facts, not
+          // forecasts, so they are drawn solid and are not activatable.
+          ...(plan?.routes ?? []).flatMap((leg) =>
+            leg.blocked_by_reports.map((block, index) => ({
+              id: `${leg.shelter_id}-block-${index}`,
+              label: block.detail ?? "Access blocked",
+              hazard: block.kind,
+              severity: "warning" as const,
+              activatable: false,
+              polygon: ringAround(block.lat, block.lon, block.radius_m),
+            })),
+          ),
+        ],
       },
     });
 
@@ -341,6 +401,12 @@ export function App() {
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {liveHazard ? (
+          <p className="live-spread" role="status">
+            Live spread forecast for this area
+          </p>
         ) : null}
 
         {plan ? (

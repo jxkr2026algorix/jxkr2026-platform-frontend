@@ -6,6 +6,7 @@ import type { PlatformEvent } from "@salgil/platform-client";
 import type { ReactNode } from "react";
 import { useI18n } from "../i18n";
 import type { TranslationKey } from "../i18n/messages";
+import { useSidebarTheme } from "../theme";
 
 interface DistrictStatusPanelProps {
   readonly districtCode: string | null;
@@ -105,6 +106,10 @@ export function DistrictStatusPanel({
   children,
 }: DistrictStatusPanelProps) {
   const { locale, t } = useI18n();
+  const { sidebarTheme, toggleSidebarTheme } = useSidebarTheme();
+  const themeActionLabel = t(
+    sidebarTheme === "dark" ? "theme.useLight" : "theme.useDark",
+  );
   const weather = districtCode
     ? (weatherByDistrict[districtCode] ?? defaultWeather)
     : defaultWeather;
@@ -121,6 +126,25 @@ export function DistrictStatusPanel({
       className="district-status-panel"
       aria-label={t("district.summary", { district: districtName })}
     >
+      <button
+        className="sidebar-theme-toggle"
+        type="button"
+        aria-label={themeActionLabel}
+        aria-pressed={sidebarTheme === "dark"}
+        title={themeActionLabel}
+        onClick={toggleSidebarTheme}
+      >
+        {sidebarTheme === "dark" ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.5" />
+            <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19.5 15.2A7.5 7.5 0 0 1 8.8 4.5 7.8 7.8 0 1 0 19.5 15.2Z" />
+          </svg>
+        )}
+      </button>
       <p className="district-status-kicker">{t("district.status")}</p>
       <h2>{districtName}</h2>
       <section aria-label={t("district.weatherConditions")}>

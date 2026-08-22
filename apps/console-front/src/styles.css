@@ -33,6 +33,20 @@
   --nav-text-hover: rgba(29, 29, 31, 0.78);
   --dark-divider: rgba(0, 0, 0, 0.1);
   --button-border: rgba(0, 0, 0, 0.08);
+  --sidebar-dark-surface: rgba(17, 18, 22, 0.94);
+  --sidebar-dark-surface-strong: rgba(12, 13, 16, 0.97);
+  --sidebar-dark-ink: #f5f7fa;
+  --sidebar-dark-ink-secondary: rgba(245, 247, 250, 0.7);
+  --sidebar-dark-ink-tertiary: rgba(245, 247, 250, 0.48);
+  --sidebar-dark-line: rgba(255, 255, 255, 0.12);
+  --sidebar-dark-control: rgba(255, 255, 255, 0.08);
+  --sidebar-dark-control-hover: rgba(255, 255, 255, 0.14);
+  --sidebar-dark-control-selected: rgba(255, 255, 255, 0.18);
+  --sidebar-dark-field: rgba(255, 255, 255, 0.1);
+  --sidebar-dark-focus: #6aa6ff;
+  --sidebar-dark-safe: #7bdc98;
+  --sidebar-dark-alert: #ffad6b;
+  --sidebar-dark-critical: #ff7068;
   --floating-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   --floating-popover-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
   --control-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
@@ -217,6 +231,7 @@ p {
   display: block;
   width: auto;
   object-fit: contain;
+  transition: filter 140ms ease-out;
 }
 
 .brand-logo-salgil {
@@ -2026,6 +2041,51 @@ tbody tr:last-child td {
   backdrop-filter: blur(18px) saturate(0.96);
   -webkit-backdrop-filter: blur(18px) saturate(0.96);
   pointer-events: auto;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.sidebar-theme-toggle {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--floating-control-weak);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.sidebar-theme-toggle:hover {
+  border-color: var(--line-strong);
+  background: var(--floating-control-hover);
+  color: var(--ink);
+}
+
+.sidebar-theme-toggle svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.district-status-kicker,
+.district-status-panel h2 {
+  padding-right: 40px;
 }
 
 .district-status-panel h2 {
@@ -2157,6 +2217,64 @@ tbody tr:last-child td {
   padding: 0;
   justify-content: center;
   border-radius: 50%;
+}
+
+.app-shell[data-sidebar-theme="dark"]
+  :where(
+    .dashboard-brand-header,
+    .operations-panel-left,
+    .district-status-panel,
+    .assistant-drawer
+  ) {
+  --ink: var(--sidebar-dark-ink);
+  --ink-secondary: var(--sidebar-dark-ink-secondary);
+  --ink-tertiary: var(--sidebar-dark-ink-tertiary);
+  --line: var(--sidebar-dark-line);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --focus: var(--sidebar-dark-focus);
+  --safe-ink: var(--sidebar-dark-safe);
+  --alert-ink: var(--sidebar-dark-alert);
+  --critical: var(--sidebar-dark-critical);
+  --floating-border: rgba(255, 255, 255, 0.1);
+  --floating-border-strong: rgba(255, 255, 255, 0.2);
+  --floating-control: var(--sidebar-dark-control-hover);
+  --floating-control-hover: var(--sidebar-dark-control-hover);
+  --floating-control-weak: var(--sidebar-dark-control);
+  --floating-control-selected: var(--sidebar-dark-control-selected);
+  --floating-field: var(--sidebar-dark-field);
+  --floating-popover: var(--sidebar-dark-surface-strong);
+  --nav-text: var(--sidebar-dark-ink-secondary);
+  --nav-text-hover: var(--sidebar-dark-ink);
+  --button-dark: rgba(245, 247, 250, 0.94);
+  --button-dark-hover: var(--sidebar-dark-ink);
+  --button-border: rgba(255, 255, 255, 0.12);
+  --on-dark: #17181c;
+  --control-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  color: var(--sidebar-dark-ink);
+  color-scheme: dark;
+}
+
+.app-shell[data-sidebar-theme="dark"] .operations-panel-left {
+  background: var(--sidebar-dark-surface);
+}
+
+.app-shell[data-sidebar-theme="dark"]
+  :is(.district-status-panel, .assistant-drawer) {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--sidebar-dark-surface-strong);
+}
+
+.app-shell[data-sidebar-theme="dark"] .brand-logo {
+  filter: grayscale(1) brightness(0) invert(1);
+}
+
+.app-shell[data-sidebar-theme="dark"] .assistant-launcher {
+  background: rgba(245, 247, 250, 0.94);
+  color: #17181c;
+}
+
+.app-shell[data-sidebar-theme="dark"] .assistant-launcher:hover {
+  background: var(--sidebar-dark-ink);
 }
 
 .assistant-launcher span {
@@ -2490,4 +2608,38 @@ tbody tr:last-child td {
   stroke: currentColor;
   stroke-width: 1.6;
   stroke-linecap: round;
+}
+
+/* The two acts stack, each labelled with what it reaches. Declaring pages
+   residents, so it carries the critical colour and simulating does not. */
+.event-confirm {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.event-confirm .button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.event-confirm .button small {
+  color: currentColor;
+  font-size: 10px;
+  font-weight: 450;
+  opacity: 0.68;
+}
+
+.button.critical {
+  border-color: var(--critical, #ef4444);
+  background: var(--critical, #ef4444);
+  color: #fff;
+}
+
+.button.critical:hover:not(:disabled) {
+  background: var(--critical-ink, #b91c1c);
+  border-color: var(--critical-ink, #b91c1c);
 }

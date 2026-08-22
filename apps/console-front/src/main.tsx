@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { App } from "./app";
 import { I18nProvider } from "./i18n";
+import { SidebarThemeProvider } from "./theme";
 import "./styles.css";
 
 if (
@@ -19,9 +20,11 @@ if (rootElement instanceof HTMLElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <I18nProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
+        <SidebarThemeProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </SidebarThemeProvider>
       </I18nProvider>
     </StrictMode>,
   );

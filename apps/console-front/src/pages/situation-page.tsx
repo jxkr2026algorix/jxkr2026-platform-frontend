@@ -23,7 +23,10 @@ interface SituationPageProps {
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
   readonly onEventSelect: (type: DisasterType | null) => void;
-  readonly onEventDeclare: (type: DisasterType) => void;
+  readonly onEventDeclare: (
+    type: DisasterType,
+    mode: "simulate" | "declare",
+  ) => void;
   readonly onPreviewEvent: (event: PlatformEvent | null) => void;
   readonly onReset: () => void;
 }

@@ -111,6 +111,12 @@ export interface RouteRequest {
    */
   readonly horizonsMinutes?: readonly number[];
   readonly departAfterMinutes?: number;
+  /**
+   * Risk at or above which an edge is impassable. The default suits a
+   * calibrated model; a stub's synthetic risk is not on the same scale and
+   * rejects every road, so callers running against one raise it.
+   */
+  readonly blockThreshold?: number;
 }
 
 /** Request body in the backend's snake_case, omitting unset fields. */
@@ -130,6 +136,9 @@ export function toRouteRequestBody(
       : {}),
     ...(request.departAfterMinutes !== undefined
       ? { depart_after_minutes: request.departAfterMinutes }
+      : {}),
+    ...(request.blockThreshold !== undefined
+      ? { block_threshold: request.blockThreshold }
       : {}),
   };
 }

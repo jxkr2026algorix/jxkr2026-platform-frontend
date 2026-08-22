@@ -10,12 +10,21 @@ import { AssistantDrawer } from "./components/AssistantDrawer";
 import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
 import { MapCanvas } from "./components/MapCanvas";
 import { SituationPage } from "./pages/situation-page";
+import { useSidebarTheme } from "./theme";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
 
 export function App() {
+  const { sidebarTheme } = useSidebarTheme();
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [placementArmed, setPlacementArmed] = useState(false);
+  /**
+   * What the next map click means. Rehearsing a scenario must not reach the
+   * platform: a drill that pages residents is worse than no drill.
+   */
+  const [placementMode, setPlacementMode] = useState<"simulate" | "declare">(
+    "simulate",
+  );
   const map = useMapBridge();
   const platform = usePlatformStream();
   const mobileUrl = useMemo(
@@ -109,6 +118,10 @@ export function App() {
     if (selection.hazard !== platform.selectedType) return;
     setPlacementArmed(false);
     const placed = platform.selectedType;
+    if (placementMode === "simulate") {
+      // Rehearsal: the map runs it and nothing leaves this screen.
+      return;
+    }
     if (selection.lat !== undefined && selection.lon !== undefined) {
       void platform.client
         .startSpread({
@@ -134,6 +147,7 @@ export function App() {
   }, [
     map.status.pointSelection,
     placementArmed,
+    placementMode,
     platform.publish,
     platform.selectedType,
     platform.client.startSpread,
@@ -152,8 +166,12 @@ export function App() {
    * Confirm the pick. Every hazard is placed on the map first — a disaster
    * without a location cannot be simulated or routed around.
    */
-  const handleEventDeclare = (type: DisasterType) => {
+  const handleEventDeclare = (
+    type: DisasterType,
+    mode: "simulate" | "declare",
+  ) => {
     setPlacementArmed(true);
+    setPlacementMode(mode);
     // The map takes the area; nothing is published until the operator marks
     // where the incident is.
     map.send({
@@ -212,6 +230,7 @@ export function App() {
   return (
     <div
       className={`app-shell view-situation${assistantOpen ? " is-assistant-open" : ""}`}
+      data-sidebar-theme={sidebarTheme}
     >
       <MapCanvas map={map} />
       <DashboardBrandHeader mobileUrl={mobileUrl} />

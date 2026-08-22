@@ -26,7 +26,11 @@ type EventControlsProps = {
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
   readonly onSelect: (type: DisasterType | null) => void;
-  readonly onDeclare: (type: DisasterType) => void;
+  /** "simulate" rehearses locally; "declare" records a real incident. */
+  readonly onDeclare: (
+    type: DisasterType,
+    mode: "simulate" | "declare",
+  ) => void;
   readonly onReset: () => void;
 };
 
@@ -51,6 +55,9 @@ export function EventControls({
   const { locale, t } = useI18n();
   const selected = eventOptions.find((o) => o.type === selectedType);
   const selectedLabel = selected ? t(selected.labelKey) : "";
+  // English reads better mid-sentence in lower case; Korean has no such case.
+  const hazardLabel =
+    locale === "en" ? selectedLabel.toLowerCase() : selectedLabel;
 
   return (
     <div className="event-controls">
@@ -75,20 +82,30 @@ export function EventControls({
 
       {selected ? (
         <div className="event-confirm">
+          {/* Rehearsing a scenario and telling the county a fire is burning
+              are not the same act, and the difference has to be visible
+              before the click rather than after it. */}
           <button
-            className="button"
+            className="button secondary"
             type="button"
             disabled={publishing}
-            onClick={() => onDeclare(selected.type)}
+            onClick={() => onDeclare(selected.type, "simulate")}
           >
-            {publishing
-              ? t("event.declaring")
-              : t("event.markArea", {
-                  hazard:
-                    locale === "en"
-                      ? selectedLabel.toLowerCase()
-                      : selectedLabel,
-                })}
+            <span>{t("event.simulate", { hazard: hazardLabel })}</span>
+            <small>{t("event.simulateHint")}</small>
+          </button>
+          <button
+            className="button critical"
+            type="button"
+            disabled={publishing}
+            onClick={() => onDeclare(selected.type, "declare")}
+          >
+            <span>
+              {publishing
+                ? t("event.declaring")
+                : t("event.declareReal", { hazard: hazardLabel })}
+            </span>
+            <small>{t("event.declareHint")}</small>
           </button>
         </div>
       ) : null}

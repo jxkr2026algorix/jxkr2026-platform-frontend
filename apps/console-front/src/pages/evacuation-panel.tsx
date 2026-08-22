@@ -192,6 +192,10 @@ export function EvacuationPanel({
           lat: origin.lat,
           lon: origin.lon,
           mode,
+          // Stub-mode risk is not on the model's scale, and at the default
+          // threshold it marks every road impassable. Remove once a
+          // calibrated model is serving.
+          blockThreshold: 0.8,
         }),
         client
           .findShelters({ hazard, lat: origin.lat, lon: origin.lon, limit: 8 })

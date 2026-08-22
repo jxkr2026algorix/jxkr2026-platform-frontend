@@ -256,3 +256,43 @@ button:focus-visible {
   font-size: 10px;
   color: #8a8f98;
 }
+
+/* Says the forecast is arriving now, not that it was true when the page
+   loaded. A resident deciding whether to leave needs to know which. */
+.live-spread {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.live-spread::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-spread::before {
+    animation: none;
+  }
+}
