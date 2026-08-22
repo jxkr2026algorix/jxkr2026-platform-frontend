@@ -128,6 +128,14 @@ p {
   isolation: isolate;
 }
 
+.app-shell.view-situation {
+  --assistant-drawer-top: 16px;
+  --inspector-padding-top: 74px;
+  --inspector-top: 16px;
+  --operations-panel-top: 16px;
+  --panel-intro-top: 70px;
+}
+
 .map-canvas {
   position: fixed;
   z-index: 0;
@@ -225,7 +233,7 @@ p {
   gap: 2px;
   padding: 4px;
   overflow-x: auto;
-  border: 1px solid var(--floating-border);
+  border: 0;
   border-radius: var(--radius-layer);
   background: var(--floating-bg-soft);
   box-shadow: var(--floating-shadow);
@@ -358,7 +366,7 @@ p {
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   font-size: 13px;
-  font-weight: 525;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   transition:
@@ -378,8 +386,8 @@ p {
 }
 
 .button.secondary {
-  border-color: var(--button-border);
-  background: var(--floating-control);
+  border-color: transparent;
+  background: var(--floating-control-weak);
   color: var(--ink);
 }
 
@@ -435,7 +443,7 @@ p {
 .operations-panel,
 .operations-timeline,
 .object-inspector {
-  border: 1px solid var(--floating-border);
+  border: 0;
   box-shadow: var(--floating-shadow);
   backdrop-filter: blur(18px) saturate(0.96);
   -webkit-backdrop-filter: blur(18px) saturate(0.96);
@@ -460,7 +468,7 @@ p {
 .operations-panel-left {
   position: fixed;
   z-index: 14;
-  top: 82px;
+  top: var(--operations-panel-top, 82px);
   bottom: 78px;
   left: 16px;
   width: 300px;
@@ -470,9 +478,25 @@ p {
   pointer-events: auto;
 }
 
+.view-situation .brand {
+  width: 300px;
+  box-sizing: border-box;
+  padding-inline: 16px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.view-situation .brand small {
+  padding-left: 0;
+  border-left: 0;
+}
+
 .panel-intro {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--line);
+  padding: var(--panel-intro-top, 14px) 16px 14px;
+  border-bottom: 0;
 }
 
 .panel-intro h1 {
@@ -498,8 +522,8 @@ p {
 
 .panel-map-status {
   margin-top: 9px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
+  padding-top: 0;
+  border-top: 0;
   color: var(--ink-tertiary);
   font-size: 10px;
 }
@@ -519,7 +543,7 @@ p {
 }
 
 .rail-section + .rail-section {
-  border-top: 1px solid var(--line);
+  border-top: 0;
 }
 
 .rail-section-label {
@@ -689,7 +713,7 @@ input[type="range"] {
 .floating-select-option strong {
   display: block;
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .floating-select-option > svg {
@@ -763,7 +787,7 @@ input[type="range"] {
   background: var(--floating-control-hover);
   box-shadow: var(--control-shadow);
   color: var(--ink);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .check-row {
@@ -845,6 +869,7 @@ input[type="range"] {
 
 .community-list {
   display: grid;
+  gap: 2px;
   margin: 0 -12px -10px;
 }
 
@@ -856,7 +881,7 @@ input[type="range"] {
   min-height: 46px;
   padding: 5px 12px;
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: 0;
   background: transparent;
   color: var(--ink);
   text-align: left;
@@ -884,7 +909,7 @@ input[type="range"] {
 
 .community-row strong {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .community-row small {
@@ -934,7 +959,7 @@ input[type="range"] {
 }
 
 .operations-timeline li + li {
-  border-left: 1px solid var(--line);
+  border-left: 0;
 }
 
 .operations-timeline time {
@@ -950,11 +975,11 @@ input[type="range"] {
 .object-inspector {
   position: fixed;
   z-index: 14;
-  top: 82px;
+  top: var(--inspector-top, 82px);
   right: 16px;
   bottom: 78px;
   width: 288px;
-  padding: 16px;
+  padding: var(--inspector-padding-top, 16px) 16px 16px;
   overflow: auto;
   border-radius: var(--radius-layer);
   background: var(--floating-bg);
@@ -963,6 +988,27 @@ input[type="range"] {
   transition:
     opacity 140ms ease-out,
     transform 140ms ease-out;
+}
+
+.view-situation .context-bar {
+  width: 288px;
+  box-sizing: border-box;
+  justify-content: flex-end;
+  padding-inline: 16px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out;
+}
+
+.view-situation.is-assistant-open .context-bar {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
 }
 
 .app-shell.is-assistant-open .object-inspector {
@@ -985,13 +1031,13 @@ input[type="range"] {
   gap: 8px;
   min-height: 52px;
   padding: 0 17px 0 14px;
-  border: 1px solid var(--floating-border);
+  border: 0;
   border-radius: var(--radius-pill);
   background: var(--button-dark);
   box-shadow: var(--floating-shadow);
   color: var(--on-dark);
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -1011,7 +1057,7 @@ input[type="range"] {
 .assistant-drawer {
   position: fixed;
   z-index: 35;
-  top: 82px;
+  top: var(--assistant-drawer-top, 82px);
   right: 16px;
   bottom: 78px;
   display: grid;
@@ -1024,6 +1070,10 @@ input[type="range"] {
   box-shadow: var(--floating-shadow);
   backdrop-filter: blur(18px) saturate(0.96);
   -webkit-backdrop-filter: blur(18px) saturate(0.96);
+}
+
+.view-situation .assistant-drawer {
+  border: 0;
 }
 
 .assistant-header {
@@ -1334,6 +1384,8 @@ input[type="range"] {
 }
 
 .inspector-data {
+  display: grid;
+  gap: 2px;
   margin: 18px 0 0;
 }
 
@@ -1342,7 +1394,7 @@ input[type="range"] {
   grid-template-columns: 92px minmax(0, 1fr);
   gap: 8px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 0;
 }
 
 .inspector-data dt {
@@ -1713,10 +1765,6 @@ tbody tr:last-child td {
 
   .assistant-drawer {
     bottom: 76px;
-  }
-
-  .panel-intro {
-    padding-block: 12px;
   }
 
   .rail-section {

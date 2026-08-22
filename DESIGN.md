@@ -47,7 +47,7 @@ The console uses a restrained floating-blur direction rather than Liquid Glass. 
 | `--critical-soft` | `#fef2f2` | Urgent feedback support surface |
 | `--critical-ink` | `#b91c1c` | Critical feedback text |
 
-Floating-shell additions use near-black `#1d1d1f`, secondary neutral `#6e6e73`, and three practical surface levels: 82% for the route dock, 88% for map controls, and 94% for dense operational reading. Every floating surface uses the same 18px backdrop blur, one quiet border, and one restrained shadow. Inner highlights, refraction effects, and nested translucent containers are excluded.
+Floating-shell additions use near-black `#1d1d1f`, secondary neutral `#6e6e73`, and three practical surface levels: 82% for the route dock, 88% for map controls, and 94% for dense operational reading. Floating rails use the same 18px backdrop blur and one restrained shadow; outer borders are omitted when the surface fill already separates them from the map. Inner highlights, refraction effects, and nested translucent containers are excluded.
 
 Status is communicated with text and structure, not color alone. Cobalt is not used as a general surface tint, and semantic colors never become a category rainbow.
 
@@ -59,14 +59,14 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Section title: 17px / 24px / 650.
 - Body: 15px / 22px / 450. Dense desktop operations metadata may use 13px but never smaller for an action.
 - Caption: 13px / 18px / 500.
-- Button: 14px / 18px / 600.
+- Button: 14px / 18px / 500.
 - Labels use English sentence case. All-caps labels and editorial serif treatments are excluded.
 
 ## 4. Spacing & Layout
 
 - Base spacing unit: 8px, with 4px and 12px half-steps where density requires them.
 - Control gaps: 8px; row padding: 12–16px; section gaps: 24–32px.
-- Desktop shell: one full-bleed map fixed to `100dvh`. The map is mounted outside route content and persists across navigation. Product identity sits at the upper-left, incident/map status at the upper-right, and page navigation in a centered bottom dock.
+- Desktop shell: one full-bleed map fixed to `100dvh`. The map is mounted outside route content and persists across navigation. On the situation route, product identity belongs to the left operations rail and incident/map status belongs to the right inspector rail; neither is a detached top island. Page navigation remains in a centered bottom dock.
 - Map workspace: the renderer owns the entire viewport. Situation controls float at the left, selected-object inspection floats at the right, and recent events occupy one centered bottom rail capped at 680px above the navigation dock.
 - Map scroll ownership: the application shell is fixed to `100dvh`; the map never scrolls. Layer and inspector rails own independent vertical scroll only when their content exceeds the viewport.
 - Console scope: desktop operations only, verified at 1280×800 and 1440×900. Narrow-screen console behavior is not part of the acceptance surface; resident and field workflows belong to `apps/mobile`.
@@ -77,7 +77,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 ### App shell
 
-- Structure: persistent full-screen map, detached product mark, detached incident context, bottom-centered route dock, and one route content layer.
+- Structure: persistent full-screen map, rail-owned product and incident context on the situation route, bottom-centered route dock, and one route content layer. Non-map workflow routes may retain compact detached context because they do not expose the two side rails.
 - States: default and current navigation item.
 - Accessibility: navigation has an explicit label and current item uses `aria-current`.
 - Layout owner: the shell never scrolls. Situation overlays own bounded local scrolling; non-map routes use one centered floating work sheet as their sole scroll owner.
@@ -133,7 +133,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 ### Spatial operations workspace
 
 - Structure: real interactive basemap, one consolidated left operations panel, one right selected-object inspector, and one compact operational timeline.
-- Floating controls: the incident heading, simulation controls, and community priority list share the left panel instead of overlapping as separate surfaces. The panel uses an 88% neutral fill, 18px blur, one quiet border, and a 14px radius.
+- Floating controls: brand identity, incident heading, simulation controls, and community priority share the left panel. Map connection and reset controls occupy the top of the right inspector. These rails use an 88% neutral fill, 18px blur, a 14px radius, and spacing instead of internal section rules wherever alignment is sufficient.
 - Route dock: four routes appear in a compact centered horizontal row near the lower safe area. The dock uses an 82% neutral blurred surface; the active route uses a quiet neutral inset fill and near-black text. Inactive routes remain neutral gray, never blue.
 - Floating work sheets: plan, contact, and field-task routes retain the live map behind a centered, bounded 82–86% white reading lens. The sheet owns its vertical scroll and leaves map context visible around its edges. Existing table boxes are flattened so the lens, not an old page container, owns the visual hierarchy.
 - Map plane: the WebGPU terrain and hazard simulation is visually primary. It is isolated in an iframe; dashboard chrome never overlays renderer controls except for explicit loading, failure, and route-revision states.
@@ -186,7 +186,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Resident status surfaces use a neutral white surface and one quiet border. Safety or warning color belongs to the status label, not simultaneously to border, background, and text.
 - Diffuse card shadows are excluded. The only retained shadow is the tight selected-segment shadow because it communicates control state.
 - Panels never contain independent card grids. Summary values share one quiet band without individual boxes.
-- Full-map floating surfaces use one quiet border, 18px backdrop blur, and one restrained shadow. They do not use refractive rims, glow, colored glass, or nested translucent containers.
+- Full-map floating surfaces use 18px backdrop blur and one restrained shadow. A quiet border is added only where the map and surface would otherwise merge; side rails and the route dock normally rely on fill and shadow. They do not use refractive rims, glow, colored glass, or nested translucent containers.
 
 ## 8. Accessibility Constraints & Accepted Debt
 

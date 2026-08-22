@@ -105,9 +105,12 @@ export function App() {
   };
 
   const handleMapCommand = (command: DashboardCommand) => map.send(command);
+  const contextHidden = currentView === "situation" && assistantOpen;
 
   return (
-    <div className={`app-shell${assistantOpen ? " is-assistant-open" : ""}`}>
+    <div
+      className={`app-shell view-${currentView}${assistantOpen ? " is-assistant-open" : ""}`}
+    >
       <div className="map-canvas">
         <iframe
           ref={map.frame.ref}
@@ -168,7 +171,11 @@ export function App() {
       </aside>
 
       <div className="workspace">
-        <header className="context-bar">
+        <header
+          className="context-bar"
+          aria-hidden={contextHidden}
+          inert={contextHidden}
+        >
           <div className="context-title">
             <strong>Cheongsong Emergency Operations Center</strong>
             <span>Updated Aug 22, 2026 at 14:10</span>
