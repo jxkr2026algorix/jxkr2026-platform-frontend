@@ -9,6 +9,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router";
+import { AssistantDrawer } from "./components/AssistantDrawer";
 import {
   type CommunityName,
   communities,
@@ -43,6 +44,7 @@ export function App() {
   const [contacted, setContacted] = useState(false);
   const [reported, setReported] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const map = useMapBridge();
   const currentView =
     navItems.find((item) => item.path === location.pathname)?.view ??
@@ -105,7 +107,7 @@ export function App() {
   const handleMapCommand = (command: DashboardCommand) => map.send(command);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${assistantOpen ? " is-assistant-open" : ""}`}>
       <div className="map-canvas">
         <iframe
           ref={map.frame.ref}
@@ -203,6 +205,7 @@ export function App() {
                 path="/situation"
                 element={
                   <SituationPage
+                    assistantOpen={assistantOpen}
                     map={map}
                     selectedCommunity={selectedCommunity}
                     reported={reported}
@@ -253,6 +256,7 @@ export function App() {
           </motion.main>
         </AnimatePresence>
       </div>
+      <AssistantDrawer open={assistantOpen} onOpenChange={setAssistantOpen} />
     </div>
   );
 }

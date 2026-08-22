@@ -13,6 +13,7 @@ import { SituationInspector } from "./situation-inspector";
 type MapBridge = ReturnType<typeof useMapBridge>;
 
 interface SituationPageProps {
+  readonly assistantOpen: boolean;
   readonly map: MapBridge;
   readonly selectedCommunity: CommunityName;
   readonly reported: boolean;
@@ -22,6 +23,7 @@ interface SituationPageProps {
 }
 
 export function SituationPage({
+  assistantOpen,
   map,
   selectedCommunity,
   reported,
@@ -88,6 +90,7 @@ export function SituationPage({
 
         <SituationInspector
           community={selected}
+          hidden={assistantOpen}
           reported={reported}
           onSelectCommunity={onSelectCommunity}
           onNavigate={onNavigate}

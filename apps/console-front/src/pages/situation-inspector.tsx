@@ -2,6 +2,7 @@ import type { Community, CommunityName, View } from "../domain";
 
 interface SituationInspectorProps {
   readonly community: Community;
+  readonly hidden: boolean;
   readonly reported: boolean;
   readonly onSelectCommunity: (name: CommunityName) => void;
   readonly onNavigate: (view: View) => void;
@@ -9,6 +10,7 @@ interface SituationInspectorProps {
 
 export function SituationInspector({
   community,
+  hidden,
   reported,
   onSelectCommunity,
   onNavigate,
@@ -18,6 +20,8 @@ export function SituationInspector({
       className="object-inspector"
       aria-live="polite"
       aria-label="Selected community details"
+      aria-hidden={hidden}
+      inert={hidden}
     >
       <div className="inspector-heading">
         <span>Selected community</span>

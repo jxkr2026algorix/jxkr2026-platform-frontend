@@ -145,6 +145,15 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 - Motion: map pan/zoom and immediate overlay visibility only. Route changes update the map and written explanation together.
 - Fallback: if online tiles are unavailable, the map region states that the basemap is unavailable while retaining overlay controls and the textual community list.
 
+### Public data assistant
+
+- Structure: one bottom-right pill launcher opens a 320px right-side evidence drawer. On the situation route the drawer temporarily replaces the selected-community inspector rather than stacking above it.
+- Material: the drawer uses the same 94% neutral floating surface, quiet border, 18px blur, and restrained shadow as dense operational reading surfaces. Messages remain row-led; only the operator message gets one weak neutral fill.
+- Content: questions are routed to the SALGIL public-data MCP. Every answer shows incomplete-source warnings, observation time, and source links when supplied; it never decides an evacuation priority or invents missing data.
+- Scroll ownership: the transcript alone scrolls between the fixed header and fixed composer. Long source URLs wrap without widening the drawer.
+- Motion: the drawer enters 18px from the right over 160ms and exits the same way. Reduced-motion mode uses opacity only; Escape and the explicit close control dismiss it.
+- Accessibility: the launcher, close control, composer, status, and transcript have explicit accessible names. Enter submits, Shift+Enter adds a line, and focus remains visibly indicated.
+
 ### Empty and feedback state
 
 - Structure: concise title, one explanatory sentence, one optional action.
