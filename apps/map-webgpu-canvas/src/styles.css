@@ -1,0 +1,306 @@
+:root {
+  --surface: #ffffff;
+  --surface-subtle: #f7f8fa;
+  --ink: #171719;
+  --ink-subtle: #5c6068;
+  --ink-muted: #8a8f98;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --action: #3366ff;
+  --action-hover: #2957e8;
+  --primary-soft: #f2f5ff;
+  --critical: #ef4444;
+  font-family:
+    "Pretendard GOV Variable", "Pretendard GOV", Pretendard, -apple-system,
+    "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #eef1f4;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+}
+
+#gpu-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+#gpu-canvas.dragging {
+  cursor: grabbing;
+}
+
+#fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--surface-subtle);
+  color: var(--ink);
+  text-align: center;
+  padding: 24px;
+}
+
+#fallback h1 {
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+
+#fallback p {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--ink-subtle);
+  margin: 0;
+  max-width: 360px;
+}
+
+#panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 236px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: none;
+}
+
+#panel h2 {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+#panel .group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#panel .label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-subtle);
+}
+
+#panel .label-row output {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+#panel .scenario-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+
+#panel .scenario-list button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+
+#panel .scenario-list button:hover {
+  background: var(--surface-subtle);
+}
+
+#panel .scenario-list button[aria-pressed="true"] {
+  background: var(--primary-soft);
+  color: var(--action);
+  font-weight: 700;
+}
+
+#panel input[type="range"] {
+  width: 100%;
+  accent-color: var(--action);
+}
+
+#panel .row {
+  display: flex;
+  gap: 8px;
+}
+
+#panel .row button {
+  appearance: none;
+  flex: 1;
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 700;
+  padding: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    background-color 120ms,
+    color 120ms,
+    border-color 120ms;
+}
+
+#panel .row button:hover {
+  background: var(--surface-subtle);
+}
+
+#panel .row button[aria-pressed="true"] {
+  background: var(--action);
+  border-color: var(--action);
+  color: #ffffff;
+}
+
+#panel .metrics {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ink-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+#panel .metrics strong {
+  color: var(--ink-subtle);
+  font-weight: 700;
+}
+
+#status {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  opacity: 0;
+  transition: opacity 160ms;
+  pointer-events: none;
+}
+
+#status.visible {
+  opacity: 1;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #panel .scenario-list button,
+  #panel .row button,
+  #status {
+    transition: none;
+  }
+}
+
+#fallback[hidden],
+#panel[hidden] {
+  display: none;
+}
+
+#panel .hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--ink-muted);
+}
+
+#zone-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.zone-badge {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  padding: 10px;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  color: #fff;
+  font-family:
+    "Pretendard GOV", "Pretendard GOV Variable", Pretendard, sans-serif;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.36px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.zone-badge[hidden] {
+  display: none;
+}
+
+#attribution {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font-size: 10px;
+  line-height: 14px;
+  color: rgba(23, 23, 25, 0.55);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 1px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
