@@ -707,9 +707,16 @@ input[type="range"] {
   font-weight: 550;
 }
 
+.map-display-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 8px;
+  margin: 10px 0;
+}
+
 .compact-controls {
   display: block;
-  margin: 10px 0;
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -733,6 +740,10 @@ input[type="range"] {
   background: var(--floating-control-weak);
 }
 
+.segmented-track-two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
 .segmented-track button {
   min-height: 32px;
   padding: 0;
@@ -740,6 +751,7 @@ input[type="range"] {
   border-radius: 7px;
   background: transparent;
   color: var(--ink-tertiary);
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -1343,8 +1355,16 @@ tbody tr:last-child td {
 }
 
 @media (max-height: 840px) and (min-width: 1101px) {
+  .operations-panel-left {
+    bottom: 76px;
+  }
+
+  .panel-intro {
+    padding-block: 12px;
+  }
+
   .rail-section {
-    padding-block: 8px;
+    padding-block: 6px;
   }
 
   .rail-section-label {
@@ -1359,7 +1379,7 @@ tbody tr:last-child td {
     min-height: 34px;
   }
 
-  .compact-controls {
+  .map-display-controls {
     margin: 6px 0;
   }
 

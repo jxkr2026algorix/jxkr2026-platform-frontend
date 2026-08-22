@@ -1,4 +1,5 @@
 import type {
+  BasemapStyle,
   DashboardCommand,
   ViewMode,
 } from "@salgil/map-webgpu-canvas/protocol";
@@ -27,6 +28,11 @@ const viewLabels: Record<ViewMode, string> = {
   flat: "2D",
   tilted: "3D",
   auto: "Auto",
+};
+
+const basemapLabels: Record<BasemapStyle, string> = {
+  satellite: "Satellite",
+  map: "Map",
 };
 
 export function SituationControls({
@@ -106,23 +112,45 @@ export function SituationControls({
             }
           />
         </label>
-        <fieldset className="compact-controls">
-          <legend>Map view</legend>
-          <div className="segmented-track">
-            {(["flat", "tilted", "auto"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={controls.viewMode === mode}
-                onClick={() =>
-                  onMapCommand({ type: "map:set-view", payload: { mode } })
-                }
-              >
-                {viewLabels[mode]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <div className="map-display-controls">
+          <fieldset className="compact-controls">
+            <legend>Map view</legend>
+            <div className="segmented-track">
+              {(["flat", "tilted", "auto"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={controls.viewMode === mode}
+                  onClick={() =>
+                    onMapCommand({ type: "map:set-view", payload: { mode } })
+                  }
+                >
+                  {viewLabels[mode]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset className="compact-controls">
+            <legend>Basemap</legend>
+            <div className="segmented-track segmented-track-two">
+              {(["satellite", "map"] as const).map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  aria-pressed={controls.basemap === style}
+                  onClick={() =>
+                    onMapCommand({
+                      type: "map:set-basemap",
+                      payload: { style },
+                    })
+                  }
+                >
+                  {basemapLabels[style]}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </div>
         <label className="check-row">
           <input
             className="check-input"

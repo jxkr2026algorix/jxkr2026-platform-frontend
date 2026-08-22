@@ -1,4 +1,5 @@
 import type {
+  BasemapStyle,
   DashboardCommand,
   MapStatePayload,
   Scenario,
@@ -7,6 +8,7 @@ import type {
 import { DEFAULT_MAP_SCENARIO, DEFAULT_RAINFALL_MM_PER_HOUR } from "./domain";
 
 export interface MapControlState {
+  readonly basemap: BasemapStyle;
   readonly scenario: Scenario;
   readonly rainfallMmPerHour: number;
   readonly viewMode: ViewMode;
@@ -17,7 +19,7 @@ export interface MapControlState {
 export type PendingMapControls = Partial<
   Pick<
     MapControlState,
-    "scenario" | "rainfallMmPerHour" | "viewMode" | "playing"
+    "basemap" | "scenario" | "rainfallMmPerHour" | "viewMode" | "playing"
   >
 >;
 
@@ -27,6 +29,7 @@ interface OptimisticControlUpdate {
 }
 
 export const initialMapControls: MapControlState = {
+  basemap: "satellite",
   scenario: DEFAULT_MAP_SCENARIO,
   rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
   viewMode: "tilted",
@@ -84,9 +87,13 @@ export function applyOptimisticControlCommand(
         controls: { ...controls, overlayEnabled: command.payload.enabled },
         pending,
       };
+    case "map:set-basemap":
+      return {
+        controls: { ...controls, basemap: command.payload.style },
+        pending: { ...pending, basemap: command.payload.style },
+      };
     case "map:ignite":
     case "map:trigger":
-    case "map:set-basemap":
     case "map:set-zones":
     case "map:set-camera":
     case "map:ping":
@@ -108,10 +115,13 @@ export function reconcileMapControls(
     pending.viewMode !== undefined && pending.viewMode !== mapState.viewMode;
   const keepPlaying =
     pending.playing !== undefined && pending.playing !== mapState.playing;
+  const keepBasemap =
+    pending.basemap !== undefined && pending.basemap !== mapState.basemap;
 
   return {
     controls: {
       ...controls,
+      basemap: keepBasemap ? controls.basemap : mapState.basemap,
       scenario: keepScenario ? controls.scenario : mapState.scenario,
       rainfallMmPerHour: keepRainfall
         ? controls.rainfallMmPerHour
@@ -120,6 +130,7 @@ export function reconcileMapControls(
       playing: keepPlaying ? controls.playing : mapState.playing,
     },
     pending: {
+      ...(keepBasemap ? { basemap: pending.basemap } : {}),
       ...(keepScenario ? { scenario: pending.scenario } : {}),
       ...(keepRainfall ? { rainfallMmPerHour: pending.rainfallMmPerHour } : {}),
       ...(keepView ? { viewMode: pending.viewMode } : {}),

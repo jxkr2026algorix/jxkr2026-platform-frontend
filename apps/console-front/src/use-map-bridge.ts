@@ -51,6 +51,8 @@ function isMapStatePayload(value: unknown): value is MapStatePayload {
     isScenario(value.scenario) &&
     (value.viewMode === "flat" || value.viewMode === "tilted") &&
     isFiniteNumber(value.rainfallMmPerHour);
+  const hasValidBasemap =
+    value.basemap === "satellite" || value.basemap === "map";
   const hasValidPlaybackState =
     typeof value.playing === "boolean" &&
     isFiniteNumber(value.speed) &&
@@ -70,6 +72,7 @@ function isMapStatePayload(value: unknown): value is MapStatePayload {
     isSeverity(landslide.severity);
   return (
     hasValidScenarioState &&
+    hasValidBasemap &&
     hasValidPlaybackState &&
     hasValidCameraState &&
     hasValidHazardState
