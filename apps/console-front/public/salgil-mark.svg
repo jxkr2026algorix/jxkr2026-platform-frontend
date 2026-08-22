@@ -1,0 +1,8 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>SALGIL shield and safe route mark</title>
+  <path d="M256 32C270 32 283 35 296 41L424 100C448 111 464 135 464 162V253C464 358 402 447 287 485C266.866 491.638 245.134 491.638 225 485C110 447 48 358 48 253V162C48 135 64 111 88 100L216 41C229 35 242 32 256 32Z" fill="#2F6FF2"/>
+  <path d="M137 386C276 344 355 304 292 254C226 202 212 168 343 124" stroke="white" stroke-width="92" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M137 386C276 344 355 304 292 254C226 202 212 168 343 124" stroke="#29C76F" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M136 303C99 303 69 333 69 370C69 419 136 475 136 475C136 475 203 419 203 370C203 333 173 303 136 303Z" fill="white"/>
+  <circle cx="136" cy="370" r="25" fill="#2F6FF2"/>
+</svg>
