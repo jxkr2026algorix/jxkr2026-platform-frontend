@@ -63,6 +63,7 @@ ${GLOBALS_WGSL}
 @group(0) @binding(2) var fluxTex : texture_2d<f32>;
 @group(0) @binding(3) var waterOut : texture_storage_2d<r32float, write>;
 ${GRID_WGSL}
+${UTIL_WGSL}
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -91,7 +92,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Demo-scaled rainfall inflow, minus infiltration/evaporation. Drainage is
   // strong enough that uplands shed their film while valleys, fed by routed
   // inflow from the whole catchment, keep accumulating.
-  w += G.rain.y * dt;
+  // Rain falls on a footprint, not on the whole province. Uniform inflow over
+  // 300 km spreads a sheet a millimetre deep everywhere and pools nowhere;
+  // concentrating it is what makes water gather in the valleys below it.
+  let ruv = (vec2f(f32(c.x), f32(c.y)) + vec2f(0.5)) / f32(gridN());
+  let rd = length(ruv - G.rainArea.xy) / max(G.rainArea.z, 1e-4);
+  // Feathered edge plus a little noise, so the band is a weather cell rather
+  // than a circle stamped on the terrain.
+  let edgeNoise = 0.86 + 0.28 * valueNoise2(ruv * 9.0 + vec2f(G.sim.z * 0.02));
+  let footprint = select(
+    1.0 - smoothstep(1.0 - G.rainArea.w, 1.0, rd / edgeNoise),
+    1.0,
+    G.rainArea.z >= 9.0,
+  );
+  w += G.rain.y * footprint * dt;
   w -= (0.026 * (1.0 + G.weather.z * 6.0) + w * 0.015) * dt;
   // Localized water burst (map:trigger flood / map click).
   if (G.fx.z > 1.5 && G.fx.z < 2.5) {

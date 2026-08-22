@@ -199,7 +199,15 @@ export type DashboardCommand =
     }
   | {
       type: "map:set-rainfall";
-      payload: { mmPerHour: number };
+      payload: {
+        mmPerHour: number;
+        /**
+         * Where the rain falls. Spread evenly over a province it pools
+         * nowhere, so a storm gets a footprint and the water gathers in the
+         * valleys under it. Omit for province-wide rainfall.
+         */
+        area?: { center: AnyPoint; radiusMeters: number };
+      };
     }
   | {
       type: "map:set-view";

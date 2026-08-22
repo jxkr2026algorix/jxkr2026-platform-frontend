@@ -197,6 +197,11 @@ export class Engine {
   private districtTexRef: GPUTexture | null = null;
   private districtOn = true;
   private districtBlend = 0;
+  /**
+   * Rainfall footprint in normalized coordinates. A radius of 10 means
+   * province-wide, which the sim reads as "no footprint".
+   */
+  private rainArea = { x: 0.5, y: 0.5, radius: 10, feather: 0.45 };
   /** 0..1 fade applied to every particle system; see renderFrame. */
   private particleVisibility = 0;
 
@@ -624,6 +629,22 @@ export class Engine {
    * Allow or block manual pan/orbit/zoom. Embedded maps are driven by
    * district selection only, so the view always frames somewhere meaningful.
    */
+  /** Confine rainfall to a footprint, or pass null for province-wide rain. */
+  setRainArea(
+    area: { x: number; y: number; radiusMeters: number } | null,
+  ): void {
+    if (!area) {
+      this.rainArea = { x: 0.5, y: 0.5, radius: 10, feather: 0.45 };
+      return;
+    }
+    this.rainArea = {
+      x: area.x,
+      y: area.y,
+      radius: Math.max(area.radiusMeters / this.terrain.worldSize, 0.004),
+      feather: 0.45,
+    };
+  }
+
   setNavigable(navigable: boolean): void {
     this.camera.setNavigable(navigable);
   }
@@ -1385,6 +1406,13 @@ export class Engine {
         smoothstep(world * 0.035, world * 0.1, this.camera.currentDistance)) *
       (1 - cam.blend * 0.92);
     g.setVec4(ROW.district, this.districtBlend, this.particleVisibility, 0, 0);
+    g.setVec4(
+      ROW.rainArea,
+      this.rainArea.x,
+      this.rainArea.y,
+      this.rainArea.radius,
+      this.rainArea.feather,
+    );
     this.detailBlend = damp(this.detailBlend, this.detailOn ? 1 : 0, 4, realDt);
     g.setVec4(
       ROW.detail,

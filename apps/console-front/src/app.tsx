@@ -39,7 +39,9 @@ export function App() {
       type: "map:set-view",
       payload: { mode: event.presentation === "3d" ? "auto" : "flat" },
     });
-    map.send({ type: "map:sim-control", payload: { action: "pause" } });
+    // Play, not pause: an incident that renders as a frozen frame reads as a
+    // broken map. Swap back to pause once the platform streams spread state.
+    map.send({ type: "map:sim-control", payload: { action: "play" } });
     map.send({
       type: "map:set-zones",
       payload: {
@@ -132,7 +134,6 @@ export function App() {
   const handleEventDeclare = (type: DisasterType, needsLocation: boolean) => {
     if (needsLocation) {
       setPlacementArmed(true);
-      map.send({ type: "map:sim-control", payload: { action: "pause" } });
       return;
     }
     setPlacementArmed(false);

@@ -292,9 +292,15 @@ function handleCommand(command: DashboardToMap): void {
       }
       break;
     }
-    case "map:set-rainfall":
+    case "map:set-rainfall": {
       engine.setRainfall(clampRainfall(command.payload.mmPerHour));
+      const area = command.payload.area;
+      const at = area ? toNormalized(area.center) : null;
+      engine.setRainArea(
+        at ? { ...at, radiusMeters: area?.radiusMeters ?? 12000 } : null,
+      );
       break;
+    }
     case "map:set-view":
       engine.setViewMode(command.payload.mode);
       break;
@@ -630,7 +636,10 @@ async function main(): Promise<void> {
     engine.setRainfall(clampRainfall(initialRain));
   }
 
-  if (bridge.embedded) engine.simControl("pause");
+  // The embedded map used to boot paused, on the plan that spread would
+  // arrive from the platform stream. That is not built yet, so pausing meant
+  // rain never pooled and fire never moved — the map looked broken rather
+  // than pending. Run locally until the backend drives it.
   engine.start();
   startDetailLod();
   if (TMAP_ENABLED) {
