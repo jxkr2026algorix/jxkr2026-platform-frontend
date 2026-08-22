@@ -61,19 +61,43 @@ if (remote && !key) {
   process.exit(1);
 }
 
+// Ports are pinned rather than left to vite. Only the map declares one, so the
+// console and the phone both start at 5173, one of them slides to whatever is
+// free, and the console's map frame and QR code then point at nothing.
+const MAP = "http://localhost:5183";
+const MOBILE = "http://localhost:5176";
 const apps = [
-  { name: "console", color: "\x1b[36m", script: "dev:console", url: "http://localhost:5173" },
-  { name: "mobile ", color: "\x1b[35m", script: "dev:mobile", url: "http://localhost:5176" },
-  { name: "map    ", color: "\x1b[33m", script: "dev:map", url: "http://localhost:5183" },
+  {
+    name: "console",
+    color: "\x1b[36m",
+    script: "dev:console",
+    port: 5173,
+    // The console embeds the map and shows a QR to the phone. Both have to be
+    // addresses a browser can actually reach, not same-origin paths.
+    env: { VITE_MAP_URL: MAP, VITE_MOBILE_URL: MOBILE },
+  },
+  {
+    name: "mobile ",
+    color: "\x1b[35m",
+    script: "dev:mobile",
+    port: 5176,
+    env: { VITE_MAP_URL: MAP },
+  },
+  { name: "map    ", color: "\x1b[33m", script: "dev:map", port: 5183, env: {} },
 ];
 
 console.log(`\n  백엔드  ${target}${remote ? "  (실서버)" : "  (로컬)"}`);
 console.log(`  키      ${key ? `${key.slice(0, 6)}…` : "개발 기본키"}\n`);
-for (const app of apps) console.log(`  ${app.color}${app.name}\x1b[0m ${app.url}`);
+for (const app of apps)
+  console.log(`  ${app.color}${app.name}\x1b[0m http://localhost:${app.port}`);
 console.log("");
 
 const children = apps.map((app) => {
-  const child = spawn("yarn", [app.script], { cwd: root, env, shell: false });
+  const child = spawn("yarn", [app.script, "--port", String(app.port), "--strictPort"], {
+    cwd: root,
+    env: { ...env, ...app.env },
+    shell: false,
+  });
   const prefix = (line) => `${app.color}${app.name}\x1b[0m ${line}`;
   const pipe = (stream, out) => {
     let buffer = "";

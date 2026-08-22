@@ -2755,36 +2755,64 @@ tbody tr:last-child td {
   }
 }
 
-/* Across the top of the console. Not a colour tint on a panel: the whole
-   screen has to say this is an exercise, or someone acts on it. */
+/* A drill has to be unmistakable, which is not the same as loud. This was a
+   full-width band of hazard stripes: it read as chrome rather than as a
+   warning, and it fought every surface on the screen at all times.
+
+   It is now the same floating layer as the map controls, so it belongs to the
+   console rather than sitting on top of it, and carries a single amber mark —
+   the only amber on the screen, which is what makes it register. */
 .drill-banner {
   position: fixed;
   z-index: 40;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 7px 16px;
-  background: repeating-linear-gradient(
-    -45deg,
-    #1f2937,
-    #1f2937 14px,
-    #111827 14px,
-    #111827 28px
-  );
-  color: #fde68a;
+  gap: 10px;
+  max-width: calc(100vw - 32px);
+  padding: 7px 14px 7px 12px;
+  border-radius: var(--radius-layer);
+  background: var(--floating-bg-soft);
+  box-shadow: var(--floating-shadow);
+  backdrop-filter: blur(18px) saturate(0.96);
+  -webkit-backdrop-filter: blur(18px) saturate(0.96);
   font-size: 12px;
+  line-height: 1.3;
   letter-spacing: -0.01em;
   pointer-events: none;
 }
 
-.drill-banner strong {
-  font-weight: 700;
+/* The mark, not a decoration: a filled amber dot with a soft ring, which is
+   how the rest of the console draws an active state. */
+.drill-banner::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--alert-ink);
+  box-shadow: 0 0 0 3px rgba(181, 71, 8, 0.18);
 }
 
+.drill-banner strong {
+  color: var(--alert-ink);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+/* The title can be long. It gives way before the words that matter do. */
 .drill-banner span {
-  opacity: 0.72;
+  overflow: hidden;
+  color: var(--ink-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  /* No room beside the brand lockup — the title drops and the marker stays. */
+  .drill-banner span {
+    display: none;
+  }
 }
