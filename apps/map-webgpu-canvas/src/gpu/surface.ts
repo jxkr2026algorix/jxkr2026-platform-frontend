@@ -20,6 +20,7 @@ ${GLOBALS_WGSL}
 @group(0) @binding(6) var riskTex : texture_2d<f32>;
 @group(0) @binding(7) var zoneTex : texture_2d<f32>;
 @group(0) @binding(8) var streetTex : texture_2d<f32>;
+@group(0) @binding(9) var detailTex : texture_2d<f32>;
 ${GRID_WGSL}
 ${UTIL_WGSL}
 
@@ -84,7 +85,20 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   sat = clamp(mix(vec3f(satLuma), sat, satBoost) * 1.03, vec3f(0.0), vec3f(1.0));
   // Street-map basemap (Google-Maps-like) cross-fades over the satellite.
   let street = textureSampleLevel(streetTex, satSampler, in.uv, 0.0).rgb;
-  let baseImg = mix(sat, street, G.weather.w);
+  var baseImg = mix(sat, street, G.weather.w);
+  // High-zoom detail patch under the camera: sharper roads and buildings.
+  let dp = G.detail;
+  if (dp.z > 0.0 && dp.w > 0.001) {
+    let duv = (in.uv - dp.xy) / dp.z;
+    if (duv.x > 0.0 && duv.x < 1.0 && duv.y > 0.0 && duv.y < 1.0) {
+      let edge = smoothstep(0.0, 0.07,
+        min(min(duv.x, 1.0 - duv.x), min(duv.y, 1.0 - duv.y)));
+      // Respect alpha so tiles still streaming in leave the coarse basemap
+      // visible instead of painting black.
+      let dcol = textureSampleLevel(detailTex, satSampler, duv, 0.0);
+      baseImg = mix(baseImg, dcol.rgb, dp.w * edge * dcol.a);
+    }
+  }
   let satBlend = G.layers.x;
   var albedo = mix(natural, baseImg, satBlend);
   albedo = mix(albedo, mapStyle, G.world.w * (1.0 - satBlend));
@@ -216,6 +230,9 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   light = mix(light, 0.82 + diff * 0.3, G.world.w * (1.0 - satBlend));
   // Satellite imagery already contains baked shading; ease off the sun.
   light = mix(light, 0.74 + diff * 0.55, satBlend);
+  // The street map is a designed graphic: keep it bright and nearly flat,
+  // with just a hint of hillshade so 3D relief still reads.
+  light = mix(light, 0.92 + diff * 0.14, G.weather.w * satBlend);
   // Gentle valley occlusion adds depth to the relief.
   light *= 1.0 - riskStatic.r * 0.14;
 
@@ -238,7 +255,11 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   color *= mix(vec3f(1.0), vec3f(1.07, 1.0, 0.9), heatT);
   color *= mix(vec3f(1.0), vec3f(0.9, 0.96, 1.08), coldT);
   color = applyFog(color, in.worldPos);
-  return vec4f(tonemap(color), 1.0);
+  // The street map is a designed graphic: bypass the filmic curve so its
+  // colors stay crisp instead of washing toward white.
+  let toned = tonemap(color);
+  let plain = pow(clamp(color, vec3f(0.0), vec3f(1.0)), vec3f(1.0 / 2.2));
+  return vec4f(mix(toned, plain, G.weather.w * satBlend), 1.0);
 }
 `;
 
@@ -340,7 +361,9 @@ export class SurfaceRenderer {
   private readonly waterBG: GPUBindGroup;
   private readonly indexBuffer: GPUBuffer;
   private readonly indexCount: number;
-  private buildTerrainBG!: (streetView: GPUTextureView) => GPUBindGroup;
+  private buildTerrainBG!: () => GPUBindGroup;
+  private streetView!: GPUTextureView;
+  private detailView!: GPUTextureView;
 
   constructor(
     device: GPUDevice,
@@ -352,6 +375,7 @@ export class SurfaceRenderer {
     riskTex: GPUTexture,
     zoneTex: GPUTexture,
     streetTex: GPUTexture,
+    detailTex: GPUTexture,
     gridSize: number,
     targets: SurfaceTargets,
   ) {
@@ -416,7 +440,9 @@ export class SurfaceRenderer {
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
     });
-    this.buildTerrainBG = (streetView: GPUTextureView) =>
+    this.streetView = streetTex.createView();
+    this.detailView = detailTex.createView();
+    this.buildTerrainBG = () =>
       device.createBindGroup({
         layout: this.terrain.getBindGroupLayout(0),
         entries: [
@@ -428,10 +454,11 @@ export class SurfaceRenderer {
           { binding: 5, resource: sampler },
           { binding: 6, resource: riskTex.createView() },
           { binding: 7, resource: zoneTex.createView() },
-          { binding: 8, resource: streetView },
+          { binding: 8, resource: this.streetView },
+          { binding: 9, resource: this.detailView },
         ],
       });
-    this.terrainBG = this.buildTerrainBG(streetTex.createView());
+    this.terrainBG = this.buildTerrainBG();
     this.waterBG = device.createBindGroup({
       layout: this.water.getBindGroupLayout(0),
       entries: [
@@ -469,7 +496,14 @@ export class SurfaceRenderer {
 
   /** Swap in the lazily loaded street basemap texture. */
   setStreetTexture(streetTex: GPUTexture): void {
-    this.terrainBG = this.buildTerrainBG(streetTex.createView());
+    this.streetView = streetTex.createView();
+    this.terrainBG = this.buildTerrainBG();
+  }
+
+  /** Swap in a freshly fetched high-zoom detail patch. */
+  setDetailTexture(detailTex: GPUTexture): void {
+    this.detailView = detailTex.createView();
+    this.terrainBG = this.buildTerrainBG();
   }
 
   draw(pass: GPURenderPassEncoder): void {

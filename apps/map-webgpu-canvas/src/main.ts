@@ -1,10 +1,14 @@
 import { DashboardBridge } from "./bridge";
 import {
   DEFAULT_REGION,
+  drawBuildings,
   type GeoReference,
-  loadBasemap,
+  IMAGERY_URL,
+  loadBuildingFootprints,
+  loadDetailPatch,
   loadRealTerrain,
-  STREET_URL,
+  loadStreetDetailPatch,
+  TMAP_ENABLED,
 } from "./dem";
 import { Engine, type HazardEvent } from "./gpu/engine";
 import {
@@ -26,19 +30,19 @@ const fallbackBox = document.getElementById("fallback") as HTMLElement;
 const panelBox = document.getElementById("panel") as HTMLElement;
 
 const HAZARD_LABELS = {
-  flood: "침수",
-  wildfire: "산불",
-  landslide: "산사태",
-  earthquake: "지진",
-  tsunami: "지진해일",
-  nuclear: "방사성물질 확산",
-  chemical: "유해화학물질 확산",
+  flood: "Flood",
+  wildfire: "Wildfire",
+  landslide: "Landslide",
+  earthquake: "Earthquake",
+  tsunami: "Tsunami",
+  nuclear: "Radiological release",
+  chemical: "Chemical release",
 } as const;
 const SEVERITY_LABELS = {
-  none: "해제",
-  advisory: "주의",
-  watch: "경계",
-  warning: "경보",
+  none: "cleared",
+  advisory: "advisory",
+  watch: "watch",
+  warning: "warning",
 } as const;
 
 let engine: Engine | null = null;
@@ -181,7 +185,7 @@ function handleCommand(command: DashboardToMap): void {
     case "map:set-basemap":
       engine.setBasemapStyle(command.payload.style);
       if (command.payload.style === "map" && !engine.streetBasemapReady) {
-        showStatus("일반 지도 타일을 불러오는 중…", 6000);
+        showStatus("Loading standard map tiles…", 6000);
       }
       break;
   }
@@ -237,9 +241,15 @@ async function loadTerrain(): Promise<{
   terrain: TerrainData;
   geo: GeoReference | null;
   imagery: HTMLCanvasElement | null;
+  street: HTMLCanvasElement | null;
 }> {
   if (params.get("terrain") === "procedural") {
-    return { terrain: generateTerrain(), geo: null, imagery: null };
+    return {
+      terrain: generateTerrain(),
+      geo: null,
+      imagery: null,
+      street: null,
+    };
   }
   try {
     const options = { ...DEFAULT_REGION };
@@ -260,11 +270,17 @@ async function loadTerrain(): Promise<{
       terrain: result.terrain,
       geo: result.geo,
       imagery: result.imagery,
+      street: result.street,
     };
   } catch (error) {
     console.warn("real terrain unavailable, using procedural fallback", error);
-    showStatus("실측 지형을 불러오지 못해 절차 생성 지형을 사용합니다.");
-    return { terrain: generateTerrain(), geo: null, imagery: null };
+    showStatus("Measured terrain is unavailable. Using generated terrain.");
+    return {
+      terrain: generateTerrain(),
+      geo: null,
+      imagery: null,
+      street: null,
+    };
   }
 }
 
@@ -284,12 +300,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  showStatus("지형 데이터를 불러오는 중…", 15000);
-  const { terrain, geo, imagery } = await loadTerrain();
+  showStatus("Loading terrain data…", 15000);
+  const { terrain, geo, imagery, street } = await loadTerrain();
   geoRef = geo;
 
   try {
-    engine = await Engine.create(canvas, terrain, imagery);
+    engine = await Engine.create(canvas, terrain, imagery, street);
   } catch (error) {
     showFallback();
     sendReady(false, geo);
@@ -314,8 +330,8 @@ async function main(): Promise<void> {
     const severity = SEVERITY_LABELS[event.severity];
     showStatus(
       event.phase === "ended"
-        ? `${label} 상황 해제`
-        : `${label} ${severity} — 시뮬레이션 감지`,
+        ? `${label} cleared`
+        : `${label} ${severity} — simulation detected`,
     );
   };
   engine.onError = (code, message) => {
@@ -323,7 +339,7 @@ async function main(): Promise<void> {
     showFallback();
   };
   engine.onTrigger = (hazard) => {
-    showStatus(`${HAZARD_LABELS[hazard]} 발생 지점을 지정했습니다`, 2500);
+    showStatus(`${HAZARD_LABELS[hazard]} origin selected`, 2500);
   };
 
   const initialScenario = params.get("scenario") as Scenario | null;
@@ -336,18 +352,12 @@ async function main(): Promise<void> {
   }
 
   engine.start();
-
-  // Street basemap ("map" style) loads in the background so the first paint
-  // is not delayed; the style toggle activates as soon as it lands.
-  if (geo) {
-    void loadBasemap(
-      geo.centerLat,
-      geo.centerLon,
-      geo.sizeMeters,
-      STREET_URL,
-    ).then((canvas) => {
-      if (canvas && engine) engine.setStreetBasemap(canvas);
-    });
+  startDetailLod();
+  if (TMAP_ENABLED) {
+    const attribution = document.getElementById("attribution");
+    if (attribution) {
+      attribution.textContent = `© TMap(SK) ${attribution.textContent ?? ""}`;
+    }
   }
 
   const zoneContainer = document.getElementById("zone-labels");
@@ -363,8 +373,102 @@ async function main(): Promise<void> {
     new ControlPanel(panelBox, engine);
   }
   if (geo) {
-    showStatus("경상북도 실측 지형·위성영상 로드 완료");
+    showStatus("Gyeongsangbuk-do terrain and satellite imagery loaded");
   }
+}
+
+/**
+ * Slippy-map-style LOD: when the camera zooms in, fetch a high-zoom tile
+ * patch (buildings and street detail) for the area in view and drape it
+ * over the coarse basemap.
+ */
+function startDetailLod(): void {
+  let generation = 0;
+  let abortCurrent: AbortController | null = null;
+  /** Last request we kicked off (pending or applied), to avoid re-requesting. */
+  let requested: { x: number; y: number; size: number; style: string } | null =
+    null;
+
+  setInterval(() => {
+    if (!engine || !geoRef) return;
+    const state = engine.getState();
+    const world = geoRef.sizeMeters;
+    const dist = state.camera.distanceMeters;
+    if (dist > world * 0.28) {
+      if (requested) {
+        abortCurrent?.abort();
+        engine.clearDetailPatch();
+        requested = null;
+      }
+      return;
+    }
+    const size = Math.min(Math.max(dist * 1.35, 2500), world * 0.35);
+    const cx = state.camera.center.x;
+    const cy = state.camera.center.y;
+    const needsReload =
+      !requested ||
+      requested.style !== state.basemap ||
+      Math.abs(requested.size - size) / requested.size > 0.35 ||
+      Math.hypot(requested.x - cx, requested.y - cy) * world > size * 0.22;
+    if (!needsReload) return;
+
+    // Supersede any in-flight load immediately instead of queueing behind it.
+    abortCurrent?.abort();
+    const abort = new AbortController();
+    abortCurrent = abort;
+    const gen = ++generation;
+    requested = { x: cx, y: cy, size, style: state.basemap };
+
+    const lat = geoRef.north - cy * (geoRef.north - geoRef.south);
+    const lon = geoRef.west + cx * (geoRef.east - geoRef.west);
+    const sizeNorm = size / world;
+    const rect = { x: cx - sizeNorm / 2, y: cy - sizeNorm / 2, size: sizeNorm };
+
+    // Show tiles as they arrive rather than waiting for the full patch.
+    let lastUpload = 0;
+    const options = {
+      signal: abort.signal,
+      onProgress: (canvas: HTMLCanvasElement) => {
+        const now = performance.now();
+        if (gen !== generation || !engine || now - lastUpload < 300) return;
+        lastUpload = now;
+        engine.setDetailPatch(canvas, rect);
+      },
+    };
+    const patchPromise =
+      state.basemap === "map"
+        ? loadStreetDetailPatch(lat, lon, size, options)
+        : loadDetailPatch(lat, lon, size, IMAGERY_URL, options);
+    void patchPromise
+      .then((patch) => {
+        if (gen !== generation || !engine) return;
+        if (!patch) {
+          // Failed (not superseded): allow a retry on the next tick.
+          if (!abort.signal.aborted) requested = null;
+          return;
+        }
+        engine.setDetailPatch(patch.canvas, rect);
+
+        // Vector building footprints from OSM, composited on top once they
+        // arrive. Best-effort: coverage is uneven and Overpass may be busy,
+        // in which case the raster tiles' own buildings still show.
+        if (size <= 12000) {
+          const styleAtFetch = state.basemap;
+          void loadBuildingFootprints(patch)
+            .then((buildings) => {
+              if (gen !== generation || !engine || buildings.length === 0) {
+                return;
+              }
+              drawBuildings(patch, buildings, styleAtFetch);
+              engine.setDetailPatch(patch.canvas, rect);
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {
+        if (gen === generation && !abort.signal.aborted) requested = null;
+      });
+  }, 250);
 }
 
 void main();

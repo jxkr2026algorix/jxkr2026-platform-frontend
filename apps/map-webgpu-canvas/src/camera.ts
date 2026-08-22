@@ -116,7 +116,7 @@ export class OrbitCamera {
     if (distanceMeters !== undefined) {
       this.distanceGoal = clamp(
         distanceMeters,
-        this.worldSize * 0.04,
+        this.worldSize * 0.008,
         this.worldSize * 1.25,
       );
     }
@@ -202,9 +202,10 @@ export class OrbitCamera {
   }
 
   private zoomBy(factor: number): void {
+    // Deep zoom allowed: the detail LOD swaps in building-level tiles.
     this.distanceGoal = clamp(
       this.distanceGoal * factor,
-      this.worldSize * 0.06,
+      this.worldSize * 0.008,
       this.worldSize * 1.25,
     );
   }
@@ -220,7 +221,8 @@ export class OrbitCamera {
     const cos = Math.cos(this.effectiveYaw());
     const moveX = (-dxPixels * cos - dyPixels * sin) * scale;
     const moveZ = (dxPixels * sin - dyPixels * cos) * scale;
-    const margin = this.worldSize * 0.05;
+    // Loose clamp here; update() applies the view-extent-aware bound.
+    const margin = this.worldSize * 0.02;
     this.targetGoal[0] = clamp(
       this.targetGoal[0] + moveX,
       margin,
@@ -241,6 +243,32 @@ export class OrbitCamera {
     this.flatBlend = damp(this.flatBlend, this.flatGoal, 3.2, dt);
     this.yaw = damp(this.yaw, this.yawGoal, 2.6, dt);
     this.distance = damp(this.distance, this.distanceGoal, 5, dt);
+
+    // Keep the visible area inside the map: in flat mode the margin equals
+    // the half-extent of the viewport, so dragging stops at the map edge
+    // instead of revealing the void beyond it.
+    const halfH = Math.tan((20 * Math.PI) / 180) * this.distanceGoal;
+    const halfW = halfH * Math.max(aspect, 0.5);
+    const base = this.worldSize * 0.02;
+    const marginX = Math.min(
+      this.worldSize * 0.5,
+      base + (halfW * 0.95 - base) * this.flatBlend,
+    );
+    const marginZ = Math.min(
+      this.worldSize * 0.5,
+      base + (halfH * 0.95 - base) * this.flatBlend,
+    );
+    this.targetGoal[0] = clamp(
+      this.targetGoal[0],
+      Math.max(marginX, base),
+      Math.min(this.worldSize - marginX, this.worldSize - base),
+    );
+    this.targetGoal[2] = clamp(
+      this.targetGoal[2],
+      Math.max(marginZ, base),
+      Math.min(this.worldSize - marginZ, this.worldSize - base),
+    );
+
     for (let axis = 0; axis < 3; axis++) {
       this.target[axis] = damp(
         this.target[axis] ?? 0,

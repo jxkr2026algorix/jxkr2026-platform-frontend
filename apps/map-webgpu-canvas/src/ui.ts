@@ -8,20 +8,20 @@ import type { Engine } from "./gpu/engine";
 import type { Scenario } from "./protocol";
 
 const SCENARIO_LABELS: Record<Scenario, string> = {
-  clear: "맑음",
-  rain: "강우",
-  flood: "집중호우",
-  wildfire: "산불",
-  landslide: "산사태",
-  typhoon: "태풍",
-  earthquake: "지진",
-  tsunami: "지진해일",
-  nuclear: "원전사고",
-  chemical: "화학사고",
-  heatwave: "폭염",
-  coldwave: "한파",
-  snow: "대설",
-  drought: "가뭄",
+  clear: "Clear",
+  rain: "Rain",
+  flood: "Flood",
+  wildfire: "Wildfire",
+  landslide: "Landslide",
+  typhoon: "Typhoon",
+  earthquake: "Earthquake",
+  tsunami: "Tsunami",
+  nuclear: "Nuclear accident",
+  chemical: "Chemical incident",
+  heatwave: "Heatwave",
+  coldwave: "Cold wave",
+  snow: "Heavy snow",
+  drought: "Drought",
 };
 
 export class ControlPanel {
@@ -46,7 +46,7 @@ export class ControlPanel {
 
   private build(): void {
     const heading = document.createElement("h2");
-    heading.textContent = "재난 시뮬레이션";
+    heading.textContent = "Disaster simulation";
     this.root.append(heading);
 
     // Scenario list
@@ -78,7 +78,7 @@ export class ControlPanel {
     const labelRow = document.createElement("div");
     labelRow.className = "label-row";
     const rainLabel = document.createElement("label");
-    rainLabel.textContent = "강우량";
+    rainLabel.textContent = "Rainfall";
     rainLabel.htmlFor = "rain-slider";
     this.rainOutput = document.createElement("output");
     this.rainOutput.textContent = "0 mm/h";
@@ -102,7 +102,7 @@ export class ControlPanel {
     const viewRow = document.createElement("div");
     viewRow.className = "row";
     for (const [mode, label] of [
-      ["auto", "자동"],
+      ["auto", "Auto"],
       ["flat", "2D"],
       ["tilted", "3D"],
     ] as const) {
@@ -120,8 +120,8 @@ export class ControlPanel {
     const basemapRow = document.createElement("div");
     basemapRow.className = "row";
     for (const [style, label] of [
-      ["satellite", "위성"],
-      ["map", "지도"],
+      ["satellite", "Satellite"],
+      ["map", "Map"],
     ] as const) {
       const button = document.createElement("button");
       button.type = "button";
@@ -144,20 +144,20 @@ export class ControlPanel {
     simRow.className = "row";
     this.playButton = document.createElement("button");
     this.playButton.type = "button";
-    this.playButton.textContent = "일시정지";
+    this.playButton.textContent = "Pause";
     this.playButton.addEventListener("click", () => {
       this.engine.simControl(this.engine.playing ? "pause" : "play");
       this.refresh();
     });
     const resetButton = document.createElement("button");
     resetButton.type = "button";
-    resetButton.textContent = "초기화";
+    resetButton.textContent = "Reset";
     resetButton.addEventListener("click", () =>
       this.engine.simControl("reset"),
     );
     const igniteButton = document.createElement("button");
     igniteButton.type = "button";
-    igniteButton.textContent = "발화";
+    igniteButton.textContent = "Ignite";
     igniteButton.addEventListener("click", () => {
       const point = this.engine.pickIgnitePoint();
       this.engine.ignite(point.x, point.y);
@@ -170,7 +170,7 @@ export class ControlPanel {
     overlayRow.className = "row";
     this.overlayButton = document.createElement("button");
     this.overlayButton.type = "button";
-    this.overlayButton.textContent = "위험 지역 표시";
+    this.overlayButton.textContent = "Show hazard areas";
     this.overlayButton.setAttribute("aria-pressed", "true");
     this.overlayButton.addEventListener("click", () => {
       this.engine.setOverlay(!this.engine.overlayEnabled);
@@ -208,7 +208,7 @@ export class ControlPanel {
         mode === this.engine.viewMode ? "true" : "false",
       );
     }
-    this.playButton.textContent = state.playing ? "일시정지" : "재생";
+    this.playButton.textContent = state.playing ? "Pause" : "Play";
     for (const [style, button] of this.basemapButtons) {
       button.setAttribute(
         "aria-pressed",
@@ -221,16 +221,16 @@ export class ControlPanel {
     );
     this.hint.textContent =
       state.scenario === "clear"
-        ? "호우·홍수·산사태·해일은 자동으로 3D 전환됩니다"
-        : "지도를 클릭하면 그 지점에서 재난이 발생합니다";
+        ? "Rain, flood, landslide, and tsunami scenarios switch to 3D automatically"
+        : "Click the map to set the incident origin";
     const h = state.hazards;
     this.metricsBox.innerHTML = "";
     const lines: [string, string][] = [
       ["FPS", String(state.fps)],
-      ["경과", `${state.simTimeSeconds.toFixed(0)}초`],
-      ["침수 면적", `${(h.flood.coverageRatio * 100).toFixed(1)}%`],
-      ["연소 셀", String(h.wildfire.burningCells)],
-      ["산사태 위험", h.landslide.riskIndex.toFixed(2)],
+      ["Elapsed", `${state.simTimeSeconds.toFixed(0)} sec`],
+      ["Flooded area", `${(h.flood.coverageRatio * 100).toFixed(1)}%`],
+      ["Burning cells", String(h.wildfire.burningCells)],
+      ["Landslide risk", h.landslide.riskIndex.toFixed(2)],
     ];
     for (const [label, value] of lines) {
       const row = document.createElement("div");

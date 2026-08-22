@@ -189,6 +189,10 @@ export class Engine {
   basemapStyle: import("../protocol").BasemapStyle = "satellite";
   private streetReady = false;
   private styleBlend = 0;
+  private detailRect = { x: 0, y: 0, size: 0 };
+  private detailOn = false;
+  private detailBlend = 0;
+  private detailTexRef: GPUTexture | null = null;
 
   private readonly debrisQueue: {
     start: number;
@@ -239,6 +243,7 @@ export class Engine {
     private readonly statsStaging: GPUBuffer,
     private readonly zoneTex: GPUTexture,
     hasImagery: boolean,
+    hasStreet: boolean,
   ) {
     this.camera = new OrbitCamera(terrain.worldSize, terrain.sampleHeight);
     this.camera.attach(canvas);
@@ -252,6 +257,7 @@ export class Engine {
     };
     this.satBlendTarget = hasImagery ? 1 : 0;
     this.satBlend = this.satBlendTarget;
+    this.streetReady = hasStreet;
     device.lost.then((info) => {
       if (this.running) this.onError?.("device-lost", info.message);
     });
@@ -261,6 +267,7 @@ export class Engine {
     canvas: HTMLCanvasElement,
     terrain: TerrainData,
     imagery: HTMLCanvasElement | null,
+    street: HTMLCanvasElement | null = null,
   ): Promise<Engine> {
     const gpu = navigator.gpu;
     if (!gpu) throw new Error("WebGPU unavailable");
@@ -340,8 +347,32 @@ export class Engine {
       [n, n],
     );
 
-    const streetTex = device.createTexture({
-      label: "street-basemap-placeholder",
+    let streetTex: GPUTexture;
+    if (street) {
+      streetTex = device.createTexture({
+        label: "street-basemap",
+        size: [street.width, street.height],
+        format: "rgba8unorm",
+        usage:
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_DST |
+          GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      device.queue.copyExternalImageToTexture(
+        { source: street },
+        { texture: streetTex },
+        [street.width, street.height],
+      );
+    } else {
+      streetTex = device.createTexture({
+        label: "street-basemap-placeholder",
+        size: [1, 1],
+        format: "rgba8unorm",
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+    }
+    const detailTex = device.createTexture({
+      label: "detail-patch-placeholder",
       size: [1, 1],
       format: "rgba8unorm",
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -381,6 +412,7 @@ export class Engine {
       riskTex,
       zoneTex,
       streetTex,
+      detailTex,
       n,
       targets,
     );
@@ -404,6 +436,7 @@ export class Engine {
       statsStaging,
       zoneTex,
       imagery !== null,
+      street !== null,
     );
   }
 
@@ -569,7 +602,39 @@ export class Engine {
   }
 
   setBasemapStyle(style: import("../protocol").BasemapStyle): void {
+    if (style !== this.basemapStyle) this.clearDetailPatch();
     this.basemapStyle = style;
+  }
+
+  /** Drape a freshly fetched high-zoom patch over the given rect. */
+  setDetailPatch(
+    canvas: HTMLCanvasElement,
+    rect: { x: number; y: number; size: number },
+  ): void {
+    const tex = this.device.createTexture({
+      label: "detail-patch",
+      size: [canvas.width, canvas.height],
+      format: "rgba8unorm",
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    this.device.queue.copyExternalImageToTexture(
+      { source: canvas },
+      { texture: tex },
+      [canvas.width, canvas.height],
+    );
+    this.surface.setDetailTexture(tex);
+    // The bind group now references the new texture; the old one can go.
+    this.detailTexRef?.destroy();
+    this.detailTexRef = tex;
+    this.detailRect = rect;
+    this.detailOn = true;
+  }
+
+  clearDetailPatch(): void {
+    this.detailOn = false;
   }
 
   get streetBasemapReady(): boolean {
@@ -1245,6 +1310,14 @@ export class Engine {
       this.weatherTemp,
       this.weatherDrought,
       this.styleBlend,
+    );
+    this.detailBlend = damp(this.detailBlend, this.detailOn ? 1 : 0, 4, realDt);
+    g.setVec4(
+      ROW.detail,
+      this.detailRect.x,
+      this.detailRect.y,
+      this.detailRect.size,
+      this.detailBlend,
     );
 
     const fogColor: [number, number, number] = [

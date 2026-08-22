@@ -29,15 +29,79 @@ export interface RealTerrainResult {
   geo: GeoReference;
   /** Satellite composite ready for texture upload, or null if unavailable. */
   imagery: HTMLCanvasElement | null;
+  /** Street-map composite (map style), loaded in parallel; may be null. */
+  street: HTMLCanvasElement | null;
 }
 
 const TERRARIUM_URL = (z: number, x: number, y: number) =>
   `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
-const IMAGERY_URL = (z: number, x: number, y: number) =>
+export const IMAGERY_URL = (z: number, x: number, y: number) =>
   `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
 /** Google-Maps-like light street map (CARTO Voyager, OSM data). */
 export const STREET_URL = (z: number, x: number, y: number) =>
   `https://${"abcd"[(x + y) % 4]}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
+
+// TMap raster tiles (SK open API) are used for the map style when an app
+// key is configured; they carry full Korean building/POI detail. Tiles are
+// standard Web Mercator XYZ, so positions line up with everything else.
+const TMAP_KEY = (
+  (import.meta.env.VITE_TMAP_APP_KEY as string | undefined) ?? ""
+).trim();
+// The SDK's tile backend serves TMS-scheme tiles (y flipped) without CORS
+// headers, so requests go through the dev-server proxy (see vite.config.ts).
+// {ytms} = (2^z - 1 - y) for TMS endpoints; {y} is standard XYZ.
+const TMAP_TEMPLATE =
+  ((import.meta.env.VITE_TMAP_TILE_URL as string | undefined) ?? "").trim() ||
+  "/tmap-tiles{s}/{z}/{x}/{ytms}.png?version=20220406";
+
+export const TMAP_ENABLED = TMAP_KEY.length > 0;
+
+const TMAP_URL = (z: number, x: number, y: number) =>
+  TMAP_TEMPLATE.replace("{s}", String(1 + ((x + y) % 3)))
+    .replace("{z}", String(z))
+    .replace("{x}", String(x))
+    .replace("{ytms}", String(2 ** z - 1 - y))
+    .replace("{y}", String(y))
+    .replace("{key}", TMAP_KEY);
+
+/** Street basemap: TMap when configured, CARTO as automatic fallback. */
+export async function loadStreetBasemap(
+  centerLat: number,
+  centerLon: number,
+  sizeMeters: number,
+): Promise<HTMLCanvasElement | null> {
+  if (TMAP_ENABLED) {
+    const canvas = await loadBasemap(
+      centerLat,
+      centerLon,
+      sizeMeters,
+      TMAP_URL,
+    );
+    if (canvas) return canvas;
+    console.warn("TMap tiles unavailable; falling back to CARTO street map");
+  }
+  return loadBasemap(centerLat, centerLon, sizeMeters, STREET_URL);
+}
+
+/** High-zoom street detail patch with the same TMap-first fallback. */
+export async function loadStreetDetailPatch(
+  centerLat: number,
+  centerLon: number,
+  sizeMeters: number,
+  options?: CompositeOptions,
+): Promise<DetailPatch | null> {
+  if (TMAP_ENABLED) {
+    const patch = await loadDetailPatch(
+      centerLat,
+      centerLon,
+      sizeMeters,
+      TMAP_URL,
+      options,
+    );
+    if (patch || options?.signal?.aborted) return patch;
+  }
+  return loadDetailPatch(centerLat, centerLon, sizeMeters, STREET_URL, options);
+}
 
 const TILE = 256;
 const EARTH = 6378137;
@@ -67,10 +131,55 @@ function metersPerPixel(lat: number, zoom: number): number {
   );
 }
 
-async function fetchTileBitmap(url: string): Promise<ImageBitmap> {
-  const response = await fetch(url, { mode: "cors" });
+// Persistent tile cache (Cache Storage): DEM, satellite, street, and
+// detail-patch tiles all pass through here, so repeat loads of the same
+// region skip the network entirely.
+const TILE_CACHE_NAME = "salgil-tiles-v1";
+let tileCachePromise: Promise<Cache | null> | undefined;
+
+function getTileCache(): Promise<Cache | null> {
+  tileCachePromise ??= (async () => {
+    try {
+      return await caches.open(TILE_CACHE_NAME);
+    } catch {
+      return null; // e.g. insecure context; fall back to network-only
+    }
+  })();
+  return tileCachePromise;
+}
+
+async function fetchTileBitmap(
+  url: string,
+  signal?: AbortSignal,
+): Promise<ImageBitmap> {
+  const cache = await getTileCache();
+  if (cache) {
+    try {
+      const hit = await cache.match(url);
+      if (hit) return await createImageBitmap(await hit.blob());
+    } catch {
+      // Corrupt entry; fall through to the network.
+    }
+  }
+  const response = await fetch(url, {
+    mode: "cors",
+    ...(signal ? { signal } : {}),
+  });
   if (!response.ok) throw new Error(`tile fetch failed: ${response.status}`);
+  if (cache) {
+    try {
+      await cache.put(url, response.clone());
+    } catch {
+      // Quota exceeded or opaque response; serving from network is fine.
+    }
+  }
   return createImageBitmap(await response.blob());
+}
+
+export interface CompositeOptions {
+  signal?: AbortSignal;
+  /** Called as tiles land, so callers can show partial progress. */
+  onProgress?: (canvas: HTMLCanvasElement) => void;
 }
 
 /**
@@ -85,6 +194,7 @@ async function compositeTiles(
   pxMinY: number,
   pxSize: number,
   outSize: number,
+  options?: CompositeOptions,
 ): Promise<HTMLCanvasElement> {
   const tileMin = {
     x: Math.floor(pxMinX / TILE),
@@ -108,7 +218,7 @@ async function compositeTiles(
     for (let tx = tileMin.x; tx <= tileMax.x; tx++) {
       if (tx < 0 || ty < 0 || tx > maxIndex || ty > maxIndex) continue;
       jobs.push(
-        fetchTileBitmap(urlFor(zoom, tx, ty)).then(
+        fetchTileBitmap(urlFor(zoom, tx, ty), options?.signal).then(
           (bitmap) => {
             ctx.drawImage(
               bitmap,
@@ -118,6 +228,7 @@ async function compositeTiles(
               TILE * scale,
             );
             bitmap.close();
+            options?.onProgress?.(canvas);
             return true;
           },
           () => false,
@@ -331,14 +442,12 @@ async function loadRealTerrainInner(
   }
   maxHeight = minHeight + (maxHeight - minHeight) * options.exaggeration;
 
-  // Satellite drape; failure is non-fatal (the procedural palette takes
-  // over). The street basemap for the map style is loaded lazily later.
-  const imagery = await loadBasemap(
-    centerLat,
-    centerLon,
-    sizeMeters,
-    IMAGERY_URL,
-  );
+  // Satellite drape and the street basemap load in parallel so the map
+  // style is available the moment the user toggles it. Both are non-fatal.
+  const [imagery, street] = await Promise.all([
+    loadBasemap(centerLat, centerLon, sizeMeters, IMAGERY_URL),
+    loadStreetBasemap(centerLat, centerLon, sizeMeters),
+  ]);
 
   const cellSize = sizeMeters / n;
   const fuel = imagery
@@ -384,5 +493,133 @@ async function loadRealTerrainInner(
     },
     geo,
     imagery,
+    street,
   };
+}
+
+export interface DetailPatch {
+  canvas: HTMLCanvasElement;
+  /** Geographic bounds of the patch (degrees). */
+  west: number;
+  east: number;
+  north: number;
+  south: number;
+}
+
+/**
+ * High-zoom detail patch for the area the camera is looking at, so streets
+ * and building footprints appear as you zoom in (slippy-map style LOD).
+ * Prefers the highest zoom (up to 17) that fits the tile budget.
+ */
+export async function loadDetailPatch(
+  centerLat: number,
+  centerLon: number,
+  sizeMeters: number,
+  urlFor: (z: number, x: number, y: number) => string,
+  options?: CompositeOptions,
+): Promise<DetailPatch | null> {
+  const TILE_BUDGET = 110;
+  for (let zoom = 17; zoom >= 12; zoom--) {
+    const mpp = metersPerPixel(centerLat, zoom);
+    const pxSize = sizeMeters / mpp;
+    const tilesAcross = Math.floor(pxSize / TILE) + 1;
+    if (tilesAcross * tilesAcross > TILE_BUDGET) continue;
+    const minX = lonToGlobalPx(centerLon, zoom) - pxSize / 2;
+    const minY = latToGlobalPx(centerLat, zoom) - pxSize / 2;
+    try {
+      const canvas = await compositeTiles(
+        urlFor,
+        zoom,
+        minX,
+        minY,
+        pxSize,
+        Math.min(2048, Math.round(pxSize)),
+        options,
+      );
+      return {
+        canvas,
+        west: globalPxToLon(minX, zoom),
+        east: globalPxToLon(minX + pxSize, zoom),
+        north: globalPxToLat(minY, zoom),
+        south: globalPxToLat(minY + pxSize, zoom),
+      };
+    } catch {
+      if (options?.signal?.aborted) return null;
+      // Fall through to a coarser zoom.
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// OSM building footprints (vector polygons) for the detail patch.
+// Coverage in Korea is uneven and the public Overpass servers are
+// best-effort, so failures are silent: the raster tiles underneath keep
+// whatever buildings they render on their own.
+// ---------------------------------------------------------------------------
+
+const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+
+export async function loadBuildingFootprints(
+  patch: DetailPatch,
+): Promise<{ lat: number; lon: number }[][]> {
+  const query =
+    `[out:json][timeout:12];` +
+    `way["building"](${patch.south},${patch.west},${patch.north},${patch.east});` +
+    `out geom 6000;`;
+  const response = await fetch(OVERPASS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `data=${encodeURIComponent(query)}`,
+  });
+  if (!response.ok) throw new Error(`overpass ${response.status}`);
+  const json = (await response.json()) as {
+    elements?: { type: string; geometry?: { lat: number; lon: number }[] }[];
+  };
+  return (json.elements ?? [])
+    .filter((el) => el.type === "way" && (el.geometry?.length ?? 0) >= 3)
+    .map((el) => el.geometry as { lat: number; lon: number }[]);
+}
+
+const mercY = (lat: number) =>
+  Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+
+/** Draw building polygons onto the patch canvas (fill + outline). */
+export function drawBuildings(
+  patch: DetailPatch,
+  buildings: { lat: number; lon: number }[][],
+  style: "satellite" | "map",
+): void {
+  const ctx = patch.canvas.getContext("2d");
+  if (!ctx) return;
+  const w = patch.canvas.width;
+  const h = patch.canvas.height;
+  const yTop = mercY(patch.north);
+  const ySpan = mercY(patch.south) - yTop;
+  const xSpan = patch.east - patch.west;
+
+  ctx.save();
+  if (style === "map") {
+    ctx.fillStyle = "rgba(118, 124, 138, 0.32)";
+    ctx.strokeStyle = "rgba(84, 90, 104, 0.75)";
+  } else {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+  }
+  ctx.lineWidth = Math.max(1, w / 2048);
+  ctx.beginPath();
+  for (const ring of buildings) {
+    for (let i = 0; i < ring.length; i++) {
+      const pt = ring[i];
+      if (!pt) continue;
+      const x = ((pt.lon - patch.west) / xSpan) * w;
+      const y = ((mercY(pt.lat) - yTop) / ySpan) * h;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }

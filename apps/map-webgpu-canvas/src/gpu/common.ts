@@ -6,7 +6,7 @@
  * must match `GLOBALS_WGSL` field-for-field.
  */
 
-export const GLOBALS_FLOATS = 64; // 256 bytes
+export const GLOBALS_FLOATS = 68; // 272 bytes
 
 export const GLOBALS_WGSL = /* wgsl */ `
 struct Globals {
@@ -23,6 +23,7 @@ struct Globals {
   layers : vec4f,   // x satellite blend, y scenario code, z min height, w max height
   event : vec4f,    // x source u, y source v, z elapsed s, w kind (1 quake, 3 nuclear, 4 chemical)
   weather : vec4f,  // x snow 0..1, y temperature -1 cold..1 heat, z drought 0..1, w street-map blend
+  detail : vec4f,   // high-zoom patch: x u0, y v0, z size (normalized), w blend
 };
 @group(0) @binding(0) var<uniform> G : Globals;
 `;
@@ -145,6 +146,7 @@ export const ROW = {
   layers: 9,
   event: 10,
   weather: 11,
+  detail: 12,
 } as const;
 
 export function createGridTexture(
