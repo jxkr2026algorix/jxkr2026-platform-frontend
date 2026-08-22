@@ -1,4 +1,6 @@
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
+import { motion } from "motion/react";
+import { SegmentIndicator } from "../components/SegmentIndicator";
 import { useI18n } from "../i18n";
 import type { TranslationKey } from "../i18n/messages";
 
@@ -74,7 +76,7 @@ export function EventControls({
           at the moment of the click, not inferable from a button colour. */}
       <fieldset className="compact-controls">
         <legend className="sr-only">{t("event.declare")}</legend>
-        <div className="segmented-track segmented-track-two">
+        <motion.div className="segmented-track segmented-track-two" layoutRoot>
           {(["simulate", "declare"] as const).map((option) => (
             <button
               key={option}
@@ -82,12 +84,15 @@ export function EventControls({
               aria-pressed={mode === option}
               onClick={() => onModeChange(option)}
             >
+              {mode === option ? (
+                <SegmentIndicator layoutId="event-mode-segment" />
+              ) : null}
               <span className="segmented-label">
                 {t(`event.mode.${option}`)}
               </span>
             </button>
           ))}
-        </div>
+        </motion.div>
       </fieldset>
       <p className="event-mode-hint">{t(`event.modeHint.${mode}`)}</p>
       <fieldset className="event-grid" disabled={publishing}>
