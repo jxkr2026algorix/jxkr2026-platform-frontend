@@ -645,11 +645,6 @@ textarea {
   overscroll-behavior: contain;
 }
 
-.floating-select-popover[data-placement="top"] {
-  top: auto;
-  bottom: calc(100% + 6px);
-}
-
 .floating-select-option {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 16px;

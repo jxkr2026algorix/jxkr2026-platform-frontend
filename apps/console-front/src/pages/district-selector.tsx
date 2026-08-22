@@ -27,7 +27,6 @@ export function DistrictSelector({
         value={selected ?? PROVINCE_CODE}
         options={options}
         disabled={loading}
-        preferredPlacement="top"
         onValueChange={onSelect}
       />
       <p role="status">

@@ -103,6 +103,7 @@ Status is communicated with text and structure, not color alone. Cobalt is not u
 
 - The trigger is a 40px neutral control with a 10px radius, inset chevron, and enough right padding that the icon never touches the edge.
 - The option popover is custom-rendered, keyboard navigable, and anchored within the owning panel. It opens with a 120ms opacity/translate transition and never uses bounce or a morphing glass effect.
+- Opening aligns the selected option's center with the trigger's center whenever the panel boundary allows it. Long lists pre-scroll around the selected option instead of starting at the first item.
 - The selected option uses a low-contrast neutral fill, a checkmark, and stronger text. Hover, focus, and selected states remain distinct without brand-colored fills.
 
 ### Checkbox

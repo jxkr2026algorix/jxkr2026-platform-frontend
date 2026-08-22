@@ -135,7 +135,6 @@ export function PatrolPage({
                 label="Report type"
                 value={reportType}
                 options={REPORT_TYPE_OPTIONS}
-                preferredPlacement="top"
                 onValueChange={setReportType}
               />
               <label>

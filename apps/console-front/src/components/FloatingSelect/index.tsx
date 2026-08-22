@@ -3,6 +3,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -16,7 +17,6 @@ interface FloatingSelectProps {
   readonly label: string;
   readonly value: string;
   readonly options: readonly FloatingSelectOption[];
-  readonly preferredPlacement?: "auto" | "top" | "bottom";
   readonly disabled?: boolean;
   readonly onValueChange: (value: string) => void;
 }
@@ -25,13 +25,14 @@ export function FloatingSelect({
   label,
   value,
   options,
-  preferredPlacement = "auto",
   disabled = false,
   onValueChange,
 }: FloatingSelectProps) {
   const reduceMotion = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const selectedOptionRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
   const selectedIndex = options.findIndex((option) => option.value === value);
   const initialIndex = selectedIndex >= 0 ? selectedIndex : 0;
@@ -39,6 +40,7 @@ export function FloatingSelect({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const [placement, setPlacement] = useState<"top" | "bottom">("bottom");
+  const [popoverTop, setPopoverTop] = useState<number | null>(null);
   const selectedOption = options[selectedIndex];
 
   useEffect(() => {
@@ -53,30 +55,48 @@ export function FloatingSelect({
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const root = rootRef.current;
+    const trigger = triggerRef.current;
+    const popover = popoverRef.current;
+    const selected = selectedOptionRef.current;
+    if (!root || !trigger || !popover || !selected) return;
+
+    const maxScrollTop = Math.max(
+      0,
+      popover.scrollHeight - popover.clientHeight,
+    );
+    const centeredScrollTop =
+      selected.offsetTop + selected.offsetHeight / 2 - popover.clientHeight / 2;
+    popover.scrollTop = Math.min(Math.max(centeredScrollTop, 0), maxScrollTop);
+
+    const rootBounds = root.getBoundingClientRect();
+    const triggerBounds = trigger.getBoundingClientRect();
+    const boundaryBounds = root
+      .closest(".workflow-view, .side-nav, .floating-lens")
+      ?.getBoundingClientRect();
+    const boundaryTop = (boundaryBounds?.top ?? 0) + 6;
+    const boundaryBottom = (boundaryBounds?.bottom ?? window.innerHeight) - 6;
+    const selectedCenter =
+      selected.offsetTop - popover.scrollTop + selected.offsetHeight / 2;
+    const triggerCenter = triggerBounds.top + triggerBounds.height / 2;
+    const idealTop = triggerCenter - selectedCenter;
+    const latestTop = Math.max(
+      boundaryTop,
+      boundaryBottom - popover.offsetHeight,
+    );
+    const viewportTop = Math.min(Math.max(idealTop, boundaryTop), latestTop);
+
+    setPopoverTop(viewportTop - rootBounds.top);
+    setPlacement(viewportTop < triggerBounds.top ? "top" : "bottom");
+  }, [open]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
       activeIndexRef.current = initialIndex;
       setActiveIndex(initialIndex);
-      const root = rootRef.current;
-      if (preferredPlacement === "auto" && root) {
-        const rootBounds = root.getBoundingClientRect();
-        const workflowBounds = root
-          .closest(".workflow-view")
-          ?.getBoundingClientRect();
-        const boundaryTop = workflowBounds?.top ?? 0;
-        const boundaryBottom = workflowBounds?.bottom ?? window.innerHeight;
-        const estimatedPopoverHeight = Math.min(278, options.length * 42 + 10);
-        const availableAbove = rootBounds.top - boundaryTop - 6;
-        const availableBelow = boundaryBottom - rootBounds.bottom - 6;
-        setPlacement(
-          availableBelow < estimatedPopoverHeight &&
-            availableAbove > availableBelow
-            ? "top"
-            : "bottom",
-        );
-      } else if (preferredPlacement !== "auto") {
-        setPlacement(preferredPlacement);
-      }
+      setPopoverTop(null);
     }
     setOpen(nextOpen);
   };
@@ -151,10 +171,12 @@ export function FloatingSelect({
         {open && (
           <motion.div
             className="floating-select-popover"
+            ref={popoverRef}
             id={listboxId}
             role="listbox"
             aria-label={label}
             data-placement={placement}
+            {...(popoverTop === null ? {} : { style: { top: popoverTop } })}
             initial={
               reduceMotion
                 ? false
@@ -175,6 +197,7 @@ export function FloatingSelect({
             {options.map((option, index) => (
               <button
                 className="floating-select-option"
+                ref={option.value === value ? selectedOptionRef : undefined}
                 id={`${listboxId}-option-${index}`}
                 key={option.value}
                 type="button"
