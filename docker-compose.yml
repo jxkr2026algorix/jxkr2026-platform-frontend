@@ -38,6 +38,7 @@ services:
       args:
         WORKSPACE: "@salgil/mobile"
         APP_DIR: apps/mobile
+        VITE_MAP_URL: ${VITE_MAP_URL:-http://localhost:8082}
     image: salgil/mobile
     ports:
       - "${MOBILE_PORT:-8081}:80"

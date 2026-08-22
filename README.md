@@ -25,7 +25,7 @@ corepack enable
 yarn install
 
 yarn dev:map --port 5175
-SALGIL_PLATFORM_API_URL=http://127.0.0.1:8000 SALGIL_PLATFORM_API_KEY=<operator-key> yarn dev:mobile --port 5174
+SALGIL_PLATFORM_API_URL=http://127.0.0.1:8000 SALGIL_PLATFORM_API_KEY=<operator-key> VITE_MAP_URL=http://localhost:5175 yarn dev:mobile --port 5174
 SALGIL_PLATFORM_API_URL=http://127.0.0.1:8000 SALGIL_PLATFORM_API_KEY=<operator-key> VITE_MAP_URL=http://localhost:5175 VITE_MOBILE_URL=http://localhost:5174 yarn dev:console --port 5173
 ```
 
@@ -35,8 +35,9 @@ SALGIL_PLATFORM_API_URL=http://127.0.0.1:8000 SALGIL_PLATFORM_API_KEY=<operator-
 
 The frontend consumes the platform backend's real `/api/v1/incidents`
 contract. Console and mobile poll open incidents for region `47750` every two
-seconds. A new backend incident updates both clients; a `wildfire` incident
-also switches the WebGPU map to wildfire and triggers a visible origin.
+seconds. A new backend incident updates both clients. The mobile client renders
+its assigned shelter, route, risk zones, and incident origin over the WebGPU
+map; trigger-capable hazards also start at the backend-provided origin.
 
 Creating an event from the console posts an `IncidentCreate` to
 `POST /api/v1/incidents`. The selected map point is recorded as
@@ -74,11 +75,12 @@ docker compose up -d --build
 Each service builds its workspace and serves the static bundle from nginx.
 Override ports with `CONSOLE_PORT`, `MOBILE_PORT`, `MAP_PORT`.
 
-The console loads the map by URL from the browser, so `VITE_MAP_URL` (default
-`http://localhost:8082`) must be reachable by the client and is baked in at build time:
+The console and mobile clients load the map by URL from the browser, so
+`VITE_MAP_URL` (default `http://localhost:8082`) must be reachable by the
+client and is baked in at build time:
 
 ```bash
-VITE_MAP_URL=https://map.example.com docker compose build console
+VITE_MAP_URL=https://map.example.com docker compose build console mobile
 ```
 
 WebGPU needs a secure context — serve the map over HTTPS outside localhost.
