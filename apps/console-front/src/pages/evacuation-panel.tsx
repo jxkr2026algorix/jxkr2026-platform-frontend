@@ -13,12 +13,6 @@ import {
   type TransportMode,
 } from "@salgil/platform-client";
 import { useState } from "react";
-import {
-  DEMO_EVENT,
-  DEMO_ROUTE_PLAN,
-  DEMO_SHELTERS,
-  DEMO_ZONES,
-} from "../demo-evacuation";
 import { useI18n } from "../i18n";
 import { EvacuationControls } from "./_components/EvacuationControls";
 import { EvacuationResult } from "./_components/EvacuationResult";
@@ -29,8 +23,6 @@ interface EvacuationPanelProps {
   readonly hazardType: DisasterType;
   readonly districtCode: string | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
-  /** Raises an alert locally, for checking the display without a backend. */
-  readonly onPreviewEvent: (event: PlatformEvent | null) => void;
 }
 
 /**
@@ -47,14 +39,12 @@ export function EvacuationPanel({
   hazardType,
   districtCode,
   onMapCommand,
-  onPreviewEvent,
 }: EvacuationPanelProps) {
   const { locale, t } = useI18n();
   const [mode, setMode] = useState<TransportMode>("foot");
   const [plan, setPlan] = useState<RoutePlan | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState(false);
 
   const hazard = SCENARIO_TO_HAZARD[hazardType];
   const origin = originFor(districtCode);
@@ -184,7 +174,6 @@ export function EvacuationPanel({
   const runPlan = async () => {
     setPending(true);
     setError("");
-    setPreview(false);
     try {
       const [next, shelters] = await Promise.all([
         client.planEvacuation({
@@ -228,26 +217,8 @@ export function EvacuationPanel({
     }
   };
 
-  const runPreview = () => {
-    setError("");
-    setPreview(true);
-    setPlan(DEMO_ROUTE_PLAN);
-    // Move the selector to the district the sample sits in, so the rail and
-    // the map agree about where the operator is looking.
-    const home = districtAt(36.5012, 129.0332);
-    if (home && home !== districtCode) {
-      onMapCommand({ type: "map:focus-district", payload: { code: home } });
-    }
-    // The alert banner reads the platform event, so the preview raises one
-    // too — otherwise the map fills in while the dashboard stays silent.
-    onPreviewEvent(DEMO_EVENT);
-    draw(DEMO_ROUTE_PLAN, DEMO_SHELTERS, DEMO_ZONES);
-  };
-
   const clear = () => {
     setPlan(null);
-    if (preview) onPreviewEvent(null);
-    setPreview(false);
     setError("");
     onMapCommand({ type: "map:set-zones", payload: { zones: [] } });
     onMapCommand({ type: "map:set-routes", payload: { routes: [] } });
@@ -267,7 +238,6 @@ export function EvacuationPanel({
         hasPlan={plan !== null}
         onModeChange={setMode}
         onPlan={() => void runPlan()}
-        onPreview={runPreview}
         onClear={clear}
       />
 
@@ -277,7 +247,7 @@ export function EvacuationPanel({
         </p>
       ) : null}
 
-      {plan ? <EvacuationResult plan={plan} preview={preview} /> : null}
+      {plan ? <EvacuationResult plan={plan} /> : null}
     </section>
   );
 }

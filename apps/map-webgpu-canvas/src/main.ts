@@ -270,10 +270,16 @@ function activateZone(zone: {
  * Playback runs to two hours in two-minute steps. Five discrete horizons read
  * as a slideshow; the point of watching spread is seeing it move, so frames
  * are computed lazily just before each one is shown rather than all at once.
+ *
+ * Two hours plays out over roughly twenty seconds. At 90 ms a frame the whole
+ * forecast was over in five, which is faster than anyone can look up from the
+ * rail they just clicked — the fire was never seen spreading, only found
+ * already spread. A frame costs 2–7 ms to compute, so the pace is a choice
+ * about watching, not a budget.
  */
 const SPREAD_MINUTES = 120;
 const SPREAD_STEP_MINUTES = 2;
-const SPREAD_FRAME_MS = 90;
+const SPREAD_FRAME_MS = 340;
 
 let spreadTimer: number | null = null;
 

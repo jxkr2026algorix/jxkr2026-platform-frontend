@@ -208,13 +208,15 @@ export function App() {
   };
 
   /**
-   * Put the board back to how it opened: no alert, no annotations, the
-   * simulation stopped, and the camera on the default district. Anything an
-   * operator did during a walkthrough is cleared in one action.
+   * Put the board back to how it opened: no annotations, the simulation
+   * stopped, and the camera on the default district. Anything an operator did
+   * during a walkthrough is cleared in one action.
+   *
+   * It does not clear the alert. An incident the platform still has open is
+   * not something this screen gets to decide is over.
    */
   const handleReset = () => {
     setPlacementArmed(false);
-    platform.previewEvent(null);
     map.send({ type: "map:set-zones", payload: { zones: [] } });
     map.send({ type: "map:set-markers", payload: { markers: [] } });
     map.send({ type: "map:set-routes", payload: { routes: [] } });
@@ -330,7 +332,6 @@ export function App() {
                   eventMode={placementMode}
                   onEventModeChange={setPlacementMode}
                   onEventDeclare={handleEventDeclare}
-                  onPreviewEvent={platform.previewEvent}
                   onReset={handleReset}
                 />
               }

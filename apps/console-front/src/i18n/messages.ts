@@ -47,8 +47,6 @@ const english = {
   "event.modeHint.declare": "Records the incident and alerts residents.",
   "event.simulate": "Simulate {hazard}",
   "event.declareReal": "Declare {hazard}",
-  "event.placeArea":
-    "Click the map where the hazard is — the ring shows the area.",
   "event.reset": "Reset board",
   "district.label": "District",
   "district.province": "Gyeongsangbuk-do",
@@ -81,11 +79,9 @@ const english = {
   "route.car": "Car",
   "route.planning": "Planning…",
   "route.plan": "Plan routes",
-  "route.sample": "Sample data",
   "route.clear": "Clear",
   "route.serviceError":
     "Could not reach the routing service. Use sample data to check the display.",
-  "route.sampleFlag": "Sample data — not from the routing service.",
   "route.nearest": "Nearest reachable shelter",
   "route.travel": "Travel",
   "route.peakRisk": "Peak risk on route",
@@ -175,8 +171,6 @@ const korean: Record<TranslationKey, string> = {
   "event.modeHint.declare": "상황을 기록하고 주민에게 알립니다.",
   "event.simulate": "{hazard} 시뮬레이션",
   "event.declareReal": "{hazard} 상황 선포",
-  "event.placeArea":
-    "재난이 발생한 지점을 지도에서 클릭하세요 — 원이 범위입니다.",
   "event.reset": "상황판 초기화",
   "district.label": "지역",
   "district.province": "경상북도",
@@ -209,11 +203,9 @@ const korean: Record<TranslationKey, string> = {
   "route.car": "자동차",
   "route.planning": "경로 계산 중…",
   "route.plan": "경로 계산",
-  "route.sample": "샘플 데이터",
   "route.clear": "지우기",
   "route.serviceError":
     "경로 서비스에 연결할 수 없습니다. 샘플 데이터로 화면을 확인하세요.",
-  "route.sampleFlag": "샘플 데이터 · 경로 서비스에서 받은 결과가 아닙니다.",
   "route.nearest": "가장 가까운 도달 가능 대피소",
   "route.travel": "이동",
   "route.peakRisk": "경로 최대 위험도",

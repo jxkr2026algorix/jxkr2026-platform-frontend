@@ -7,7 +7,6 @@ type EvacuationControlsProps = {
   readonly hasPlan: boolean;
   readonly onModeChange: (mode: TransportMode) => void;
   readonly onPlan: () => void;
-  readonly onPreview: () => void;
   readonly onClear: () => void;
 };
 
@@ -17,7 +16,6 @@ export function EvacuationControls({
   hasPlan,
   onModeChange,
   onPlan,
-  onPreview,
   onClear,
 }: EvacuationControlsProps) {
   const { t } = useI18n();
@@ -54,9 +52,6 @@ export function EvacuationControls({
           onClick={onPlan}
         >
           {pending ? t("route.planning") : t("route.plan")}
-        </button>
-        <button className="button secondary" type="button" onClick={onPreview}>
-          {t("route.sample")}
         </button>
         {hasPlan ? (
           <button className="button secondary" type="button" onClick={onClear}>

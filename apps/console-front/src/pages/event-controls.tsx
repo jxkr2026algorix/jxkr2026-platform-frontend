@@ -111,11 +111,6 @@ export function EventControls({
         ))}
       </fieldset>
 
-      {placementArmed ? (
-        <p className="placement-prompt" role="status">
-          {t("event.placeArea")}
-        </p>
-      ) : null}
       {errorMessage ? (
         <p className="event-error" role="alert">
           {errorMessage}

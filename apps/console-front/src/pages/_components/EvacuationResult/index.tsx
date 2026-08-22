@@ -1,13 +1,7 @@
 import { type RoutePlan, recommendedLeg } from "@salgil/platform-client";
 import { useI18n } from "../../../i18n";
 
-export function EvacuationResult({
-  plan,
-  preview,
-}: {
-  readonly plan: RoutePlan;
-  readonly preview: boolean;
-}) {
+export function EvacuationResult({ plan }: { readonly plan: RoutePlan }) {
   const { t } = useI18n();
   const best = recommendedLeg(plan);
   const unreachable = plan.routes.filter((leg) => !leg.found);
@@ -28,10 +22,6 @@ export function EvacuationResult({
 
   return (
     <div className="evacuation-result">
-      {preview ? (
-        <p className="evacuation-flag">{t("route.sampleFlag")}</p>
-      ) : null}
-
       {best ? (
         <dl className="evacuation-metrics">
           <div>

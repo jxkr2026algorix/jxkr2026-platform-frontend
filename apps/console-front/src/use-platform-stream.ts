@@ -107,15 +107,6 @@ export function usePlatformStream() {
     [client],
   );
 
-  /**
-   * Push an event into the dashboard without the backend. Used to verify
-   * alert, zone, shelter, and route rendering while those endpoints are
-   * still being built; it never reaches the platform.
-   */
-  const previewEvent = useCallback((next: PlatformEvent | null) => {
-    setEvent(next);
-  }, []);
-
   // Either channel is enough. The stream is instant; the polled event is what
   // a console opened after the exercise started has.
   const drill = declared?.drill
@@ -144,7 +135,6 @@ export function usePlatformStream() {
     frame,
     streaming,
     event,
-    previewEvent,
     selectedType,
     connection,
     publishing,

@@ -2392,18 +2392,11 @@ tbody tr:last-child td {
   font-size: 9px;
 }
 
-.placement-prompt,
 .backend-simulation-note {
   margin: 8px 0 0;
   color: var(--ink-tertiary);
   font-size: 10px;
   line-height: 1.4;
-}
-
-.placement-prompt {
-  padding-left: 8px;
-  border-left: 2px solid var(--alert-ink);
-  color: var(--alert-ink);
 }
 
 .event-error {
@@ -2536,16 +2529,6 @@ tbody tr:last-child td {
 .evacuation-blocked span {
   color: var(--ink-tertiary);
   font-size: 10px;
-}
-
-.evacuation-flag {
-  margin: 0;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: var(--alert-soft, #fff7ed);
-  color: var(--alert-ink, #c2410c);
-  font-size: 11px;
-  font-weight: 550;
 }
 
 .evacuation-note {

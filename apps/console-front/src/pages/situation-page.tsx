@@ -29,7 +29,6 @@ interface SituationPageProps {
     type: DisasterType,
     mode: "simulate" | "declare",
   ) => void;
-  readonly onPreviewEvent: (event: PlatformEvent | null) => void;
   readonly onReset: () => void;
 }
 
@@ -46,7 +45,6 @@ export function SituationPage({
   eventMode,
   onEventModeChange,
   onEventDeclare,
-  onPreviewEvent,
   onReset,
 }: SituationPageProps) {
   const { t } = useI18n();
@@ -79,7 +77,6 @@ export function SituationPage({
             hazardType={latestEvent?.type ?? selectedType ?? "landslide"}
             districtCode={map.status.controls.districtCode}
             onMapCommand={onMapCommand}
-            onPreviewEvent={onPreviewEvent}
           />
         </DistrictStatusPanel>
       </section>
