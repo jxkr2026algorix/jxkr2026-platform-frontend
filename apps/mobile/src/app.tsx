@@ -502,10 +502,13 @@ export function App() {
     const version = `${event.id}:${event.sequence}`;
     if (notifiedIncidentRef.current === version) return;
     notifiedIncidentRef.current = version;
-    // The notification arrives without the screen around it, so it carries
-    // the marker itself.
+    // The notification arrives without the screen around it, so it carries the
+    // marker itself — unless the headline already carries it, which is how a
+    // drill started from the assistant arrives. Prefixing twice reads as a bug
+    // and undermines the one word that has to be believed.
+    const marked = drill && !event.headline.startsWith("[훈련]");
     notifyIncident(
-      drill ? `[훈련] ${event.headline}` : event.headline,
+      marked ? `[훈련] ${event.headline}` : event.headline,
       drill
         ? `훈련 상황입니다. 실제 재난이 아닙니다. ${event.instruction}`
         : event.instruction,

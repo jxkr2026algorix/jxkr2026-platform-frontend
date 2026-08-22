@@ -28,6 +28,11 @@ export default defineConfig(({ command }) => ({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      // The generated worker handles caching; this adds the push listener that
+      // makes an alert arrive with no page open. Kept as a separate file in
+      // `public/` because the rest of the worker is generated on every build.
+      workbox: { importScripts: ["/push-sw.js"] },
+      injectRegister: "auto",
       // The worker is what makes an emergency alert land on a locked phone,
       // so it has to be exercisable in development rather than only in a
       // production build.

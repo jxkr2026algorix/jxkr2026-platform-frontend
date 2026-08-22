@@ -4,6 +4,7 @@ import {
   notificationState,
   requestNotifications,
 } from "./notifications";
+import { subscribeToPush } from "./push";
 
 export function NotificationPermissionGate() {
   const [permission, setPermission] =
@@ -34,6 +35,20 @@ export function NotificationPermissionGate() {
     if (!isOpen) return;
     actionRef.current?.focus();
   }, [isOpen]);
+
+  /**
+   * Register for background push as soon as permission allows it. Granting
+   * permission only lets the page raise notifications while it is open; this
+   * is what reaches a locked phone, and it is the whole point of asking.
+   *
+   * Runs on every grant, including a permission granted in an earlier visit:
+   * subscriptions expire and browsers rotate their keys, so re-sending the
+   * current one is how the register stays true.
+   */
+  useEffect(() => {
+    if (permission !== "granted") return;
+    void subscribeToPush(import.meta.env.VITE_PLATFORM_REGION_CODE ?? null);
+  }, [permission]);
 
   const handleRequest = useCallback(async () => {
     setIsRequesting(true);
