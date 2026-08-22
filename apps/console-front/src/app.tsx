@@ -196,7 +196,7 @@ export function App() {
     map.send({ type: "map:set-routes", payload: { routes: [] } });
     map.send({ type: "map:sim-control", payload: { action: "reset" } });
     map.send({ type: "map:set-scenario", payload: { scenario: "clear" } });
-    map.send({ type: "map:set-view", payload: { mode: "flat" } });
+    map.send({ type: "map:set-view", payload: { mode: "auto" } });
     // The district stays: reset clears the incident, not where the operator
     // is looking.
   };

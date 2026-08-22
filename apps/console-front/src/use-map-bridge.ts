@@ -254,7 +254,7 @@ export function useMapBridge() {
             rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
           },
         });
-        send({ type: "map:set-view", payload: { mode: "flat" } });
+        send({ type: "map:set-view", payload: { mode: "auto" } });
         send({ type: "map:set-overlay", payload: { enabled: false } });
         send({
           type: "map:focus-district",

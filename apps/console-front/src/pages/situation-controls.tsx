@@ -1,7 +1,6 @@
 import type {
   BasemapStyle,
   DashboardCommand,
-  ViewMode,
 } from "@salgil/map-webgpu-canvas/protocol";
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 import { motion } from "motion/react";
@@ -30,14 +29,12 @@ interface SituationControlsProps {
 }
 
 /**
- * Only the two the operator chooses between. "auto" still exists in the
- * protocol, but exposing it meant a hazard button could silently flip the
- * view mode out from under a deliberate 2D/3D choice.
+ * Auto is a choice of its own: leave it on and the view follows the hazard —
+ * 3D where water depth over terrain is the thing being read, 2D where extent
+ * is. Picking 2D or 3D pins it, which is why all three are on the control
+ * rather than the mode changing underneath a selection that still says 2D.
  */
-const viewLabels: Record<Exclude<ViewMode, "auto">, string> = {
-  flat: "2D",
-  tilted: "3D",
-};
+const viewModes = ["auto", "flat", "tilted"] as const;
 
 export function SituationControls({
   map,
@@ -80,11 +77,8 @@ export function SituationControls({
         <div className="map-display-controls">
           <fieldset className="compact-controls">
             <legend>{t("map.view")}</legend>
-            <motion.div
-              className="segmented-track segmented-track-two"
-              layoutRoot
-            >
-              {(["flat", "tilted"] as const).map((mode) => (
+            <motion.div className="segmented-track" layoutRoot>
+              {viewModes.map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -96,7 +90,13 @@ export function SituationControls({
                   {controls.viewMode === mode ? (
                     <SegmentIndicator layoutId="map-view-segment" />
                   ) : null}
-                  <span className="segmented-label">{viewLabels[mode]}</span>
+                  <span className="segmented-label">
+                    {t(`map.view.${mode}`)}
+                    {/* Auto is otherwise opaque: this says what it picked. */}
+                    {mode === "auto" && controls.viewMode === "auto" ? (
+                      <em>{t(`map.view.${controls.effectiveView}`)}</em>
+                    ) : null}
+                  </span>
                 </button>
               ))}
             </motion.div>

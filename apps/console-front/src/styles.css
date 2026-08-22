@@ -1452,7 +1452,7 @@ textarea {
 }
 
 .assistant-composer {
-  padding: 12px 14px 13px;
+  padding: 12px 14px 18px;
   border-top: 0;
 }
 
@@ -1516,6 +1516,7 @@ textarea {
   margin-top: 7px;
   color: var(--ink-tertiary);
   font-size: 9px;
+  line-height: 1.4;
 }
 
 .inspector-heading span,
@@ -2642,4 +2643,15 @@ tbody tr:last-child td {
 .button.critical:hover:not(:disabled) {
   background: var(--critical-ink, #b91c1c);
   border-color: var(--critical-ink, #b91c1c);
+}
+
+/* What Auto resolved to, under the label. Without it the control says "Auto"
+   and the map is in 3D with nothing connecting the two. */
+.segmented-label em {
+  display: block;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.1;
+  opacity: 0.6;
 }

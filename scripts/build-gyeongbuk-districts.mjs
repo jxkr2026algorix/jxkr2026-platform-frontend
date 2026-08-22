@@ -164,8 +164,11 @@ const districts = DISTRICTS.map((district) => {
   const largest = ranked[0];
   const kept = ranked.filter((r) => r.area >= largest.area * MIN_RING_SHARE);
 
-  // The focus bbox ignores far-flung islets (Dokdo for Ulleung, the small
-  // Pohang/Yeongdeok rocks) so "fly to this district" frames the real body.
+  // Two boxes, because they answer different questions. The focus box ignores
+  // far-flung islets so "fly to this district" frames the inhabited body at a
+  // useful zoom; the full box covers every ring, and it is what decides how
+  // much terrain to load — Dokdo is Ulleung-gun and has to be on the map even
+  // though framing the county on it would make Ulleungdo a speck.
   const focusRings = ranked.filter((r) => r.area >= largest.area * BBOX_RING_SHARE);
   const focusPoints = focusRings.flatMap((r) => r.ring);
   const lons = focusPoints.map((p) => p[0]);
@@ -184,6 +187,15 @@ const districts = DISTRICTS.map((district) => {
       round(Math.max(...lons)),
       round(Math.max(...lats)),
     ],
+    fullBbox: (() => {
+      const all = kept.flatMap(({ ring }) => ring);
+      return [
+        round(Math.min(...all.map((p) => p[0]))),
+        round(Math.min(...all.map((p) => p[1]))),
+        round(Math.max(...all.map((p) => p[0]))),
+        round(Math.max(...all.map((p) => p[1]))),
+      ];
+    })(),
     rings: kept.map(({ ring }) =>
       simplify(ring, TOLERANCE).flatMap((p) => [round(p[0]), round(p[1])]),
     ),

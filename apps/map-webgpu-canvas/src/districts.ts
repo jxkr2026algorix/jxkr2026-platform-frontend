@@ -35,6 +35,12 @@ export interface District {
   center: readonly [number, number];
   /** [west, south, east, north] of the main body, in degrees. */
   bbox: Bbox;
+  /**
+   * Every ring, islets included. This is what decides how much terrain to
+   * load: Dokdo is Ulleung-gun and belongs on the map, even though framing
+   * the county on it would reduce Ulleungdo to a speck.
+   */
+  fullBbox: Bbox;
 }
 
 interface DistrictRecord {
@@ -44,6 +50,7 @@ interface DistrictRecord {
   kind: string;
   center: number[];
   bbox: number[];
+  fullBbox?: number[];
 }
 
 /** Sentinel code for 비례대표: no constituency, so the whole province. */
@@ -62,6 +69,12 @@ export const DISTRICTS: readonly District[] = (
     record.bbox[1] ?? 0,
     record.bbox[2] ?? 0,
     record.bbox[3] ?? 0,
+  ] as const,
+  fullBbox: [
+    record.fullBbox?.[0] ?? record.bbox[0] ?? 0,
+    record.fullBbox?.[1] ?? record.bbox[1] ?? 0,
+    record.fullBbox?.[2] ?? record.bbox[2] ?? 0,
+    record.fullBbox?.[3] ?? record.bbox[3] ?? 0,
   ] as const,
 }));
 
@@ -197,8 +210,19 @@ export function regionForDistrict(
   district: District,
   current: RegionBox = PROVINCE_REGION,
 ): { region: RegionBox; reload: boolean } {
-  if (bboxContains(bboxForRegion(current), district.bbox)) {
+  // Measured against every ring, so a district's outlying islands are inside
+  // the loaded terrain rather than off the edge of it.
+  if (bboxContains(bboxForRegion(current), district.fullBbox)) {
     return { region: current, reload: false };
   }
-  return { region: regionForBbox(district.bbox, 3.2), reload: true };
+  const span = Math.max(
+    district.fullBbox[2] - district.fullBbox[0],
+    district.fullBbox[3] - district.fullBbox[1],
+  );
+  // A compact district needs padding to sit in; one that already spans a
+  // hundred kilometres of sea does not.
+  return {
+    region: regionForBbox(district.fullBbox, span > 0.3 ? 1.15 : 3.2),
+    reload: true,
+  };
 }

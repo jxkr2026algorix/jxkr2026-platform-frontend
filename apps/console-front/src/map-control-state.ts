@@ -16,7 +16,10 @@ export interface MapControlState {
   readonly basemap: BasemapStyle;
   readonly scenario: Scenario;
   readonly rainfallMmPerHour: number;
+  /** What the operator chose, including "auto". */
   readonly viewMode: ViewMode;
+  /** What the map is actually showing. Under "auto" the two differ. */
+  readonly effectiveView: Exclude<ViewMode, "auto">;
   readonly playing: boolean;
   readonly overlayEnabled: boolean;
   /** Focused 시/군 code, or null for the province-wide view. */
@@ -48,7 +51,10 @@ export const initialMapControls: MapControlState = {
   basemap: "satellite",
   scenario: DEFAULT_MAP_SCENARIO,
   rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
-  viewMode: "flat",
+  // Auto by default: the view follows the hazard, and with nothing running
+  // that resolves to 2D — which is where the operator wants to start anyway.
+  viewMode: "auto",
+  effectiveView: "flat",
   playing: false,
   // Off until asked for: susceptibility is an analytical layer, and at
   // province scale its cells are 600 m across and read as blocky noise.
@@ -175,7 +181,16 @@ export function reconcileMapControls(
       rainfallMmPerHour: keepRainfall
         ? controls.rainfallMmPerHour
         : mapState.rainfallMmPerHour,
-      viewMode: keepView ? controls.viewMode : mapState.viewMode,
+      // "auto" is a standing choice, not a transient one. The map reports the
+      // concrete mode it resolved to, and overwriting the selection with it
+      // made the control read 3D moments after the operator picked Auto.
+      viewMode:
+        controls.viewMode === "auto"
+          ? "auto"
+          : keepView
+            ? controls.viewMode
+            : mapState.viewMode,
+      effectiveView: mapState.viewMode,
       playing: keepPlaying ? controls.playing : mapState.playing,
       districtCode: keepDistrict
         ? controls.districtCode
