@@ -6,7 +6,6 @@ import { FloatingSelect } from "../components/FloatingSelect";
 import {
   type CommunityName,
   communities,
-  DEFAULT_RAINFALL_MM_PER_HOUR,
   type ScenarioOption,
   scenarioOptions,
   type View,
@@ -39,6 +38,7 @@ export function SituationControls({
   onNavigate,
 }: SituationControlsProps) {
   const mapState = map.status.state;
+  const controls = map.status.controls;
 
   const selectScenario = (value: string) => {
     const scenario = scenarioOptions.find((option) => option.value === value);
@@ -91,18 +91,13 @@ export function SituationControls({
         <label className="range-field">
           <span>
             <b>Rainfall</b>
-            <strong>
-              {Math.round(
-                mapState?.rainfallMmPerHour ?? DEFAULT_RAINFALL_MM_PER_HOUR,
-              )}{" "}
-              mm/h
-            </strong>
+            <strong>{Math.round(controls.rainfallMmPerHour)} mm/h</strong>
           </span>
           <input
             type="range"
             min="0"
             max="120"
-            value={mapState?.rainfallMmPerHour ?? DEFAULT_RAINFALL_MM_PER_HOUR}
+            value={controls.rainfallMmPerHour}
             onChange={(event) =>
               onMapCommand({
                 type: "map:set-rainfall",
@@ -113,24 +108,26 @@ export function SituationControls({
         </label>
         <fieldset className="compact-controls">
           <legend>Map view</legend>
-          {(["flat", "tilted", "auto"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={mapState?.viewMode === mode}
-              onClick={() =>
-                onMapCommand({ type: "map:set-view", payload: { mode } })
-              }
-            >
-              {viewLabels[mode]}
-            </button>
-          ))}
+          <div className="segmented-track">
+            {(["flat", "tilted", "auto"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={controls.viewMode === mode}
+                onClick={() =>
+                  onMapCommand({ type: "map:set-view", payload: { mode } })
+                }
+              >
+                {viewLabels[mode]}
+              </button>
+            ))}
+          </div>
         </fieldset>
         <label className="check-row">
           <input
             className="check-input"
             type="checkbox"
-            checked={map.status.overlayEnabled}
+            checked={controls.overlayEnabled}
             onChange={(event) =>
               onMapCommand({
                 type: "map:set-overlay",
@@ -154,11 +151,11 @@ export function SituationControls({
             onClick={() =>
               onMapCommand({
                 type: "map:sim-control",
-                payload: { action: mapState?.playing ? "pause" : "play" },
+                payload: { action: controls.playing ? "pause" : "play" },
               })
             }
           >
-            {mapState?.playing ? "Pause" : "Play"}
+            {controls.playing ? "Pause" : "Play"}
           </button>
           <button
             className="button text"

@@ -30,10 +30,9 @@ export function SituationPage({
   onMapCommand,
 }: SituationPageProps) {
   const selected = communities.find((item) => item.name === selectedCommunity);
-  const mapState = map.status.state;
   const selectedScenario =
     scenarioOptions.find(
-      (option) => option.value === (mapState?.scenario ?? DEFAULT_MAP_SCENARIO),
+      (option) => option.value === map.status.controls.scenario,
     ) ??
     scenarioOptions.find((option) => option.value === DEFAULT_MAP_SCENARIO);
 

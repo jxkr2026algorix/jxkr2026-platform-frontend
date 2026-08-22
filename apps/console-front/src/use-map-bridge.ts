@@ -10,6 +10,13 @@ import {
 } from "@salgil/map-webgpu-canvas/protocol";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_MAP_SCENARIO, DEFAULT_RAINFALL_MM_PER_HOUR } from "./domain";
+import {
+  applyOptimisticControlCommand,
+  initialMapControls,
+  type MapControlState,
+  type PendingMapControls,
+  reconcileMapControls,
+} from "./map-control-state";
 
 export type MapConnection = "loading" | "ready" | "unsupported" | "error";
 
@@ -120,15 +127,16 @@ export function useMapBridge() {
   const [connection, setConnection] = useState<MapConnection>("loading");
   const [mapState, setMapState] = useState<MapStatePayload | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [overlayEnabled, setOverlayEnabled] = useState(true);
+  const [controls, setControls] = useState<MapControlState>(initialMapControls);
+  const controlsRef = useRef<MapControlState>(initialMapControls);
   const initializedRef = useRef(false);
+  const pendingControlsRef = useRef<PendingMapControls>({});
+  const pendingRainfallRef = useRef<DashboardCommand | null>(null);
+  const rainfallFrameRef = useRef<number | null>(null);
   const mapLocation = useMemo(getMapLocation, []);
 
-  const send = useCallback(
+  const postCommand = useCallback(
     (command: DashboardCommand) => {
-      if (command.type === "map:set-overlay") {
-        setOverlayEnabled(command.payload.enabled);
-      }
       frameRef.current?.contentWindow?.postMessage(
         {
           source: DASHBOARD_SOURCE,
@@ -139,6 +147,43 @@ export function useMapBridge() {
       );
     },
     [mapLocation.origin],
+  );
+
+  const send = useCallback(
+    (command: DashboardCommand) => {
+      const update = applyOptimisticControlCommand(
+        controlsRef.current,
+        pendingControlsRef.current,
+        command,
+      );
+      controlsRef.current = update.controls;
+      pendingControlsRef.current = update.pending;
+      setControls(update.controls);
+
+      if (command.type !== "map:set-rainfall") {
+        postCommand(command);
+        return;
+      }
+
+      pendingRainfallRef.current = command;
+      if (rainfallFrameRef.current !== null) return;
+      rainfallFrameRef.current = requestAnimationFrame(() => {
+        const latestCommand = pendingRainfallRef.current;
+        pendingRainfallRef.current = null;
+        rainfallFrameRef.current = null;
+        if (latestCommand) postCommand(latestCommand);
+      });
+    },
+    [postCommand],
+  );
+
+  useEffect(
+    () => () => {
+      if (rainfallFrameRef.current !== null) {
+        cancelAnimationFrame(rainfallFrameRef.current);
+      }
+    },
+    [],
   );
 
   useEffect(() => {
@@ -173,6 +218,14 @@ export function useMapBridge() {
       if (message.type === "map:state") {
         setConnection("ready");
         setMapState(message.payload);
+        const update = reconcileMapControls(
+          controlsRef.current,
+          pendingControlsRef.current,
+          message.payload,
+        );
+        controlsRef.current = update.controls;
+        pendingControlsRef.current = update.pending;
+        setControls(update.controls);
         initializeMap();
       }
       if (message.type === "map:error") {
@@ -186,7 +239,7 @@ export function useMapBridge() {
 
   return {
     frame: { ref: frameRef, src: mapLocation.src },
-    status: { connection, state: mapState, errorMessage, overlayEnabled },
+    status: { connection, state: mapState, controls, errorMessage },
     send,
   };
 }
