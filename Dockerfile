@@ -14,12 +14,21 @@ COPY package.json yarn.lock .yarnrc.yml ./
 COPY apps/console-front/package.json apps/console-front/package.json
 COPY apps/mobile/package.json apps/mobile/package.json
 COPY apps/map-webgpu-canvas/package.json apps/map-webgpu-canvas/package.json
+COPY apps/platform-client/package.json apps/platform-client/package.json
 RUN yarn install --immutable
 
 FROM deps AS build
 ARG WORKSPACE
 ARG VITE_MAP_URL
+ARG VITE_MOBILE_URL
+ARG VITE_PLATFORM_REGION_CODE
+ARG VITE_TMAP_ENABLED
+ARG VITE_TMAP_TILE_URL
 ENV VITE_MAP_URL=${VITE_MAP_URL}
+ENV VITE_MOBILE_URL=${VITE_MOBILE_URL}
+ENV VITE_PLATFORM_REGION_CODE=${VITE_PLATFORM_REGION_CODE}
+ENV VITE_TMAP_ENABLED=${VITE_TMAP_ENABLED}
+ENV VITE_TMAP_TILE_URL=${VITE_TMAP_TILE_URL}
 COPY . .
 RUN yarn workspace ${WORKSPACE} build
 

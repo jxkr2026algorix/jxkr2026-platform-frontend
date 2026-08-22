@@ -61,4 +61,5 @@ src/
 
 - 고도: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Mapzen terrarium)
 - 영상: Esri World Imagery — 데모 용도. 프로덕션 배포 전 이용 약관 확인 필요.
+- 배경 지도: TMAP MOBILITY. `VITE_TMAP_ENABLED=1`로 같은 출처의 타일 프록시를 활성화한다. 비활성화되거나 타일 로드에 실패하면 OpenStreetMap 데이터 기반 CARTO 지도로 대체된다. 대시보드에는 두 공급자 경로의 출처가 항상 표시된다.
 - 수문 시간축은 시연을 위해 약 3600배 가속. 수치는 시각화용이며 예측값이 아님.

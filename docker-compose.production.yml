@@ -1,0 +1,86 @@
+name: salgil-production
+
+x-frontend: &frontend
+  restart: unless-stopped
+  expose:
+    - "80"
+  healthcheck:
+    test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+    interval: 30s
+    timeout: 3s
+    retries: 3
+    start_period: 5s
+  networks:
+    - frontend
+
+services:
+  gateway:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env.production}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-operator}
+      DASHBOARD_PASSWORD_HASH: ${DASHBOARD_PASSWORD_HASH:?Set DASHBOARD_PASSWORD_HASH in .env.production}
+      SALGIL_PLATFORM_API_URL: ${SALGIL_PLATFORM_API_URL:?Set SALGIL_PLATFORM_API_URL in .env.production}
+      SALGIL_OPERATOR_API_KEY: ${SALGIL_OPERATOR_API_KEY:?Set SALGIL_OPERATOR_API_KEY in .env.production}
+      SALGIL_MOBILE_API_KEY: ${SALGIL_MOBILE_API_KEY:?Set SALGIL_MOBILE_API_KEY in .env.production}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      console:
+        condition: service_healthy
+      mobile:
+        condition: service_healthy
+      map:
+        condition: service_healthy
+    networks:
+      - frontend
+
+  console:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WORKSPACE: "@salgil/console-front"
+        APP_DIR: apps/console-front
+        VITE_MAP_URL: https://map.salgil.gyeongbuk.kr
+        VITE_MOBILE_URL: https://mobile.salgil.gyeongbuk.kr
+        VITE_PLATFORM_REGION_CODE: ${VITE_PLATFORM_REGION_CODE:-47750}
+    image: salgil/console-front:${DEPLOY_TAG:-local}
+
+  mobile:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WORKSPACE: "@salgil/mobile"
+        APP_DIR: apps/mobile
+        VITE_MAP_URL: https://map.salgil.gyeongbuk.kr
+        VITE_PLATFORM_REGION_CODE: ${VITE_PLATFORM_REGION_CODE:-47750}
+    image: salgil/mobile:${DEPLOY_TAG:-local}
+
+  map:
+    <<: *frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WORKSPACE: "@salgil/map-webgpu-canvas"
+        APP_DIR: apps/map-webgpu-canvas
+        VITE_TMAP_ENABLED: ${VITE_TMAP_ENABLED:-1}
+    image: salgil/map-webgpu-canvas:${DEPLOY_TAG:-local}
+
+networks:
+  frontend:
+
+volumes:
+  caddy_data:
+  caddy_config:

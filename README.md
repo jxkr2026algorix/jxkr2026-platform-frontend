@@ -60,7 +60,30 @@ Cheongsong code `47750`.
 Set `VITE_DISABLE_REACT_DEVTOOLS=1` to disable the development-only
 react-grab/react-scan instrumentation.
 
+## Dashboard language
+
+The operations dashboard supports Korean and English. It starts in English
+unless the operator has previously selected and saved another language.
+The language switch updates the interface, page metadata, and the SALGIL logo;
+the Gyeongsangbuk-do collaborator logo stays beside it in the top-left header.
+
+The left and right dashboard rails start in dark graphite mode while the map
+keeps its original appearance. The appearance button in the district rail
+switches only those dashboard rails between dark and light, and the selected
+rail theme is saved in the browser.
+
+Dashboard brand assets live in `apps/console-front/public/brand/`. Keep the
+Korean and English SALGIL SVGs aligned to the same visual height when replacing
+them so the collaboration lockup does not shift between languages.
+
 ## Deployment
+
+For the three production domains on one Lightsail instance, follow
+[docs/deployment-lightsail.md](docs/deployment-lightsail.md). That stack adds
+automatic HTTPS, dashboard authentication, audience-separated API credentials,
+the production TMAP proxy, and rollback-friendly image tags.
+
+For local container testing:
 
 ```bash
 docker compose up -d --build

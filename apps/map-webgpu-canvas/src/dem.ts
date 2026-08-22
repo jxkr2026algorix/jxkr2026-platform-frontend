@@ -50,12 +50,14 @@ export const IMAGERY_URL = (z: number, x: number, y: number) =>
 export const STREET_URL = (z: number, x: number, y: number) =>
   `https://${"abcd"[(x + y) % 4]}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
 
-// TMap raster tiles (SK open API) are used for the map style when an app
-// key is configured; they carry full Korean building/POI detail. Tiles are
-// standard Web Mercator XYZ, so positions line up with everything else.
-const TMAP_KEY = (
-  (import.meta.env.VITE_TMAP_APP_KEY as string | undefined) ?? ""
-).trim();
+const TMAP_ENABLED_VALUE = (
+  (import.meta.env.VITE_TMAP_ENABLED as string | undefined) ?? ""
+)
+  .trim()
+  .toLowerCase();
+const LEGACY_DEV_TMAP_KEY = import.meta.env.DEV
+  ? ((import.meta.env.VITE_TMAP_APP_KEY as string | undefined) ?? "").trim()
+  : "";
 // The SDK's tile backend serves TMS-scheme tiles (y flipped) without CORS
 // headers, so requests go through the dev-server proxy (see vite.config.ts).
 // {ytms} = (2^z - 1 - y) for TMS endpoints; {y} is standard XYZ.
@@ -63,15 +65,17 @@ const TMAP_TEMPLATE =
   ((import.meta.env.VITE_TMAP_TILE_URL as string | undefined) ?? "").trim() ||
   "/tmap-tiles{s}/{z}/{x}/{ytms}.png?version=20220406";
 
-export const TMAP_ENABLED = TMAP_KEY.length > 0;
+export const TMAP_ENABLED =
+  TMAP_ENABLED_VALUE === "1" ||
+  TMAP_ENABLED_VALUE === "true" ||
+  LEGACY_DEV_TMAP_KEY.length > 0;
 
 const TMAP_URL = (z: number, x: number, y: number) =>
   TMAP_TEMPLATE.replace("{s}", String(1 + ((x + y) % 3)))
     .replace("{z}", String(z))
     .replace("{x}", String(x))
     .replace("{ytms}", String(2 ** z - 1 - y))
-    .replace("{y}", String(y))
-    .replace("{key}", TMAP_KEY);
+    .replace("{y}", String(y));
 
 /** Street basemap: TMap when configured, CARTO as automatic fallback. */
 export async function loadStreetBasemap(

@@ -1,6 +1,10 @@
 .git
 .gitignore
 .DS_Store
+.env
+.env.*
+**/.env
+**/.env.*
 .omo
 .codegraph
 .yarn/install-state.gz

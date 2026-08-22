@@ -1,0 +1,92 @@
+{
+	email {$ACME_EMAIL}
+}
+
+(browser_security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+salgil.gyeongbuk.kr {
+	import browser_security
+	header X-Frame-Options "DENY"
+
+	basic_auth {
+		{$DASHBOARD_USERNAME} {$DASHBOARD_PASSWORD_HASH}
+	}
+
+	handle_path /api/platform/* {
+		rewrite * /api/v1{uri}
+		reverse_proxy {$SALGIL_PLATFORM_API_URL} {
+			header_up Authorization "Bearer {$SALGIL_OPERATOR_API_KEY}"
+		}
+	}
+
+	handle {
+		reverse_proxy console:80
+	}
+}
+
+mobile.salgil.gyeongbuk.kr {
+	import browser_security
+	header X-Frame-Options "DENY"
+
+	@mobile_read {
+		method GET
+		path /api/platform/incidents /api/platform/stream
+	}
+	handle @mobile_read {
+		uri strip_prefix /api/platform
+		rewrite * /api/v1{uri}
+		reverse_proxy {$SALGIL_PLATFORM_API_URL} {
+			header_up Authorization "Bearer {$SALGIL_MOBILE_API_KEY}"
+		}
+	}
+
+	@mobile_route {
+		method POST
+		path /api/platform/routing/evacuation
+	}
+	handle @mobile_route {
+		uri strip_prefix /api/platform
+		rewrite * /api/v1{uri}
+		reverse_proxy {$SALGIL_PLATFORM_API_URL} {
+			header_up Authorization "Bearer {$SALGIL_MOBILE_API_KEY}"
+		}
+	}
+
+	handle /api/platform/* {
+		respond "Not found" 404
+	}
+
+	handle {
+		reverse_proxy mobile:80
+	}
+}
+
+map.salgil.gyeongbuk.kr {
+	import browser_security
+	header Content-Security-Policy "frame-ancestors https://salgil.gyeongbuk.kr https://mobile.salgil.gyeongbuk.kr"
+
+	handle_path /tmap-tiles1/* {
+		rewrite * /tms/1.0.0/hd_tile{uri}
+		reverse_proxy https://topopentile1.tmap.co.kr
+	}
+	handle_path /tmap-tiles2/* {
+		rewrite * /tms/1.0.0/hd_tile{uri}
+		reverse_proxy https://topopentile2.tmap.co.kr
+	}
+	handle_path /tmap-tiles3/* {
+		rewrite * /tms/1.0.0/hd_tile{uri}
+		reverse_proxy https://topopentile3.tmap.co.kr
+	}
+
+	handle {
+		reverse_proxy map:80
+	}
+}

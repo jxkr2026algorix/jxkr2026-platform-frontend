@@ -1,5 +1,6 @@
 .DS_Store
 .omo/
+.artifacts/
 artifacts/
 node_modules/
 dist/
@@ -7,6 +8,7 @@ dist/
 .yarn/install-state.gz
 .env
 .env.local
+.env.production
 .env.*.local
 
 # vite-plugin-pwa dev output
