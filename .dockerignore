@@ -1,0 +1,17 @@
+.git
+.gitignore
+.DS_Store
+.omo
+.codegraph
+.yarn/install-state.gz
+node_modules
+**/node_modules
+**/dist
+artifacts
+docker-compose.yml
+Dockerfile
+.dockerignore
+README.md
+DESIGN.md
+salgil-ops-web
+salgil-field-web
