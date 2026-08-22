@@ -128,7 +128,6 @@ function getMapLocation(): { src: string; origin: string } {
 export function useMapBridge() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [connection, setConnection] = useState<MapConnection>("loading");
-  const [mapState, setMapState] = useState<MapStatePayload | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [controls, setControls] = useState<MapControlState>(initialMapControls);
   const controlsRef = useRef<MapControlState>(initialMapControls);
@@ -220,7 +219,6 @@ export function useMapBridge() {
       }
       if (message.type === "map:state") {
         setConnection("ready");
-        setMapState(message.payload);
         const update = reconcileMapControls(
           controlsRef.current,
           pendingControlsRef.current,
@@ -242,7 +240,7 @@ export function useMapBridge() {
 
   return {
     frame: { ref: frameRef, src: mapLocation.src },
-    status: { connection, state: mapState, controls, errorMessage },
+    status: { connection, controls, errorMessage },
     send,
   };
 }

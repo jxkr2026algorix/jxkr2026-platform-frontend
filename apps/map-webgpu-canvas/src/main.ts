@@ -184,9 +184,6 @@ function handleCommand(command: DashboardToMap): void {
       break;
     case "map:set-basemap":
       engine.setBasemapStyle(command.payload.style);
-      if (command.payload.style === "map" && !engine.streetBasemapReady) {
-        showStatus("Loading standard map tiles…", 6000);
-      }
       break;
   }
   ack(true);
@@ -300,7 +297,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  showStatus("Loading terrain data…", 15000);
   const { terrain, geo, imagery, street } = await loadTerrain();
   geoRef = geo;
 
@@ -371,9 +367,6 @@ async function main(): Promise<void> {
   const showPanel = uiParam === "1" || (!bridge.embedded && uiParam !== "0");
   if (showPanel) {
     new ControlPanel(panelBox, engine);
-  }
-  if (geo) {
-    showStatus("Gyeongsangbuk-do terrain and satellite imagery loaded");
   }
 }
 

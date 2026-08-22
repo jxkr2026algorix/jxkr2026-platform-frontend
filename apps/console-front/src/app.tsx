@@ -23,14 +23,7 @@ import { ContactPage } from "./pages/contact-page";
 import { PatrolPage } from "./pages/patrol-page";
 import { PlanPage } from "./pages/plan-page";
 import { SituationPage } from "./pages/situation-page";
-import { type MapConnection, useMapBridge } from "./use-map-bridge";
-
-const mapConnectionLabels: Record<MapConnection, string> = {
-  loading: "Connecting map",
-  ready: "Map connected",
-  unsupported: "WebGPU unavailable",
-  error: "Map connection failed",
-};
+import { useMapBridge } from "./use-map-bridge";
 
 const MotionNavLink = motion.create(NavLink);
 
@@ -181,9 +174,6 @@ export function App() {
             <span>Updated Aug 22, 2026 at 14:10</span>
           </div>
           <div className="context-actions">
-            <span className={`sync-state is-${map.status.connection}`}>
-              {mapConnectionLabels[map.status.connection]}
-            </span>
             <motion.button
               className="button secondary"
               type="button"

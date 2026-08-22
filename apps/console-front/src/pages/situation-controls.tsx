@@ -46,7 +46,6 @@ export function SituationControls({
   onMapCommand,
   onNavigate,
 }: SituationControlsProps) {
-  const mapState = map.status.state;
   const controls = map.status.controls;
 
   const selectScenario = (value: string) => {
@@ -68,10 +67,6 @@ export function SituationControls({
         <p className="breadcrumb">Incident 2026-0822-01 · Level 2 response</p>
         <h1 id="situation-title">Cheongsong operational map</h1>
         <div className="panel-intro-actions">
-          <span className="state-text is-approved">
-            <i />
-            Live operating picture
-          </span>
           <button
             className="button primary"
             type="button"
@@ -79,10 +74,6 @@ export function SituationControls({
           >
             Review plan
           </button>
-        </div>
-        <div className="panel-map-status">
-          <span>Gyeongsangbuk-do · live simulation</span>
-          <b>{mapState ? `${Math.round(mapState.fps)} fps` : "Connecting"}</b>
         </div>
       </div>
       <div className="rail-section">
