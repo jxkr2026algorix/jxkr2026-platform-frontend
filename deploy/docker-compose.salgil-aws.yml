@@ -1,0 +1,38 @@
+# salgil-aws 배포용 오버레이.
+#
+#   docker compose -f docker-compose.production.yml -f deploy/docker-compose.salgil-aws.yml up -d
+#
+# 기본 production 스택과 다른 점은 하나다: **gateway 를 쓰지 않는다.**
+#
+# 이 서버에는 이미 시스템 Caddy 가 떠 있고 datainfra 와 api 를 서비스한다. 스택의
+# gateway 도 80/443 을 잡으려 하므로 둘은 공존할 수 없다. 그래서 세 앱을 루프백
+# 포트로 올리고, deploy/Caddyfile 의 내용은 시스템 Caddy 의 사이트 설정으로 옮겼다
+# (/etc/caddy/sites/frontend.caddy). 기본 인증·API 키 주입·TMAP 프록시·CSP 는
+# 그대로 유지된다.
+#
+# 포트를 루프백에만 여는 이유는 이 호스트가 공인 IPv4 를 갖고 있어서다. 0.0.0.0 에
+# 걸면 Cloudflare 를 우회해 오리진에 직접 닿는 경로가 생긴다.
+
+services:
+  gateway:
+    # 서비스를 지울 수는 없어서(다른 서비스가 참조하지 않지만 compose 병합 대상이다)
+    # 즉시 끝나는 컨테이너로 바꾼다.
+    image: alpine:3
+    command: ["true"]
+    restart: "no"
+    ports: !override []
+    volumes: !override []
+    depends_on: !override []
+    environment: !override {}
+
+  console:
+    ports:
+      - "127.0.0.1:${CONSOLE_PORT:-8090}:80"
+
+  mobile:
+    ports:
+      - "127.0.0.1:${MOBILE_PORT:-8091}:80"
+
+  map:
+    ports:
+      - "127.0.0.1:${MAP_PORT:-8092}:80"

@@ -1,0 +1,134 @@
+# SALGIL 프론트엔드 3면. 원본은 이 저장소의 deploy/Caddyfile 이고, 이 서버의
+# 시스템 Caddy 로 옮긴 판이다.
+#
+# 옮긴 이유: 이 호스트의 Caddy 는 datainfra 와 api 도 함께 서비스한다. 스택의
+# gateway 컨테이너를 띄우면 80/443 을 두고 다툰다.
+#
+# 바뀐 것은 두 가지뿐이다.
+#   - upstream 이 컨테이너 이름에서 루프백 포트로 (네이티브 Caddy 는 compose
+#     네트워크의 이름을 찾지 못한다)
+#   - ACME 대신 `tls internal` — 도메인이 Cloudflare 를 가리켜 HTTP-01 검증이
+#     오리진까지 오지 않는다. **Cloudflare SSL/TLS 모드는 Full 이어야 한다.**
+#
+# 기본 인증, API 키 주입, 모바일 허용 목록, TMAP 프록시, CSP 는 원본 그대로다.
+# 비밀값은 /etc/caddy/salgil.env 에서 온다.
+
+(browser_security) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+}
+
+# ── 운영 대시보드 ────────────────────────────────────────────────────────────
+salgil.gyeongbuk.kr {
+	tls internal
+	import browser_security
+	header X-Frame-Options "DENY"
+
+	# 기본 인증을 걸지 않는다 — 심사위원이 링크를 눌렀을 때 브라우저 자격증명
+	# 창이 뜨면 안 된다. 그 대신 이 오리진은 operator 키로 백엔드에 닿을 수 있으므로,
+	# 공개 상태에서는 누구나 상황을 만들고 계획을 승인할 수 있다는 뜻이다.
+	# 데모가 끝나면 basic_auth 를 되살리는 것을 전제로 한다.
+
+	# 브라우저 번들에는 API 키가 들어가지 않는다. 여기서 붙인다.
+	handle_path /api/platform/* {
+		rewrite * /api/v1{uri}
+		reverse_proxy {$SALGIL_PLATFORM_API_URL} {
+			header_up Authorization "Bearer {$SALGIL_OPERATOR_API_KEY}"
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8090
+	}
+}
+
+# ── 모바일 PWA (공개) ────────────────────────────────────────────────────────
+mobile.salgil.gyeongbuk.kr {
+	tls internal
+	import browser_security
+	header X-Frame-Options "DENY"
+
+	# 공개 오리진이므로 백엔드로 나갈 수 있는 경로를 세 개로 못 박는다.
+	# 키 자체는 operator 등급이다 — 경로 계산이 그 등급을 요구하고 field 로는
+	# 403 이 난다. 그래서 도달 가능한 경로를 여기서 제한하는 것이 실제 방어선이다.
+	@mobile_read {
+		method GET
+		path /api/platform/incidents /api/platform/stream
+	}
+	handle @mobile_read {
+		# route 로 감싸야 적힌 순서대로 실행된다. 없으면 Caddy 의 기본 지시어
+		# 순서에 따라 rewrite 가 먼저 돌아 접두어가 남고, 백엔드가
+		# /api/v1/api/platform/... 을 받아 404 를 낸다.
+		route {
+			uri strip_prefix /api/platform
+			rewrite * /api/v1{uri}
+			reverse_proxy {$SALGIL_PLATFORM_API_URL} {
+				header_up Authorization "Bearer {$SALGIL_MOBILE_API_KEY}"
+				header_up Host {upstream_hostport}
+			}
+		}
+	}
+
+	@mobile_route {
+		method POST
+		path /api/platform/routing/evacuation
+	}
+	handle @mobile_route {
+		# route 로 감싸야 적힌 순서대로 실행된다. 없으면 Caddy 의 기본 지시어
+		# 순서에 따라 rewrite 가 먼저 돌아 접두어가 남고, 백엔드가
+		# /api/v1/api/platform/... 을 받아 404 를 낸다.
+		route {
+			uri strip_prefix /api/platform
+			rewrite * /api/v1{uri}
+			reverse_proxy {$SALGIL_PLATFORM_API_URL} {
+				header_up Authorization "Bearer {$SALGIL_MOBILE_API_KEY}"
+				header_up Host {upstream_hostport}
+			}
+		}
+	}
+
+	handle /api/platform/* {
+		respond "Not found" 404
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8091
+	}
+}
+
+# ── WebGPU 지도 ──────────────────────────────────────────────────────────────
+map.salgil.gyeongbuk.kr {
+	tls internal
+	import browser_security
+	# 콘솔과 모바일이 iframe 으로 싣는다. 그 둘만 허용한다.
+	header Content-Security-Policy "frame-ancestors https://salgil.gyeongbuk.kr https://mobile.salgil.gyeongbuk.kr"
+
+	handle_path /tmap-tiles1/* {
+		rewrite * /tms/1.0.0/hd_tile{uri}
+		reverse_proxy https://topopentile1.tmap.co.kr {
+			header_up Host topopentile1.tmap.co.kr
+		}
+	}
+	handle_path /tmap-tiles2/* {
+		rewrite * /tms/1.0.0/hd_tile{uri}
+		reverse_proxy https://topopentile2.tmap.co.kr {
+			header_up Host topopentile2.tmap.co.kr
+		}
+	}
+	handle_path /tmap-tiles3/* {
+		rewrite * /tms/1.0.0/hd_tile{uri}
+		reverse_proxy https://topopentile3.tmap.co.kr {
+			header_up Host topopentile3.tmap.co.kr
+		}
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8092
+	}
+}
