@@ -290,10 +290,11 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   if (fBlend > 0.002 && fieldV > G.fieldMeta.z) {
     let kind = G.fieldMeta.y;
     let peak = max(G.fieldMeta.w, 1e-4);
-    // Normalized against the frame's own peak, so a shallow forecast still
-    // shows structure instead of rendering as one flat wash.
+    // Normalized against a high percentile of the frame, so the tributaries
+    // read as well as the trunk. Square-rooted because depth perception is
+    // not linear and the shallow end is where the extent actually is.
     let norm = clamp((fieldV - G.fieldMeta.z) / max(peak - G.fieldMeta.z, 1e-4), 0.0, 1.0);
-    let ramp = pow(norm, 0.65);
+    let ramp = sqrt(norm);
     var fCol = vec3f(0.0);
     if (kind < 0.5) {
       // Inundation: shallow edges pale, the channel through it dark.
@@ -308,8 +309,8 @@ fn fs(in: VSOut) -> @location(0) vec4f {
     // The long tail of near-threshold cells covers most of a catchment. Left
     // visible it hazes the whole map; cut it and only the channels the water
     // actually runs down are drawn, which is what makes the branching legible.
-    let onset = smoothstep(0.10, 0.34, norm);
-    albedo = mix(albedo, fCol, fBlend * onset * (0.55 + 0.42 * ramp));
+    let onset = smoothstep(0.0, 0.13, norm);
+    albedo = mix(albedo, fCol, fBlend * onset * (0.5 + 0.45 * ramp));
   }
 
   // Administrative 시/군 boundaries from the national dataset. Independent of

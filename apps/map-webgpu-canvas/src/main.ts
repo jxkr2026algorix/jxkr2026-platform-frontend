@@ -264,14 +264,29 @@ let terrainRef: TerrainData | null = null;
  * being built: compute the drainage-driven flood extent for a window around
  * the camera. Replaced wholesale once `map:set-hazard-field` is fed upstream.
  */
-function computeLocalFloodField(sizeMeters = 12000): boolean {
-  if (!engine || !geoRef || !terrainRef) return false;
+async function computeLocalFloodField(sizeMeters = 12000): Promise<boolean> {
+  if (!engine || !geoRef) return false;
   const center = engine.cameraCenter;
   const { lat, lon } = mapPointToLatLon(center.x, center.y, geoRef);
   const win = windowAround(lat, lon, sizeMeters);
-  return applyHazardField(
-    floodField(terrainRef, geoRef, win, engine.rainfall || 60),
-  );
+  showStatus("Computing flood extent…", 0);
+  const field = await floodField(win, engine.rainfall || 60);
+  if (!field) {
+    showStatus("Elevation for this area is unavailable.", 3000);
+    return false;
+  }
+  showStatus("Flood extent ready", 2000);
+  if (params.get("fieldstats") === "1") {
+    const sorted = Float32Array.from(field.values).sort();
+    const at = (q: number) => sorted[Math.floor(q * (sorted.length - 1))] ?? 0;
+    console.info(
+      "[field] " +
+        [0.5, 0.8, 0.9, 0.95, 0.98, 0.995, 0.999, 1]
+          .map((q) => `p${q * 100}=${at(q).toFixed(3)}`)
+          .join(" "),
+    );
+  }
+  return applyHazardField(field);
 }
 
 /** Field colour ramps, keyed off the hazard the recipe produced. */
@@ -741,7 +756,7 @@ async function main(): Promise<void> {
     annotations.onActivateZone = activateZone;
     if (params.get("demo") === "flood") {
       // Give the terrain a moment to settle before the one-off computation.
-      setTimeout(() => computeLocalFloodField(), 400);
+      setTimeout(() => void computeLocalFloodField(), 400);
     }
     if (params.get("demo") === "annotations") {
       applyZones(DEMO_ZONES);

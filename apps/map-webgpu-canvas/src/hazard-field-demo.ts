@@ -13,8 +13,8 @@
  * disc — the terrain decides where the water goes.
  */
 
+import { loadWindowHeights } from "./dem";
 import type { HazardField } from "./protocol";
-import type { TerrainData } from "./terrain-gen";
 
 /** Frames are square; 512 over a 12 km window is a ~23 m cell. */
 const FIELD_SIZE = 512;
@@ -24,28 +24,6 @@ export interface FieldWindow {
   south: number;
   east: number;
   north: number;
-}
-
-/** Terrain heights sampled over a geographic window, in the field's grid. */
-function sampleHeights(
-  terrain: TerrainData,
-  bounds: { west: number; east: number; north: number; south: number },
-  win: FieldWindow,
-  n: number,
-): Float32Array {
-  const heights = new Float32Array(n * n);
-  const u0 = (win.west - bounds.west) / (bounds.east - bounds.west);
-  const u1 = (win.east - bounds.west) / (bounds.east - bounds.west);
-  const v0 = (bounds.north - win.north) / (bounds.north - bounds.south);
-  const v1 = (bounds.north - win.south) / (bounds.north - bounds.south);
-  for (let j = 0; j < n; j++) {
-    const v = v0 + ((v1 - v0) * j) / (n - 1);
-    for (let i = 0; i < n; i++) {
-      const u = u0 + ((u1 - u0) * i) / (n - 1);
-      heights[j * n + i] = terrain.sampleHeight(u, v);
-    }
-  }
-  return heights;
 }
 
 /**
@@ -89,14 +67,19 @@ function flowAccumulation(heights: Float32Array, n: number): Float32Array {
  * catchment and falls with local slope: water runs off a hillside and stands
  * on a valley floor.
  */
-export function floodField(
-  terrain: TerrainData,
-  bounds: { west: number; east: number; north: number; south: number },
+export async function floodField(
   win: FieldWindow,
   rainfallMmPerHour: number,
-): HazardField {
+): Promise<HazardField | null> {
   const n = FIELD_SIZE;
-  const heights = sampleHeights(terrain, bounds, win, n);
+  const heights = await loadWindowHeights(
+    win.west,
+    win.south,
+    win.east,
+    win.north,
+    n,
+  );
+  if (!heights) return null;
   const acc = flowAccumulation(heights, n);
   const values = new Float32Array(n * n);
   const intensity = Math.max(rainfallMmPerHour, 1) / 80;
@@ -115,8 +98,15 @@ export function floodField(
       // Catchment scaled logarithmically: a channel two orders of magnitude
       // larger is deeper, not a hundred times deeper.
       const catchment = Math.log10(1 + (acc[idx] ?? 1)) / Math.log10(1 + n * n);
-      const flat = 1 / (1 + slope * 0.55);
-      values[idx] = Math.max(0, catchment ** 2.6 * flat * 14 * intensity);
+      // The slope penalty is gentle on purpose. Steep reaches genuinely hold
+      // less water, but penalising them hard broke every channel into
+      // disconnected pools — and a drainage network that does not connect
+      // tells an operator nothing about where the water is going.
+      const flat = 1 / (1 + slope * 0.18);
+      // The exponent decides how much catchment a gully needs before it
+      // counts. Lower and every hillside crease floods; this keeps the
+      // channels that carry real volume.
+      values[idx] = Math.max(0, catchment ** 2.15 * flat * 17 * intensity);
     }
   }
 
@@ -126,7 +116,7 @@ export function floodField(
     width: n,
     height: n,
     values,
-    threshold: 0.12,
+    threshold: 0.09,
     isStub: true,
   };
 }

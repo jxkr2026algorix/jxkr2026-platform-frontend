@@ -685,6 +685,67 @@ async function loadRealTerrainInner(
   };
 }
 
+/**
+ * Elevation for a small window at full tile resolution.
+ *
+ * Resampling the province heightmap is not enough for drainage: its cells are
+ * hundreds of metres across, so a bilinear read of it has no real relief at
+ * 20 m spacing and flow directions collapse onto the grid axes — the channels
+ * come out as straight lines meeting at right angles. This fetches the DEM
+ * tiles for the window itself so the terrain has genuine detail to route on.
+ */
+export async function loadWindowHeights(
+  west: number,
+  south: number,
+  east: number,
+  north: number,
+  size: number,
+): Promise<Float32Array | null> {
+  const centerLat = (north + south) / 2;
+  const spanMeters =
+    (east - west) * 111320 * Math.cos((centerLat * Math.PI) / 180);
+  const targetMpp = spanMeters / size;
+  // One zoom finer than the output needs, then downsample: real detail into
+  // every cell rather than an upsampled coarse source.
+  let zoom = clamp(
+    Math.ceil(Math.log2(metersPerPixel(centerLat, 0) / targetMpp)) + 1,
+    10,
+    15,
+  );
+  for (; zoom >= 10; zoom--) {
+    const minX = lonToGlobalPx(west, zoom);
+    const minY = latToGlobalPx(north, zoom);
+    const pxSize = lonToGlobalPx(east, zoom) - minX;
+    const tiles = Math.floor(pxSize / TILE) + 2;
+    if (tiles * tiles > 260) continue;
+    try {
+      const canvas = await compositeTiles(
+        TERRARIUM_URL,
+        zoom,
+        minX,
+        minY,
+        pxSize,
+        size,
+      );
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return null;
+      const pixels = ctx.getImageData(0, 0, size, size).data;
+      const heights = new Float32Array(size * size);
+      for (let i = 0; i < size * size; i++) {
+        heights[i] = decodeTerrarium(
+          pixels[i * 4] ?? 0,
+          pixels[i * 4 + 1] ?? 0,
+          pixels[i * 4 + 2] ?? 0,
+        );
+      }
+      return heights;
+    } catch {
+      // Try a coarser zoom.
+    }
+  }
+  return null;
+}
+
 export interface DetailPatch {
   canvas: HTMLCanvasElement;
   /** Geographic bounds of the patch (degrees). */

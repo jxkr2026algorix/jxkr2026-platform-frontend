@@ -683,9 +683,25 @@ export class Engine {
     this.fieldTexRef?.destroy();
     this.fieldTexRef = tex;
     this.fieldRect = frame.rect;
-    let peak = frame.threshold;
-    for (const v of frame.values) if (v > peak) peak = v;
-    this.fieldMeta = { kind: frame.kind, threshold: frame.threshold, peak };
+    // Normalize against a high percentile, not the maximum. A drainage field
+    // is heavy-tailed — one main channel can be twenty times its tributaries —
+    // so scaling by the peak leaves everything but that channel invisible.
+    // Sampled rather than fully sorted: a percentile does not need every cell.
+    const sample: number[] = [];
+    for (let i = 0; i < frame.values.length; i += 7) {
+      const v = frame.values[i] ?? 0;
+      if (v > frame.threshold) sample.push(v);
+    }
+    sample.sort((a, b) => a - b);
+    const reference =
+      sample.length > 0
+        ? (sample[Math.floor(sample.length * 0.92)] ?? frame.threshold)
+        : frame.threshold + 1;
+    this.fieldMeta = {
+      kind: frame.kind,
+      threshold: frame.threshold,
+      peak: Math.max(reference, frame.threshold + 1e-3),
+    };
     this.fieldOn = true;
   }
 
