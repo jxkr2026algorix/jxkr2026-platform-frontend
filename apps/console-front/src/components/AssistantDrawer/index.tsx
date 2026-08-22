@@ -34,7 +34,6 @@ export function AssistantDrawer({
 }: AssistantDrawerProps) {
   const reduceMotion = useReducedMotion();
   const [connection, setConnection] = useState<ConnectionState>("idle");
-  const [connectionLabel, setConnectionLabel] = useState("Public data");
   const [messages, setMessages] = useState<readonly ChatMessage[]>([
     initialMessage,
   ]);
@@ -53,15 +52,13 @@ export function AssistantDrawer({
     setConnection("connecting");
     void import("../../mcp-client")
       .then(({ connectMcp }) => connectMcp())
-      .then((result) => {
+      .then(() => {
         setConnection("ready");
-        setConnectionLabel(`${result.serverTitle} · ${result.toolCount} tools`);
       })
       .catch((error: unknown) => {
         if (error instanceof Error) {
           connectionStartedRef.current = false;
           setConnection("error");
-          setConnectionLabel("Data connection unavailable");
           return;
         }
         throw error;
@@ -172,15 +169,7 @@ export function AssistantDrawer({
             transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
           >
             <header className="assistant-header">
-              <div>
-                <span
-                  className={`assistant-status is-${connection}`}
-                  role="status"
-                >
-                  {connectionLabel}
-                </span>
-                <h2>Data assistant</h2>
-              </div>
+              <h2>Data assistant</h2>
               <motion.button
                 className="assistant-icon-button"
                 type="button"
@@ -198,6 +187,11 @@ export function AssistantDrawer({
               ref={transcriptRef}
               aria-live="polite"
             >
+              {connection === "error" ? (
+                <p className="assistant-connection-error" role="alert">
+                  Data connection unavailable. Reopen the assistant to retry.
+                </p>
+              ) : null}
               {messages.map((message) => (
                 <AssistantMessage key={message.id} message={message} />
               ))}

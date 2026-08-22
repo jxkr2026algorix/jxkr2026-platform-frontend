@@ -1204,33 +1204,10 @@ textarea {
 }
 
 .assistant-header h2 {
-  margin: 3px 0 0;
+  margin: 3px 0;
   font-size: 18px;
   font-weight: 625;
   letter-spacing: -0.025em;
-}
-
-.assistant-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-tertiary);
-  font-size: 10px;
-}
-
-.assistant-status::before {
-  width: 7px;
-  height: 7px;
-  background: currentColor;
-  content: "";
-}
-
-.assistant-status.is-ready {
-  color: var(--safe-ink);
-}
-
-.assistant-status.is-error {
-  color: var(--critical);
 }
 
 .assistant-icon-button {
@@ -1266,6 +1243,15 @@ textarea {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+}
+
+.assistant-connection-error {
+  margin: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--button-border);
+  color: var(--critical);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .assistant-message {
