@@ -407,13 +407,10 @@ export class MapAnnotations {
       return;
     }
     chip.hidden = false;
-    // Position and scale live in one inline transform. Splitting them across
-    // `translate` and `transform` left the chips pinned to the screen instead
-    // of tracking the map; the hover scale comes through a custom property so
-    // the stylesheet never has to fight this write.
-    chip.style.transform =
-      `translate(-50%, -50%) translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px)` +
-      ` scale(var(--chip-scale, 1))`;
+    // Position only. Hover scale lives on the `scale` property in CSS, so
+    // this per-frame write is never subject to a transition — an eased
+    // transform is what detached the chips from the map before.
+    chip.style.transform = `translate(-50%, -50%) translate(${at.x.toFixed(1)}px, ${at.y.toFixed(1)}px)`;
   }
 
   /** Project one normalized point, or null if it is behind the camera. */

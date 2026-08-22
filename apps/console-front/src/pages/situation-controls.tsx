@@ -14,13 +14,14 @@ type MapBridge = ReturnType<typeof useMapBridge>;
 
 interface SituationControlsProps {
   readonly map: MapBridge;
-  readonly selectedType: DisasterType;
+  readonly selectedType: DisasterType | null;
   readonly placementArmed: boolean;
   readonly publishing: boolean;
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
-  readonly onEventSelect: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onEventSelect: (type: DisasterType | null) => void;
+  readonly onEventDeclare: (type: DisasterType, needsLocation: boolean) => void;
   readonly onReset: () => void;
 }
 
@@ -48,6 +49,7 @@ export function SituationControls({
   latestEvent,
   onMapCommand,
   onEventSelect,
+  onEventDeclare,
   onReset,
 }: SituationControlsProps) {
   const controls = map.status.controls;
@@ -68,6 +70,7 @@ export function SituationControls({
           errorMessage={errorMessage}
           latestEvent={latestEvent}
           onSelect={onEventSelect}
+          onDeclare={onEventDeclare}
           onReset={onReset}
         />
         <div className="map-display-controls">

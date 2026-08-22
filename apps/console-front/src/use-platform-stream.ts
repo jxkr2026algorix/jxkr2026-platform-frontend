@@ -18,7 +18,9 @@ export function usePlatformStream() {
   );
   const [event, setEvent] = useState<PlatformEvent | null>(null);
 
-  const [selectedType, setSelectedType] = useState<DisasterType>("landslide");
+  // Nothing is pre-selected: a hazard showing as chosen on load invites a
+  // confirm press that declares an incident nobody picked.
+  const [selectedType, setSelectedType] = useState<DisasterType | null>(null);
   const [connection, setConnection] =
     useState<PlatformConnection>("connecting");
   const [publishing, setPublishing] = useState(false);

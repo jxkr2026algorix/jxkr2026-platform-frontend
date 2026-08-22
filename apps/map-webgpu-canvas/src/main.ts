@@ -718,11 +718,14 @@ function startDetailLod(): void {
     const size = Math.min(Math.max(dist * 1.35, 2500), world * 0.35);
     const cx = state.camera.center.x;
     const cy = state.camera.center.y;
+    // Hysteresis: a patch covers more than the viewport, so it only has to be
+    // refetched once the camera has genuinely left it. Tighter thresholds meant
+    // a slow pan refetched continuously and each swap showed.
     const needsReload =
       !requested ||
       requested.style !== state.basemap ||
-      Math.abs(requested.size - size) / requested.size > 0.35 ||
-      Math.hypot(requested.x - cx, requested.y - cy) * world > size * 0.22;
+      Math.abs(requested.size - size) / requested.size > 0.55 ||
+      Math.hypot(requested.x - cx, requested.y - cy) * world > size * 0.34;
     if (!needsReload) return;
 
     // Supersede any in-flight load immediately instead of queueing behind it.
@@ -737,17 +740,10 @@ function startDetailLod(): void {
     const sizeNorm = size / world;
     const rect = { x: cx - sizeNorm / 2, y: cy - sizeNorm / 2, size: sizeNorm };
 
-    // Show tiles as they arrive rather than waiting for the full patch.
-    let lastUpload = 0;
-    const options = {
-      signal: abort.signal,
-      onProgress: (canvas: HTMLCanvasElement) => {
-        const now = performance.now();
-        if (gen !== generation || !engine || now - lastUpload < 300) return;
-        lastUpload = now;
-        engine.setDetailPatch(canvas, rect);
-      },
-    };
+    // Uploaded once, complete. Publishing half-composited canvases as tiles
+    // landed made the patch visibly assemble itself on screen, which is what
+    // the flicker during zoom actually was.
+    const options = { signal: abort.signal };
     const patchPromise =
       state.basemap === "map"
         ? loadStreetDetailPatch(lat, lon, size, options)

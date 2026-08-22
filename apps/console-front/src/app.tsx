@@ -120,12 +120,18 @@ export function App() {
     platform.selectedType,
   ]);
 
-  const handleEventSelect = (type: DisasterType, needsLocation: boolean) => {
+  /** Pick a hazard. Nothing is published until it is confirmed. */
+  const handleEventSelect = (type: DisasterType | null) => {
     platform.setSelectedType(type);
+    setPlacementArmed(false);
+    if (type)
+      map.send({ type: "map:set-scenario", payload: { scenario: type } });
+  };
+
+  /** Confirm the pick: publish it, or arm the map for the origin first. */
+  const handleEventDeclare = (type: DisasterType, needsLocation: boolean) => {
     if (needsLocation) {
       setPlacementArmed(true);
-      map.send({ type: "map:set-scenario", payload: { scenario: type } });
-      map.send({ type: "map:set-view", payload: { mode: "auto" } });
       map.send({ type: "map:sim-control", payload: { action: "pause" } });
       return;
     }
@@ -225,6 +231,7 @@ export function App() {
                   latestEvent={platform.event}
                   onMapCommand={handleMapCommand}
                   onEventSelect={handleEventSelect}
+                  onEventDeclare={handleEventDeclare}
                   onPreviewEvent={platform.previewEvent}
                   onReset={handleReset}
                 />

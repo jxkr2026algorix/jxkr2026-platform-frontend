@@ -15,13 +15,14 @@ type MapBridge = ReturnType<typeof useMapBridge>;
 interface SituationPageProps {
   readonly map: MapBridge;
   readonly client: PlatformClient;
-  readonly selectedType: DisasterType;
+  readonly selectedType: DisasterType | null;
   readonly placementArmed: boolean;
   readonly publishing: boolean;
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
   readonly onMapCommand: (command: DashboardCommand) => void;
-  readonly onEventSelect: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onEventSelect: (type: DisasterType | null) => void;
+  readonly onEventDeclare: (type: DisasterType, needsLocation: boolean) => void;
   readonly onPreviewEvent: (event: PlatformEvent | null) => void;
   readonly onReset: () => void;
 }
@@ -36,6 +37,7 @@ export function SituationPage({
   latestEvent,
   onMapCommand,
   onEventSelect,
+  onEventDeclare,
   onPreviewEvent,
   onReset,
 }: SituationPageProps) {
@@ -55,6 +57,7 @@ export function SituationPage({
           latestEvent={latestEvent}
           onMapCommand={onMapCommand}
           onEventSelect={onEventSelect}
+          onEventDeclare={onEventDeclare}
           onReset={onReset}
         />
         <DistrictStatusPanel
@@ -64,7 +67,7 @@ export function SituationPage({
         >
           <EvacuationPanel
             client={client}
-            hazardType={latestEvent?.type ?? selectedType}
+            hazardType={latestEvent?.type ?? selectedType ?? "landslide"}
             districtCode={map.status.controls.districtCode}
             onMapCommand={onMapCommand}
             onPreviewEvent={onPreviewEvent}

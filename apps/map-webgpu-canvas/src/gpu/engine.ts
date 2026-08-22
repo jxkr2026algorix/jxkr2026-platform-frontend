@@ -19,6 +19,7 @@ import type {
 } from "../protocol";
 import { computeStaticRisk, type TerrainData } from "../terrain-gen";
 import { createGridTexture, GlobalsWriter, ROW } from "./common";
+import { MipmapGenerator, mipLevelsFor } from "./mipmap";
 import {
   DEBRIS_COUNT,
   initialRainData,
@@ -246,6 +247,7 @@ export class Engine {
     private readonly particles: ParticleSystems,
     private readonly surface: SurfaceRenderer,
     private readonly statsStaging: GPUBuffer,
+    private readonly mipmaps: MipmapGenerator,
     hasImagery: boolean,
     hasStreet: boolean,
   ) {
@@ -283,6 +285,9 @@ export class Engine {
     const format = gpu.getPreferredCanvasFormat();
     context.configure({ device, format, alphaMode: "opaque" });
 
+    // Shared across every basemap upload, including later swaps.
+    const mipmaps = new MipmapGenerator(device);
+
     const n = terrain.gridSize;
     const textures: GridTextures = {
       height: createGridTexture(device, "height", "r32float", n),
@@ -319,6 +324,7 @@ export class Engine {
         label: "satellite",
         size: [imagery.width, imagery.height],
         format: "rgba8unorm",
+        mipLevelCount: mipLevelsFor(imagery.width, imagery.height),
         usage:
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
@@ -329,6 +335,7 @@ export class Engine {
         { texture: satTex },
         [imagery.width, imagery.height],
       );
+      mipmaps.generate(satTex, "rgba8unorm");
     } else {
       satTex = device.createTexture({
         label: "satellite-placeholder",
@@ -359,6 +366,7 @@ export class Engine {
         label: "street-basemap",
         size: [street.width, street.height],
         format: "rgba8unorm",
+        mipLevelCount: mipLevelsFor(street.width, street.height),
         usage:
           GPUTextureUsage.TEXTURE_BINDING |
           GPUTextureUsage.COPY_DST |
@@ -369,6 +377,7 @@ export class Engine {
         { texture: streetTex },
         [street.width, street.height],
       );
+      mipmaps.generate(streetTex, "rgba8unorm");
     } else {
       streetTex = device.createTexture({
         label: "street-basemap-placeholder",
@@ -440,6 +449,7 @@ export class Engine {
       particles,
       surface,
       statsStaging,
+      mipmaps,
       imagery !== null,
       street !== null,
     );
@@ -642,6 +652,7 @@ export class Engine {
       label: "detail-patch",
       size: [canvas.width, canvas.height],
       format: "rgba8unorm",
+      mipLevelCount: mipLevelsFor(canvas.width, canvas.height),
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.COPY_DST |
@@ -652,6 +663,7 @@ export class Engine {
       { texture: tex },
       [canvas.width, canvas.height],
     );
+    this.mipmaps.generate(tex, "rgba8unorm");
     this.surface.setDetailTexture(tex);
     // The bind group now references the new texture; the old one can go.
     this.detailTexRef?.destroy();
@@ -712,6 +724,7 @@ export class Engine {
       label: "street-basemap",
       size: [canvas.width, canvas.height],
       format: "rgba8unorm",
+      mipLevelCount: mipLevelsFor(canvas.width, canvas.height),
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.COPY_DST |
@@ -722,6 +735,7 @@ export class Engine {
       { texture: tex },
       [canvas.width, canvas.height],
     );
+    this.mipmaps.generate(tex, "rgba8unorm");
     this.surface.setStreetTexture(tex);
     this.streetReady = true;
   }

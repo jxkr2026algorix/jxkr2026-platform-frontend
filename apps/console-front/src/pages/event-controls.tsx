@@ -1,5 +1,4 @@
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
-import { useState } from "react";
 
 const eventOptions: readonly {
   readonly type: DisasterType;
@@ -15,81 +14,90 @@ const eventOptions: readonly {
 ];
 
 type EventControlsProps = {
-  readonly selectedType: DisasterType;
-  readonly onReset: () => void;
+  /** Null until the operator picks one; nothing is chosen on load. */
+  readonly selectedType: DisasterType | null;
   readonly placementArmed: boolean;
   readonly publishing: boolean;
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
-  readonly onSelect: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onSelect: (type: DisasterType | null) => void;
+  readonly onDeclare: (type: DisasterType, needsLocation: boolean) => void;
+  readonly onReset: () => void;
 };
 
+/**
+ * Declaring an incident is a two-step act: pick the hazard, then confirm.
+ *
+ * The first version published on the first click, which is why it had to be
+ * hidden behind a lock. Choose-then-confirm needs no lock and no explaining —
+ * the pending choice is visible, and the confirm button says exactly what will
+ * happen when it is pressed.
+ */
 export function EventControls({
   selectedType,
-  onReset,
   placementArmed,
   publishing,
   errorMessage,
   latestEvent,
   onSelect,
+  onDeclare,
+  onReset,
 }: EventControlsProps) {
-  // These buttons record a real incident on the platform, so they start
-  // locked. Unlocking is a deliberate act, and it does not survive a reset.
-  const [unlocked, setUnlocked] = useState(false);
-
-  const reset = () => {
-    setUnlocked(false);
-    onReset();
-  };
+  const selected = eventOptions.find((o) => o.type === selectedType);
 
   return (
     <div className="event-controls">
       <div className="event-control-heading">
-        <p className="rail-section-label">Event control</p>
+        <p className="rail-section-label">Declare an incident</p>
       </div>
-      <label className="check-row">
-        <input
-          className="check-input"
-          type="checkbox"
-          checked={unlocked}
-          onChange={(event) => setUnlocked(event.target.checked)}
-        />
-        <span className="check-box" aria-hidden="true">
-          <svg viewBox="0 0 16 16">
-            <title>Selected</title>
-            <path d="m3.5 8.2 2.8 2.8 6.2-6.2" />
-          </svg>
-        </span>
-        <span className="check-label">Allow recording incidents</span>
-      </label>
-      <fieldset className="event-grid" disabled={!unlocked || publishing}>
-        <legend className="sr-only">Create disaster event</legend>
+      <fieldset className="event-grid" disabled={publishing}>
+        <legend className="sr-only">Hazard type</legend>
         {eventOptions.map((option) => (
           <button
             key={option.type}
             type="button"
             aria-pressed={selectedType === option.type}
-            onClick={() => onSelect(option.type, option.needsLocation)}
+            onClick={() =>
+              onSelect(selectedType === option.type ? null : option.type)
+            }
           >
             <span>{option.label}</span>
-            <small>{option.needsLocation ? "Pick on map" : "Start now"}</small>
+            <small>{option.needsLocation ? "Pick on map" : "Area-wide"}</small>
           </button>
         ))}
       </fieldset>
-      {!unlocked ? (
+
+      {selected ? (
+        <div className="event-confirm">
+          <button
+            className="button"
+            type="button"
+            disabled={publishing}
+            onClick={() => onDeclare(selected.type, selected.needsLocation)}
+          >
+            {publishing
+              ? "Declaring…"
+              : selected.needsLocation
+                ? `Declare ${selected.label.toLowerCase()} — pick the origin`
+                : `Declare ${selected.label.toLowerCase()}`}
+          </button>
+          <button
+            className="link-button"
+            type="button"
+            onClick={() => onSelect(null)}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
         <p className="placement-prompt">
-          Recording is off. Turn it on to declare an incident, or use Sample
-          data to check the display.
+          Pick a hazard to declare one, or use Sample data to check the display.
         </p>
-      ) : null}
+      )}
+
       {placementArmed ? (
         <p className="placement-prompt" role="status">
-          Select one point on the map. Only the origin is rendered locally.
-        </p>
-      ) : null}
-      {publishing ? (
-        <p className="placement-prompt" role="status">
-          Recording incident on the platform…
+          Select the origin on the map.
         </p>
       ) : null}
       {errorMessage ? (
@@ -105,7 +113,7 @@ export function EventControls({
       <button
         className="button secondary event-reset"
         type="button"
-        onClick={reset}
+        onClick={onReset}
       >
         Reset board
       </button>

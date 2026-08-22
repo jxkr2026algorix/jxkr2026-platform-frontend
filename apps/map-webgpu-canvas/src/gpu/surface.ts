@@ -81,26 +81,27 @@ fn fs(in: VSOut) -> @location(0) vec4f {
 
   // Satellite imagery is muted; boost its saturation and lift it a touch.
   // Dark pixels (deep water) get less boost so lakes keep a natural hue.
-  var sat = textureSampleLevel(satTex, satSampler, in.uv, 0.0).rgb;
+  var sat = textureSample(satTex, satSampler, in.uv).rgb;
   let satLuma = dot(sat, vec3f(0.299, 0.587, 0.114));
   let satBoost = mix(1.02, 1.28, smoothstep(0.08, 0.30, satLuma));
   sat = clamp(mix(vec3f(satLuma), sat, satBoost) * 1.03, vec3f(0.0), vec3f(1.0));
   // Street-map basemap (Google-Maps-like) cross-fades over the satellite.
-  let street = textureSampleLevel(streetTex, satSampler, in.uv, 0.0).rgb;
+  let street = textureSample(streetTex, satSampler, in.uv).rgb;
   var baseImg = mix(sat, street, G.weather.w);
   // High-zoom detail patch under the camera: sharper roads and buildings.
+  // Sampled unconditionally: textureSample needs uniform control flow to pick
+  // a mip level, so the patch is masked after the fact rather than branched
+  // around. Clamp-to-edge keeps the out-of-patch fetch harmless.
   let dp = G.detail;
-  if (dp.z > 0.0 && dp.w > 0.001) {
-    let duv = (in.uv - dp.xy) / dp.z;
-    if (duv.x > 0.0 && duv.x < 1.0 && duv.y > 0.0 && duv.y < 1.0) {
-      let edge = smoothstep(0.0, 0.07,
-        min(min(duv.x, 1.0 - duv.x), min(duv.y, 1.0 - duv.y)));
-      // Respect alpha so tiles still streaming in leave the coarse basemap
-      // visible instead of painting black.
-      let dcol = textureSampleLevel(detailTex, satSampler, duv, 0.0);
-      baseImg = mix(baseImg, dcol.rgb, dp.w * edge * dcol.a);
-    }
-  }
+  let duv = (in.uv - dp.xy) / max(dp.z, 1e-6);
+  let dcol = textureSample(detailTex, satSampler, clamp(duv, vec2f(0.0), vec2f(1.0)));
+  let inside = step(0.0, duv.x) * step(duv.x, 1.0) *
+    step(0.0, duv.y) * step(duv.y, 1.0);
+  let edge = smoothstep(0.0, 0.07,
+    min(min(duv.x, 1.0 - duv.x), min(duv.y, 1.0 - duv.y)));
+  // Respect alpha so tiles still streaming in leave the coarse basemap
+  // visible instead of painting black.
+  baseImg = mix(baseImg, dcol.rgb, dp.w * inside * edge * dcol.a * step(1e-6, dp.z));
   let satBlend = G.layers.x;
   var albedo = mix(natural, baseImg, satBlend);
   albedo = mix(albedo, mapStyle, G.world.w * (1.0 - satBlend));
@@ -114,6 +115,49 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   albedo = mix(albedo, vec3f(0.90, 0.92, 0.96), snowCover);
   let albLuma = dot(albedo, vec3f(0.299, 0.587, 0.114));
   albedo = mix(albedo, vec3f(albLuma) * vec3f(1.18, 0.98, 0.62), G.weather.z * 0.45);
+
+  // Rain on the ground itself. Individual drops are sub-pixel at operational
+  // zoom, so what has to read is what rain does to a landscape seen from
+  // above: the ground goes wet and flat, and ragged precipitation cells drift
+  // across it. Everything here is noise-driven — a periodic band scrolling
+  // downwind reads as a wave, not as weather.
+  let rainAmt = clamp(G.rain.x, 0.0, 1.0);
+  if (rainAmt > 0.002) {
+    let wind = normalize(vec2f(G.rain.z, G.rain.w) + vec2f(0.001, 0.0));
+    let tRain = G.camPos.w;
+    let lum = dot(albedo, vec3f(0.299, 0.587, 0.114));
+    // Wet ground: darker, flatter, a touch colder.
+    let wet = mix(albedo, vec3f(lum), 0.34) * vec3f(0.68, 0.74, 0.86);
+    albedo = mix(albedo, wet, rainAmt * 0.62);
+
+    // Precipitation cells: two octaves at different speeds, so the pattern
+    // never repeats and the heavier patches visibly travel downwind.
+    let cellUv = in.worldPos.xz / (G.world.x * 0.06);
+    let drift = wind * tRain * 0.035;
+    let cellA = valueNoise2(cellUv - drift);
+    let cellB = valueNoise2(cellUv * 2.7 - drift * 2.1);
+    let cells = clamp(cellA * 0.65 + cellB * 0.35, 0.0, 1.0);
+    // Heavier cells darken and desaturate further; lighter ones let the map
+    // through, which is what makes the field read as moving.
+    albedo *= 1.0 - rainAmt * 0.34 * smoothstep(0.30, 0.80, cells);
+    albedo = mix(albedo, vec3f(0.55, 0.60, 0.68) * lum, rainAmt * 0.16 * cells);
+
+    // Falling rain, only once a pixel is small enough to resolve it. The
+    // streaks are fine, jittered per column, and fade out with distance
+    // instead of aliasing into a moire at province scale.
+    let px = length(in.worldPos.xz - G.camPos.xz) + G.world.x * 0.02;
+    let near = 1.0 - smoothstep(G.world.x * 0.012, G.world.x * 0.05, px);
+    if (near > 0.01) {
+      let across = vec2f(wind.y, -wind.x);
+      let sp = in.worldPos.xz / (G.world.x * 0.00035);
+      let col = floor(dot(sp, across));
+      let jitter = hash2f(vec2i(i32(col), 0));
+      let run = fract(dot(sp, wind) * 0.5 + tRain * 9.0 + jitter * 7.0);
+      let streak = step(0.55, fract(dot(sp, across))) *
+        smoothstep(0.55, 0.98, run) * (1.0 - smoothstep(0.98, 1.0, run));
+      albedo += vec3f(0.58, 0.64, 0.76) * streak * rainAmt * near * 0.30;
+    }
+  }
 
   // Hazard-susceptibility zone overlay for the active scenario, drawn as a
   // hatched tint so it reads as an analytical layer over the basemap.
@@ -223,7 +267,7 @@ fn fs(in: VSOut) -> @location(0) vec4f {
   // Administrative 시/군 boundaries from the national dataset. Independent of
   // the hazard overlay: an operator navigating by district still needs the
   // outlines when the hazard layer is off.
-  let districtLine = textureSampleLevel(districtTex, satSampler, in.uv, 0.0);
+  let districtLine = textureSample(districtTex, satSampler, in.uv);
   albedo = mix(albedo, districtLine.rgb, districtLine.a * G.district.x);
 
   // Point-source events: earthquake shockwave and airborne plumes.
@@ -488,9 +532,14 @@ export class SurfaceRenderer {
       multisample: { count: targets.sampleCount },
     });
 
+    // Trilinear plus anisotropy. Without mipmapFilter the mip chain built for
+    // these textures would never be used, and without anisotropy the drape
+    // smears at the grazing angles the 3D view spends most of its time at.
     const sampler = device.createSampler({
       magFilter: "linear",
       minFilter: "linear",
+      mipmapFilter: "linear",
+      maxAnisotropy: 16,
       addressModeU: "clamp-to-edge",
       addressModeV: "clamp-to-edge",
     });
