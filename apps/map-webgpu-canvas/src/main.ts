@@ -19,6 +19,7 @@ import {
   cameraForBbox,
   districtByCode,
   latLonToMapPoint,
+  PROVINCE_BBOX,
   PROVINCE_CODE,
   PROVINCE_REGION,
   regionForDistrict,
@@ -162,7 +163,10 @@ async function focusDistrict(code: string | null): Promise<void> {
   if (!engine) return;
   if (!district) {
     // 비례대표 / province view: pull all the way back to the full extent.
-    engine.setCamera({ x: 0.5, y: 0.5 }, currentRegion.sizeMeters * 0.92);
+    engine.setCamera(
+      { x: 0.5, y: 0.5 },
+      cameraForBbox(PROVINCE_BBOX).distanceMeters,
+    );
     return;
   }
   const framing = cameraForBbox(district.bbox);

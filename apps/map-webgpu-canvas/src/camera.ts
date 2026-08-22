@@ -17,6 +17,9 @@ import {
 
 export type CameraMode = "flat" | "tilted";
 
+const DEFAULT_DISTANCE_FACTOR = 1.65;
+const MAX_DISTANCE_FACTOR = 1.8;
+
 interface PointerState {
   id: number;
   x: number;
@@ -59,13 +62,11 @@ export class OrbitCamera {
     const half = worldSize / 2;
     this.target = [half, this.sampleHeight(0.5, 0.5), half];
     this.targetGoal = [...this.target];
-    this.distance = worldSize * 0.92;
+    this.distance = worldSize * DEFAULT_DISTANCE_FACTOR;
     this.distanceGoal = this.distance;
   }
 
   setMode(mode: CameraMode): void {
-    // Entering 3D from the flat map: wind the yaw back so the camera sweeps
-    // around while it tilts and zooms in.
     if (mode === "tilted" && this.mode !== "tilted" && this.flatBlend > 0.6) {
       this.yaw = this.yawGoal - Math.PI * 1.25;
     }
@@ -74,11 +75,9 @@ export class OrbitCamera {
     this.distanceGoal = clamp(
       this.distanceGoal,
       this.worldSize * 0.08,
-      this.worldSize * 1.2,
+      this.worldSize * MAX_DISTANCE_FACTOR,
     );
-    if (mode === "tilted") {
-      this.distanceGoal = Math.min(this.distanceGoal, this.worldSize * 0.62);
-    } else {
+    if (mode === "flat") {
       this.distanceGoal = Math.max(this.distanceGoal, this.worldSize * 0.7);
     }
   }
@@ -118,7 +117,7 @@ export class OrbitCamera {
       this.distanceGoal = clamp(
         distanceMeters,
         this.worldSize * 0.008,
-        this.worldSize * 1.25,
+        this.worldSize * MAX_DISTANCE_FACTOR,
       );
     }
   }
@@ -237,7 +236,7 @@ export class OrbitCamera {
     this.distanceGoal = clamp(
       this.distanceGoal * factor,
       this.worldSize * 0.008,
-      this.worldSize * 1.25,
+      this.worldSize * MAX_DISTANCE_FACTOR,
     );
   }
 
