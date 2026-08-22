@@ -1,4 +1,5 @@
 import type { AssistantAnswer } from "../../assistant-query";
+import { useI18n } from "../../i18n";
 
 export type ChatMessage = {
   readonly id: string;
@@ -12,9 +13,15 @@ type AssistantMessageProps = {
 };
 
 export function AssistantMessage({ message }: AssistantMessageProps) {
+  const { t } = useI18n();
+
   return (
     <article className={`assistant-message is-${message.role}`}>
-      <span>{message.role === "assistant" ? "Assistant" : "You"}</span>
+      <span>
+        {message.role === "assistant"
+          ? t("assistant.role")
+          : t("assistant.you")}
+      </span>
       <p>{message.text}</p>
       {message.answer?.details.length ? (
         <ul>
@@ -28,7 +35,7 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
       ) : null}
       {message.answer?.citations.length ? (
         <div className="assistant-citations">
-          <strong>Sources</strong>
+          <strong>{t("assistant.sources")}</strong>
           {message.answer.citations.map((citation) => (
             <a
               href={citation.url}

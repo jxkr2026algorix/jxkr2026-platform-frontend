@@ -50,7 +50,9 @@ export const initialMapControls: MapControlState = {
   rainfallMmPerHour: DEFAULT_RAINFALL_MM_PER_HOUR,
   viewMode: "flat",
   playing: false,
-  overlayEnabled: true,
+  // Off until asked for: susceptibility is an analytical layer, and at
+  // province scale its cells are 600 m across and read as blocky noise.
+  overlayEnabled: false,
   districtCode: DEFAULT_DISTRICT_CODE,
   districtOverlay: true,
   districtLoading: false,

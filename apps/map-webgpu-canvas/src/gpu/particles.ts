@@ -240,7 +240,7 @@ fn vs(
     size = world * 0.0007;
     alpha = 0.9 * lifeFrac;
   }
-  alpha *= G.district.y;
+  alpha *= G.district.z;
 
   // Smoke puffs tumble slowly as they rise.
   let ang = seed * 6.2831 + age * (seed - 0.5) * 1.6;
@@ -402,7 +402,7 @@ fn vs(
   out.pos = G.viewProj * vec4f(pos, 1.0);
   out.color = vec4f(
     applyFog(tonemap(vec3f(0.30, 0.24, 0.17) * shade), pos),
-    clamp(p.w / 1.5, 0.0, 1.0) * fadeIn * G.district.y,
+    clamp(p.w / 1.5, 0.0, 1.0) * fadeIn * G.district.z,
   );
   out.uv = ruv;
   out.seed = seed;

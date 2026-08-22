@@ -6,6 +6,7 @@ import type {
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 import { motion } from "motion/react";
 import { SegmentIndicator } from "../components/SegmentIndicator";
+import { useI18n } from "../i18n";
 import type { useMapBridge } from "../use-map-bridge";
 import { DistrictSelector } from "./district-selector";
 import { EventControls } from "./event-controls";
@@ -35,11 +36,6 @@ const viewLabels: Record<Exclude<ViewMode, "auto">, string> = {
   tilted: "3D",
 };
 
-const basemapLabels: Record<BasemapStyle, string> = {
-  satellite: "Satellite",
-  map: "Map",
-};
-
 export function SituationControls({
   map,
   selectedType,
@@ -52,15 +48,20 @@ export function SituationControls({
   onEventDeclare,
   onReset,
 }: SituationControlsProps) {
+  const { t } = useI18n();
   const controls = map.status.controls;
+  const basemapLabels: Readonly<Record<BasemapStyle, string>> = {
+    satellite: t("map.satellite"),
+    map: t("map.standard"),
+  };
 
   return (
     <aside
       className="operations-panel operations-panel-left"
-      aria-label="Event and map controls"
+      aria-label={t("map.controls")}
     >
       <div className="panel-intro">
-        <h1 id="situation-title">Cheongsong operational map</h1>
+        <h1 id="situation-title">{t("map.title")}</h1>
       </div>
       <div className="rail-section">
         <EventControls
@@ -75,7 +76,7 @@ export function SituationControls({
         />
         <div className="map-display-controls">
           <fieldset className="compact-controls">
-            <legend>Map view</legend>
+            <legend>{t("map.view")}</legend>
             <motion.div
               className="segmented-track segmented-track-two"
               layoutRoot
@@ -98,7 +99,7 @@ export function SituationControls({
             </motion.div>
           </fieldset>
           <fieldset className="compact-controls">
-            <legend>Basemap</legend>
+            <legend>{t("map.basemap")}</legend>
             <motion.div
               className="segmented-track segmented-track-two"
               layoutRoot

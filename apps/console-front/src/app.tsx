@@ -5,9 +5,10 @@ import {
   SCENARIO_TO_HAZARD,
 } from "@salgil/platform-client";
 import { useEffect, useMemo, useState } from "react";
-import QRCode from "react-qr-code";
-import { Navigate, NavLink, Route, Routes } from "react-router";
+import { Navigate, Route, Routes } from "react-router";
 import { AssistantDrawer } from "./components/AssistantDrawer";
+import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
+import { MapCanvas } from "./components/MapCanvas";
 import { SituationPage } from "./pages/situation-page";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
@@ -212,45 +213,8 @@ export function App() {
     <div
       className={`app-shell view-situation${assistantOpen ? " is-assistant-open" : ""}`}
     >
-      <div className="map-canvas">
-        <iframe
-          ref={map.frame.ref}
-          src={map.frame.src}
-          title="SALGIL 3D multi-hazard map"
-          allow="fullscreen"
-        />
-        {map.status.connection !== "ready" && (
-          <div
-            className="map-feedback"
-            role={map.status.connection === "error" ? "alert" : "status"}
-          >
-            <strong>
-              {map.status.connection === "loading"
-                ? "Loading operational map"
-                : "3D map unavailable"}
-            </strong>
-            <span>
-              {map.status.errorMessage ||
-                "Operational controls remain available while the renderer reconnects."}
-            </span>
-          </div>
-        )}
-      </div>
-      <aside className="side-nav">
-        <NavLink
-          className="brand"
-          to="/situation"
-          aria-label="SALGIL operations home"
-        >
-          <span className="brand-lockup">
-            <img src="/salgil-mark.svg" alt="" />
-            <strong>Salgil</strong>
-          </span>
-        </NavLink>
-        <span className="mobile-qr" role="img" aria-label="Mobile demo QR code">
-          <QRCode value={mobileUrl} size={42} level="M" />
-        </span>
-      </aside>
+      <MapCanvas map={map} />
+      <DashboardBrandHeader mobileUrl={mobileUrl} />
 
       <div className="workspace">
         <main

@@ -1,5 +1,6 @@
 import { DISTRICTS, PROVINCE_CODE } from "@salgil/map-webgpu-canvas/districts";
 import { FloatingSelect } from "../components/FloatingSelect";
+import { useI18n } from "../i18n";
 
 interface DistrictSelectorProps {
   readonly selected: string | null;
@@ -12,27 +13,26 @@ export function DistrictSelector({
   loading,
   onSelect,
 }: DistrictSelectorProps) {
+  const { locale, t } = useI18n();
   const options = [
-    { value: PROVINCE_CODE, label: "Gyeongsangbuk-do" },
+    { value: PROVINCE_CODE, label: t("district.province") },
     ...DISTRICTS.map((district) => ({
       value: district.code,
-      label: district.nameEn,
+      label: locale === "ko" ? district.name : district.nameEn,
     })),
   ];
 
   return (
     <div className="district-selector">
       <FloatingSelect
-        label="District"
+        label={t("district.label")}
         value={selected ?? PROVINCE_CODE}
         options={options}
         disabled={loading}
         onValueChange={onSelect}
       />
       <p role="status">
-        {loading
-          ? "Loading terrain for the selected district."
-          : "Choose a district to move the map camera."}
+        {loading ? t("district.loading") : t("district.help")}
       </p>
     </div>
   );

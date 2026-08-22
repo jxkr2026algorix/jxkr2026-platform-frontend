@@ -53,14 +53,15 @@ export function usePlatformStream() {
     const unsubscribe = client.subscribe((message) => {
       switch (message.kind) {
         case "disaster.event":
+          // The active incident is not the operator's pending pick. Setting
+          // the pick from an incoming event made a hazard button look pressed
+          // on open and offered to declare what was already declared.
           setEvent(message.event);
-          setSelectedType(message.event.type);
           return;
         case "incident.clear":
           setEvent(null);
           return;
         case "control.sync":
-          setSelectedType(message.selectedType);
           return;
       }
     });

@@ -1,6 +1,7 @@
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "../../i18n";
 import { getPressTransition } from "../../motion";
 import { AssistantIcon, CloseIcon, SendIcon } from "./icons";
 import { AssistantMessage, type ChatMessage } from "./message";
@@ -15,28 +16,15 @@ type AssistantDrawerProps = {
   ) => Promise<PlatformEvent>;
 };
 
-const suggestions = [
-  "Start a wildfire training event in Cheongsong",
-  "Show data health",
-  "Start a heavy rain training event",
-] as const;
-
-const initialMessage: ChatMessage = {
-  id: "welcome",
-  role: "assistant",
-  text: "Ask about Gyeongbuk public data or start a training incident. Training events appear on the dashboard and mobile app at the same time.",
-};
-
 export function AssistantDrawer({
   open,
   onOpenChange,
   onCreateTrainingEvent,
 }: AssistantDrawerProps) {
+  const { t } = useI18n();
   const reduceMotion = useReducedMotion();
   const [connection, setConnection] = useState<ConnectionState>("idle");
-  const [messages, setMessages] = useState<readonly ChatMessage[]>([
-    initialMessage,
-  ]);
+  const [messages, setMessages] = useState<readonly ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const connectionStartedRef = useRef(false);
@@ -44,7 +32,17 @@ export function AssistantDrawer({
   const launcherRef = useRef<HTMLButtonElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const wasOpenRef = useRef(open);
-  const transcriptUpdate = `${messages.length}-${sending}`;
+  const transcriptUpdate = `${messages.length + 1}-${sending}`;
+  const suggestions = [
+    t("assistant.suggestWildfire"),
+    t("assistant.suggestHealth"),
+    t("assistant.suggestRain"),
+  ];
+  const welcomeMessage: ChatMessage = {
+    id: "welcome",
+    role: "assistant",
+    text: t("assistant.welcome"),
+  };
 
   useEffect(() => {
     if (!open || connectionStartedRef.current) return;
@@ -94,17 +92,21 @@ export function AssistantDrawer({
   const submitQuery = async (rawQuery: string) => {
     const query = rawQuery.trim();
     if (!query || sending) return;
+    const normalizedQuery = query.toLocaleLowerCase();
     const trainingTypes = [
-      ["wildfire", ["wildfire", "forest fire"]],
-      ["rain", ["heavy rain", "rainstorm"]],
-      ["flood", ["flood", "inundation"]],
-      ["landslide", ["landslide"]],
-      ["heatwave", ["heatwave", "heat wave"]],
-      ["earthquake", ["earthquake"]],
+      ["wildfire", ["wildfire", "forest fire", "산불"]],
+      ["rain", ["heavy rain", "rainstorm", "호우", "폭우"]],
+      ["flood", ["flood", "inundation", "홍수", "침수"]],
+      ["landslide", ["landslide", "산사태"]],
+      ["heatwave", ["heatwave", "heat wave", "폭염"]],
+      ["earthquake", ["earthquake", "지진"]],
     ] satisfies readonly (readonly [DisasterType, readonly string[]])[];
-    const requestedTrainingType = query.toLowerCase().includes("training")
+    const isTrainingRequest = ["training", "훈련", "연습"].some((term) =>
+      normalizedQuery.includes(term),
+    );
+    const requestedTrainingType = isTrainingRequest
       ? trainingTypes.find(([, terms]) =>
-          terms.some((term) => query.toLowerCase().includes(term)),
+          terms.some((term) => normalizedQuery.includes(term)),
         )?.[0]
       : undefined;
     if (!requestedTrainingType && connection !== "ready") return;
@@ -122,7 +124,7 @@ export function AssistantDrawer({
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            text: `${event.headline} The training event is syncing to the dashboard and mobile app through the platform stream.`,
+            text: t("assistant.trainingSync", { headline: event.headline }),
           },
         ]);
         return;
@@ -145,7 +147,7 @@ export function AssistantDrawer({
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            text: "Public data could not be loaded. Try again shortly.",
+            text: t("assistant.loadError"),
           },
         ]);
       } else {
@@ -162,18 +164,18 @@ export function AssistantDrawer({
         {open && (
           <motion.aside
             className="assistant-drawer"
-            aria-label="Public data assistant"
+            aria-label={t("assistant.label")}
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 18 }}
             animate={{ opacity: 1, x: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 18 }}
             transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
           >
             <header className="assistant-header">
-              <h2>Data assistant</h2>
+              <h2>{t("assistant.title")}</h2>
               <motion.button
                 className="assistant-icon-button"
                 type="button"
-                aria-label="Close data assistant"
+                aria-label={t("assistant.close")}
                 onClick={() => onOpenChange(false)}
                 whileTap={reduceMotion ? {} : { scale: 0.94 }}
                 transition={getPressTransition(reduceMotion)}
@@ -189,19 +191,20 @@ export function AssistantDrawer({
             >
               {connection === "error" ? (
                 <p className="assistant-connection-error" role="alert">
-                  Data connection unavailable. Reopen the assistant to retry.
+                  {t("assistant.connectionError")}
                 </p>
               ) : null}
+              <AssistantMessage message={welcomeMessage} />
               {messages.map((message) => (
                 <AssistantMessage key={message.id} message={message} />
               ))}
               {sending ? (
                 <div className="assistant-pending" role="status">
                   <i />
-                  Checking public data
+                  {t("assistant.checking")}
                 </div>
               ) : null}
-              {messages.length === 1 ? (
+              {messages.length === 0 ? (
                 <div className="assistant-suggestions">
                   {suggestions.map((suggestion) => (
                     <button
@@ -224,9 +227,7 @@ export function AssistantDrawer({
                 void submitQuery(input);
               }}
             >
-              <label htmlFor="assistant-input">
-                Ask data or create training
-              </label>
+              <label htmlFor="assistant-input">{t("assistant.askLabel")}</label>
               <div>
                 <textarea
                   id="assistant-input"
@@ -234,7 +235,7 @@ export function AssistantDrawer({
                   value={input}
                   rows={2}
                   maxLength={500}
-                  placeholder="Show landslide conditions in Cheongsong"
+                  placeholder={t("assistant.placeholder")}
                   disabled={sending}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={(event) => {
@@ -246,7 +247,7 @@ export function AssistantDrawer({
                 />
                 <motion.button
                   type="submit"
-                  aria-label="Send question"
+                  aria-label={t("assistant.send")}
                   disabled={!input.trim() || sending}
                   whileTap={reduceMotion ? {} : { scale: 0.94 }}
                   transition={getPressTransition(reduceMotion)}
@@ -254,9 +255,7 @@ export function AssistantDrawer({
                   <SendIcon />
                 </motion.button>
               </div>
-              <small>
-                Evidence only · Final decisions require operator review
-              </small>
+              <small>{t("assistant.evidence")}</small>
             </form>
           </motion.aside>
         )}
@@ -267,13 +266,13 @@ export function AssistantDrawer({
           ref={launcherRef}
           className="assistant-launcher"
           type="button"
-          aria-label="Open data assistant"
+          aria-label={t("assistant.open")}
           onClick={() => onOpenChange(true)}
           whileTap={reduceMotion ? {} : { scale: 0.95 }}
           transition={getPressTransition(reduceMotion)}
         >
           <AssistantIcon />
-          <span>Ask data</span>
+          <span>{t("assistant.ask")}</span>
         </motion.button>
       ) : null}
     </>

@@ -24,7 +24,7 @@ struct Globals {
   event : vec4f,    // x source u, y source v, z elapsed s, w kind (1 quake, 3 nuclear, 4 chemical)
   weather : vec4f,  // x snow 0..1, y temperature -1 cold..1 heat, z drought 0..1, w street-map blend
   detail : vec4f,   // high-zoom patch: x u0, y v0, z size (normalized), w blend
-  district : vec4f, // x boundary-overlay blend, y particle visibility, zw reserved
+  district : vec4f, // x boundary blend, y rain visibility, z ember visibility, w reserved
   rainArea : vec4f, // x centre u, y centre v, z radius (normalized), w feather
   fieldRect : vec4f, // hazard field placement: x u0, y v0, z du, w dv
   fieldMeta : vec4f, // x blend 0..1, y kind, z threshold, w peak value

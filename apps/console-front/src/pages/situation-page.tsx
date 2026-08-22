@@ -5,6 +5,7 @@ import type {
   PlatformEvent,
 } from "@salgil/platform-client";
 import { MapZoom } from "../components/MapZoom";
+import { useI18n } from "../i18n";
 import type { useMapBridge } from "../use-map-bridge";
 import { DistrictStatusPanel } from "./district-status-panel";
 import { EvacuationPanel } from "./evacuation-panel";
@@ -41,12 +42,11 @@ export function SituationPage({
   onPreviewEvent,
   onReset,
 }: SituationPageProps) {
+  const { t } = useI18n();
+
   return (
     <section className="view map-view" aria-labelledby="situation-title">
-      <section
-        className="spatial-workspace"
-        aria-label="Cheongsong spatial operations workspace"
-      >
+      <section className="spatial-workspace" aria-label={t("map.workspace")}>
         <MapZoom onMapCommand={onMapCommand} />
         <SituationControls
           map={map}

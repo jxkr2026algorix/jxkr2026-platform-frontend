@@ -185,8 +185,8 @@ export class Engine {
   private weatherSnow = 0;
   private weatherTemp = 0;
   private weatherDrought = 0;
-  private overlayOn = true;
-  private overlayCurrent = 1;
+  private overlayOn = false;
+  private overlayCurrent = 0;
   basemapStyle: import("../protocol").BasemapStyle = "satellite";
   private streetReady = false;
   private styleBlend = 0;
@@ -211,6 +211,8 @@ export class Engine {
   private rainArea = { x: 0.5, y: 0.5, radius: 10, feather: 0.45 };
   /** 0..1 fade applied to every particle system; see renderFrame. */
   private particleVisibility = 0;
+  /** Fire smoke and debris, which stay legible in the flat plan view. */
+  private emberVisibility = 0;
 
   private readonly debrisQueue: {
     start: number;
@@ -1360,7 +1362,7 @@ export class Engine {
       clamp(this.rainCurrent / 120, 0, 1) * RAIN_COUNT,
     );
     // Below this the systems contribute nothing visible, so skip the draws.
-    if (this.particleVisibility > 0.01) {
+    if (Math.max(this.particleVisibility, this.emberVisibility) > 0.01) {
       this.particles.draw(pass, rainInstances, fireActive);
     }
     pass.end();
@@ -1517,11 +1519,23 @@ export class Engine {
     // are sub-pixel specks — tens of thousands of them — which reads as noise
     // over the terrain rather than as weather. Fade them in as the camera
     // closes, and drop them entirely in the flat plan view.
-    this.particleVisibility =
-      (1 -
-        smoothstep(world * 0.035, world * 0.1, this.camera.currentDistance)) *
-      (1 - cam.blend * 0.92);
-    g.setVec4(ROW.district, this.districtBlend, this.particleVisibility, 0, 0);
+    // Distance is what decides whether a particle means anything: framed on a
+    // district they are sub-pixel specks, tens of thousands of them, and read
+    // as noise over the terrain rather than as weather.
+    const nearness =
+      1 - smoothstep(world * 0.05, world * 0.14, this.camera.currentDistance);
+    // Rain is vertical streaks, so a plan view has nothing to show and it goes
+    // in 2D. Smoke and embers are a plume with a footprint, which reads from
+    // directly overhead — and a fire with nothing rising off it looks dead.
+    this.particleVisibility = nearness * (1 - cam.blend * 0.92);
+    this.emberVisibility = nearness;
+    g.setVec4(
+      ROW.district,
+      this.districtBlend,
+      this.particleVisibility,
+      this.emberVisibility,
+      0,
+    );
     g.setVec4(
       ROW.rainArea,
       this.rainArea.x,

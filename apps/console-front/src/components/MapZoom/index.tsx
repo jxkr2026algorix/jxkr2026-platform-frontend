@@ -1,4 +1,5 @@
 import type { DashboardCommand } from "@salgil/map-webgpu-canvas/protocol";
+import { useI18n } from "../../i18n";
 
 interface MapZoomProps {
   readonly onMapCommand: (command: DashboardCommand) => void;
@@ -14,18 +15,27 @@ const STEP = 1.28;
  * the view can never leave the loaded terrain.
  */
 export function MapZoom({ onMapCommand }: MapZoomProps) {
+  const { t } = useI18n();
   const zoom = (factor: number) =>
     onMapCommand({ type: "map:zoom", payload: { factor } });
 
   return (
     <fieldset className="map-zoom">
-      <legend className="sr-only">Map zoom</legend>
-      <button type="button" onClick={() => zoom(1 / STEP)} aria-label="Zoom in">
+      <legend className="sr-only">{t("map.zoom")}</legend>
+      <button
+        type="button"
+        onClick={() => zoom(1 / STEP)}
+        aria-label={t("map.zoomIn")}
+      >
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M8 3.5v9M3.5 8h9" />
         </svg>
       </button>
-      <button type="button" onClick={() => zoom(STEP)} aria-label="Zoom out">
+      <button
+        type="button"
+        onClick={() => zoom(STEP)}
+        aria-label={t("map.zoomOut")}
+      >
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M3.5 8h9" />
         </svg>

@@ -339,6 +339,14 @@ async function playLocalSpread(
       minutes = -SPREAD_HOLD_STEPS * SPREAD_STEP_MINUTES;
     }
   };
+  if (hazard === "wildfire") {
+    // The field carries the extent; smoke and embers still come from the
+    // local particle systems, and they need a burning cell to rise from.
+    // Without this the fire is a coloured area with nothing above it.
+    engine.setScenario("wildfire");
+    engine.triggerAt("wildfire", centre.x, centre.y);
+    engine.simControl("play");
+  }
   showStatus(`${HAZARD_LABELS[hazard]} spread`, 2500);
   step();
   spreadTimer = window.setInterval(step, SPREAD_FRAME_MS);

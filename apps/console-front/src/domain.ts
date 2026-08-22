@@ -6,7 +6,12 @@ export type CommunityName = "Sangchon" | "Wolwe" | "Bunam" | "Juwangsan";
 /** Cheongsong-gun: the district the console opens on. */
 export const DEFAULT_DISTRICT_CODE = "47750";
 
-export const DEFAULT_MAP_SCENARIO: Scenario = "landslide";
+/**
+ * Nothing is happening when the console opens. Booting into a hazard scenario
+ * painted the whole province in susceptibility colour and told the operator an
+ * incident was under way when none had been declared.
+ */
+export const DEFAULT_MAP_SCENARIO: Scenario = "clear";
 export const DEFAULT_RAINFALL_MM_PER_HOUR = 72;
 
 export interface Community {

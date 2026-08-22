@@ -1,4 +1,6 @@
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
+import { useI18n } from "../i18n";
+import type { TranslationKey } from "../i18n/messages";
 
 /**
  * Every hazard happens in a place. There is no area-wide disaster to declare:
@@ -6,14 +8,14 @@ import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
  */
 const eventOptions: readonly {
   readonly type: DisasterType;
-  readonly label: string;
+  readonly labelKey: TranslationKey;
 }[] = [
-  { type: "rain", label: "Heavy rain" },
-  { type: "flood", label: "Flood" },
-  { type: "landslide", label: "Landslide" },
-  { type: "wildfire", label: "Wildfire" },
-  { type: "earthquake", label: "Earthquake" },
-  { type: "heatwave", label: "Heatwave" },
+  { type: "rain", labelKey: "event.rain" },
+  { type: "flood", labelKey: "event.flood" },
+  { type: "landslide", labelKey: "event.landslide" },
+  { type: "wildfire", labelKey: "event.wildfire" },
+  { type: "earthquake", labelKey: "event.earthquake" },
+  { type: "heatwave", labelKey: "event.heatwave" },
 ];
 
 type EventControlsProps = {
@@ -46,15 +48,17 @@ export function EventControls({
   onDeclare,
   onReset,
 }: EventControlsProps) {
+  const { locale, t } = useI18n();
   const selected = eventOptions.find((o) => o.type === selectedType);
+  const selectedLabel = selected ? t(selected.labelKey) : "";
 
   return (
     <div className="event-controls">
       <div className="event-control-heading">
-        <p className="rail-section-label">Declare an incident</p>
+        <p className="rail-section-label">{t("event.declare")}</p>
       </div>
       <fieldset className="event-grid" disabled={publishing}>
-        <legend className="sr-only">Hazard type</legend>
+        <legend className="sr-only">{t("event.type")}</legend>
         {eventOptions.map((option) => (
           <button
             key={option.type}
@@ -64,7 +68,7 @@ export function EventControls({
               onSelect(selectedType === option.type ? null : option.type)
             }
           >
-            <span>{option.label}</span>
+            <span>{t(option.labelKey)}</span>
           </button>
         ))}
       </fieldset>
@@ -78,15 +82,20 @@ export function EventControls({
             onClick={() => onDeclare(selected.type)}
           >
             {publishing
-              ? "Declaring…"
-              : `Mark ${selected.label.toLowerCase()} area on the map`}
+              ? t("event.declaring")
+              : t("event.markArea", {
+                  hazard:
+                    locale === "en"
+                      ? selectedLabel.toLowerCase()
+                      : selectedLabel,
+                })}
           </button>
         </div>
       ) : null}
 
       {placementArmed ? (
         <p className="placement-prompt" role="status">
-          Drag over the map to size the area, then click to place it.
+          {t("event.placeArea")}
         </p>
       ) : null}
       {errorMessage ? (
@@ -104,7 +113,7 @@ export function EventControls({
         type="button"
         onClick={onReset}
       >
-        Reset board
+        {t("event.reset")}
       </button>
     </div>
   );

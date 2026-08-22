@@ -36,9 +36,7 @@ function getInitialLocale(): Locale {
     window.localStorage.getItem(localeStorageKey),
   );
   if (storedLocale.success) return storedLocale.data;
-  return navigator.languages.some((language) => language.startsWith("ko"))
-    ? "ko"
-    : "en";
+  return "en";
 }
 
 export function I18nProvider({ children }: { readonly children: ReactNode }) {
@@ -51,7 +49,7 @@ export function I18nProvider({ children }: { readonly children: ReactNode }) {
 
   const t = useCallback(
     (key: TranslationKey, values: TranslationValues = {}) => {
-      let translated = messages[locale][key];
+      let translated: string = messages[locale][key];
       for (const [name, value] of Object.entries(values)) {
         translated = translated.replaceAll(`{${name}}`, String(value));
       }

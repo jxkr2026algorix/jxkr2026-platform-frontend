@@ -255,6 +255,7 @@ export function useMapBridge() {
           },
         });
         send({ type: "map:set-view", payload: { mode: "flat" } });
+        send({ type: "map:set-overlay", payload: { enabled: false } });
         send({
           type: "map:focus-district",
           payload: { code: DEFAULT_DISTRICT_CODE },

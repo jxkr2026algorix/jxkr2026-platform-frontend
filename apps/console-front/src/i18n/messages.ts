@@ -34,7 +34,8 @@ const english = {
   "event.heatwave": "Heatwave",
   "event.declaring": "Declaring…",
   "event.markArea": "Mark {hazard} area on the map",
-  "event.placeArea": "Drag over the map to size the area, then click to place it.",
+  "event.placeArea":
+    "Drag over the map to size the area, then click to place it.",
   "event.reset": "Reset board",
   "district.label": "District",
   "district.province": "Gyeongsangbuk-do",
@@ -94,7 +95,8 @@ const english = {
   "assistant.askLabel": "Ask data or create training",
   "assistant.placeholder": "Show landslide conditions in Cheongsong",
   "assistant.send": "Send question",
-  "assistant.evidence": "Evidence only · Final decisions require operator review",
+  "assistant.evidence":
+    "Evidence only · Final decisions require operator review",
   "assistant.open": "Open data assistant",
   "assistant.ask": "Ask data",
   "assistant.role": "Assistant",
@@ -123,7 +125,8 @@ const korean: Record<TranslationKey, string> = {
   "map.frameTitle": "살길 3D 복합 재난 지도",
   "map.loading": "운영 지도를 불러오는 중입니다",
   "map.unavailable": "3D 지도를 사용할 수 없습니다",
-  "map.reconnect": "렌더러를 다시 연결하는 동안에도 운영 제어를 사용할 수 있습니다.",
+  "map.reconnect":
+    "렌더러를 다시 연결하는 동안에도 운영 제어를 사용할 수 있습니다.",
   "map.workspace": "청송 공간 운영 작업 영역",
   "map.controls": "재난 및 지도 제어",
   "map.title": "청송 운영 지도",
@@ -180,7 +183,8 @@ const korean: Record<TranslationKey, string> = {
   "route.plan": "경로 계산",
   "route.sample": "샘플 데이터",
   "route.clear": "지우기",
-  "route.serviceError": "경로 서비스에 연결할 수 없습니다. 샘플 데이터로 화면을 확인하세요.",
+  "route.serviceError":
+    "경로 서비스에 연결할 수 없습니다. 샘플 데이터로 화면을 확인하세요.",
   "route.sampleFlag": "샘플 데이터 · 경로 서비스에서 받은 결과가 아닙니다.",
   "route.nearest": "가장 가까운 도달 가능 대피소",
   "route.travel": "이동",
@@ -190,13 +194,16 @@ const korean: Record<TranslationKey, string> = {
   "route.noShelter": "도달 가능한 대피소를 찾지 못했습니다.",
   "route.unreachable": "접근 불가",
   "route.closures": "현장 보고로 확인된 통제 구간 {count}건을 반영했습니다.",
-  "route.predictionStub": "예측 모델은 데모용입니다. 확산 결과를 참고용으로만 확인하세요.",
+  "route.predictionStub":
+    "예측 모델은 데모용입니다. 확산 결과를 참고용으로만 확인하세요.",
   "route.minutes": "{count}분",
   "assistant.label": "공공데이터 도우미",
   "assistant.title": "데이터 도우미",
   "assistant.close": "데이터 도우미 닫기",
-  "assistant.connectionError": "데이터 연결을 사용할 수 없습니다. 도우미를 다시 열어 재시도하세요.",
-  "assistant.welcome": "경북 공공데이터를 질문하거나 훈련 상황을 시작하세요. 훈련 이벤트는 대시보드와 모바일 앱에 동시에 표시됩니다.",
+  "assistant.connectionError":
+    "데이터 연결을 사용할 수 없습니다. 도우미를 다시 열어 재시도하세요.",
+  "assistant.welcome":
+    "경북 공공데이터를 질문하거나 훈련 상황을 시작하세요. 훈련 이벤트는 대시보드와 모바일 앱에 동시에 표시됩니다.",
   "assistant.checking": "공공데이터 확인 중",
   "assistant.askLabel": "데이터 질문 또는 훈련 생성",
   "assistant.placeholder": "청송 산사태 상황을 보여줘",
@@ -207,8 +214,10 @@ const korean: Record<TranslationKey, string> = {
   "assistant.role": "도우미",
   "assistant.you": "나",
   "assistant.sources": "출처",
-  "assistant.loadError": "공공데이터를 불러오지 못했습니다. 잠시 후 다시 시도하세요.",
-  "assistant.trainingSync": "{headline} 훈련 이벤트를 플랫폼 스트림을 통해 대시보드와 모바일 앱에 동기화하고 있습니다.",
+  "assistant.loadError":
+    "공공데이터를 불러오지 못했습니다. 잠시 후 다시 시도하세요.",
+  "assistant.trainingSync":
+    "{headline} 훈련 이벤트를 플랫폼 스트림을 통해 대시보드와 모바일 앱에 동기화하고 있습니다.",
   "assistant.suggestWildfire": "청송 산불 훈련 이벤트 시작",
   "assistant.suggestHealth": "데이터 연결 상태 보여줘",
   "assistant.suggestRain": "호우 훈련 이벤트 시작",
