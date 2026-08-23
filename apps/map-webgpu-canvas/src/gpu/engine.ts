@@ -524,12 +524,24 @@ export class Engine {
   // -------------------------------------------------------------------------
 
   setScenario(scenario: Scenario, rainfallOverride?: number): void {
+    const changed = scenario !== this.scenario;
     this.scenario = scenario;
-    this.scenarioStart = this.simTime;
     const preset = PRESETS[scenario];
     this.rainTarget = rainfallOverride ?? preset.rainfall;
     this.wind = [...preset.wind];
     this.apiGain = preset.apiGain;
+    if (!changed) {
+      // Re-stating the scenario already running is not a request to run it
+      // again. Both consoles send this from effects that also watch the route,
+      // the shelters and the plan, so it arrives many times per incident — and
+      // every one of those used to restart the scenario and re-arm its demo
+      // event, dropping another quake on the Gyeongju preset a second and a
+      // half later. That is why the epicentre kept coming back to one place
+      // no matter where the operator marked.
+      this.applyAutoView();
+      return;
+    }
+    this.scenarioStart = this.simTime;
     if (preset.autoIgnite) {
       this.autoIgniteAt = this.simTime + 1.2;
     }
@@ -618,6 +630,12 @@ export class Engine {
   triggerAt(hazard: TriggerKind, x: number, y: number): void {
     const px = clamp(x, 0.01, 0.99);
     const py = clamp(y, 0.01, 0.99);
+    // Someone has said where this happens, so the scenario's own demo event is
+    // not wanted any more. Left armed, it fired shortly afterwards at the
+    // preset site and took the camera with it — the hazard the operator placed
+    // was correct for a second and then replaced.
+    this.autoEvent = null;
+    this.autoIgniteAt = 0;
     switch (hazard) {
       case "wildfire":
         this.ignite(px, py);
