@@ -16,9 +16,25 @@
   --on-dark: #fff;
   --button-dark: rgba(29, 29, 31, 0.92);
   --button-dark-hover: #000;
-  --floating-bg: rgba(248, 250, 252, 0.8);
-  --floating-bg-soft: rgba(248, 250, 252, 0.82);
-  --floating-bg-strong: rgba(248, 250, 252, 0.86);
+  /* Written unprefixed only, on purpose. Pairing it by hand with
+     `-webkit-backdrop-filter` made the minifier fold the two into one
+     declaration and emit just the prefixed half, so the deployed console
+     shipped a property Firefox does not implement and no blur at all. Left
+     alone, lightningcss emits both from this one line.
+
+     16px, not the 24px this used to run at. Past roughly 20px the terrain
+     behind a panel is smoothed into a flat wash, and a panel with nothing
+     recognisable behind it reads as opaque — which is exactly the complaint
+     that the blur "is not there" on the deployed console. The saturation is
+     nudged up rather than down for the same reason: it keeps the map's colour
+     showing through instead of greying it out. */
+  --panel-blur: blur(16px) saturate(1.06);
+  /* Alpha buys legibility over a busy map, but every point of it is a point
+     of backdrop the blur cannot show. These are as opaque as the text will
+     tolerate and no more. */
+  --floating-bg: rgba(248, 250, 252, 0.72);
+  --floating-bg-soft: rgba(248, 250, 252, 0.75);
+  --floating-bg-strong: rgba(248, 250, 252, 0.79);
   --floating-border: rgba(255, 255, 255, 0.74);
   --floating-border-strong: rgba(60, 60, 67, 0.3);
   --floating-control: rgba(255, 255, 255, 0.64);
@@ -33,8 +49,8 @@
   --nav-text-hover: rgba(29, 29, 31, 0.78);
   --dark-divider: rgba(0, 0, 0, 0.1);
   --button-border: rgba(0, 0, 0, 0.08);
-  --sidebar-dark-surface: rgba(17, 18, 22, 0.8);
-  --sidebar-dark-surface-strong: rgba(12, 13, 16, 0.86);
+  --sidebar-dark-surface: rgba(17, 18, 22, 0.7);
+  --sidebar-dark-surface-strong: rgba(12, 13, 16, 0.76);
   --sidebar-dark-ink: #f5f7fa;
   --sidebar-dark-ink-secondary: rgba(245, 247, 250, 0.7);
   --sidebar-dark-ink-tertiary: rgba(245, 247, 250, 0.48);
@@ -53,6 +69,23 @@
   --radius-control: 10px;
   --radius-layer: 14px;
   --radius-pill: 999px;
+}
+
+/* The translucency above is paid for by the blur. Where the blur does not run
+   — a browser without the property, or a machine where the compositor has
+   refused it — the panels would be plain see-through rectangles with the map
+   legible straight through the text. These put the opacity back. */
+@supports not (
+    (backdrop-filter: blur(1px)) or
+    (-webkit-backdrop-filter: blur(1px))
+  ) {
+  :root {
+    --floating-bg: rgba(248, 250, 252, 0.94);
+    --floating-bg-soft: rgba(248, 250, 252, 0.95);
+    --floating-bg-strong: rgba(248, 250, 252, 0.96);
+    --sidebar-dark-surface: rgba(17, 18, 22, 0.94);
+    --sidebar-dark-surface-strong: rgba(12, 13, 16, 0.96);
+  }
 }
 
 * {
@@ -196,8 +229,7 @@ p {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-strong);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: var(--panel-blur);
   transform: translate(-50%, -50%);
 }
 
@@ -327,8 +359,7 @@ p {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-soft);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: var(--panel-blur);
   transform: translateX(-50%);
   pointer-events: auto;
   scrollbar-width: none;
@@ -391,8 +422,7 @@ p {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-soft);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: var(--panel-blur);
   pointer-events: auto;
 }
 
@@ -514,8 +544,7 @@ p {
 .object-inspector {
   border: 0;
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: var(--panel-blur);
 }
 
 .surface-soft {
@@ -548,8 +577,7 @@ p {
   overflow: visible;
   border-radius: var(--radius-layer);
   background: var(--floating-bg);
-  backdrop-filter: blur(24px) saturate(0.92);
-  -webkit-backdrop-filter: blur(24px) saturate(0.92);
+  backdrop-filter: var(--panel-blur);
   pointer-events: auto;
 }
 
@@ -721,8 +749,7 @@ textarea {
   border-radius: 12px;
   background: var(--floating-popover);
   box-shadow: var(--floating-popover-shadow);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: var(--panel-blur);
   overscroll-behavior: contain;
 }
 
@@ -1193,7 +1220,6 @@ textarea {
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   transition:
     opacity 140ms ease-out,
     transform 140ms ease-out;
@@ -1212,7 +1238,7 @@ textarea {
 }
 
 .app-shell.is-assistant-open .operations-timeline {
-  width: min(680px, calc(100vw - 704px));
+  width: min(680px, calc(100vw - var(--assistant-drawer-width, 288px) - 416px));
 }
 
 .assistant-launcher {
@@ -1256,18 +1282,69 @@ textarea {
   bottom: 16px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: 288px;
+  width: var(--assistant-drawer-width, 288px);
+  min-width: 288px;
   overflow: hidden;
   border: 1px solid var(--floating-border);
   border-radius: var(--radius-layer);
   background: var(--floating-bg-strong);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(24px) saturate(0.92);
-  -webkit-backdrop-filter: blur(24px) saturate(0.92);
+  backdrop-filter: var(--panel-blur);
 }
 
 .view-situation .assistant-drawer {
   border: 0;
+}
+
+/* The drag target sits on the panel's left border and is wider than the line
+   it draws: a 1px hit area is a 1px hit area, and the panel edge is the last
+   place to make the operator aim. Kept inside the panel rather than straddling
+   its edge, because the panel clips its overflow and half the target would be
+   cut off. */
+.assistant-resize {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 11px;
+  height: auto;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.assistant-resize::after {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ink-tertiary);
+  content: "";
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.assistant-resize:hover::after,
+.assistant-resize:focus-visible::after,
+.assistant-drawer.is-resizing .assistant-resize::after {
+  opacity: 0.7;
+}
+
+.assistant-resize:focus-visible {
+  outline: none;
+}
+
+/* While dragging, the cursor belongs to the drag for as long as it lasts —
+   crossing the transcript must not turn it into a text caret. */
+.assistant-drawer.is-resizing,
+.assistant-drawer.is-resizing * {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .assistant-header {
@@ -1387,6 +1464,75 @@ textarea {
 
 .assistant-message.is-user p {
   color: var(--ink);
+}
+
+/* Rendered Markdown from the model. Tight vertical rhythm on purpose: this is
+   a 288px column by default, and Markdown's usual paragraph spacing turns a
+   six-line answer into a scroll. */
+.assistant-markdown > * {
+  margin: 0;
+}
+
+.assistant-markdown > * + * {
+  margin-top: 8px;
+}
+
+.assistant-markdown .assistant-md-heading {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.assistant-markdown strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.assistant-markdown :is(ul, ol) {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0 0 0 17px;
+  border-top: 0;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.assistant-markdown li::marker {
+  color: var(--ink-tertiary);
+}
+
+/* Situation codes and incident IDs. These get read out over a radio, so they
+   are set apart from the prose and allowed to break anywhere rather than
+   pushing the panel into a horizontal scroll. */
+.assistant-markdown code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--floating-control-weak);
+  color: var(--ink);
+  font-size: 11px;
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+}
+
+.assistant-markdown pre {
+  padding: 9px 10px;
+  border-radius: var(--radius-control);
+  background: var(--floating-control-weak);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.assistant-markdown pre code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.assistant-markdown a {
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .assistant-message ul {
@@ -2090,8 +2236,7 @@ tbody tr:last-child td {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-strong);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(24px) saturate(0.92);
-  -webkit-backdrop-filter: blur(24px) saturate(0.92);
+  backdrop-filter: var(--panel-blur);
   pointer-events: auto;
   transition:
     background-color 160ms ease-out,
@@ -2348,7 +2493,7 @@ tbody tr:last-child td {
   right: 16px;
   bottom: 16px;
   left: auto;
-  width: 288px;
+  width: var(--assistant-drawer-width, 288px);
 }
 
 .app-shell.is-assistant-open .object-inspector,
@@ -2638,8 +2783,7 @@ tbody tr:last-child td {
   border-radius: 8px;
   background: var(--floating-bg-strong);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: var(--panel-blur);
   overflow: hidden;
   pointer-events: auto;
 }
@@ -2718,37 +2862,24 @@ tbody tr:last-child td {
 
 /* --- Assistant, while it is generating ---------------------------------- */
 
-/* The one place this product uses a gradient. It is not decoration: it marks
-   the live edge of the text so a growing answer is distinguishable from a
-   finished one at a glance, and it stops the moment the answer settles. */
+/* Arriving text is set exactly like settled text. It used to be larger and
+   darker, so every answer resized itself the instant it finished — the last
+   thing the eye should be doing when the content stops moving. */
 .assistant-stream p {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.62;
-  white-space: pre-wrap;
-  color: var(--ink);
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
-.assistant-stream em {
-  font-style: normal;
-  background: linear-gradient(
-    100deg,
-    var(--ink) 0%,
-    var(--ink) 20%,
-    #6f8dff 45%,
-    #b98cff 60%,
-    var(--ink) 85%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: assistant-sweep 1.5s linear infinite;
-}
+/* The one place this product uses a gradient. It is not decoration: a caret
+   at the live edge marks the answer as still being written, through the
+   pauses between tokens, and it stops the moment the answer settles.
 
-/* A caret at the very end, so the answer reads as still being written even
-   during the pauses between tokens. */
-.assistant-stream p::after {
+   On the last block only. The text is parsed as Markdown while it streams, so
+   an answer mid-list is several elements, and a caret after each of them
+   reads as several answers. */
+.assistant-stream .assistant-markdown > :last-child::after {
   content: "";
   display: inline-block;
   width: 2px;
@@ -2789,14 +2920,9 @@ tbody tr:last-child td {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .assistant-stream em,
-  .assistant-stream p::after,
+  .assistant-stream .assistant-markdown > :last-child::after,
   .assistant-pending i {
     animation: none;
-  }
-  .assistant-stream em {
-    background: none;
-    color: var(--ink);
   }
 }
 
@@ -2821,8 +2947,7 @@ tbody tr:last-child td {
   border-radius: var(--radius-layer);
   background: var(--floating-bg-soft);
   box-shadow: var(--floating-shadow);
-  backdrop-filter: blur(18px) saturate(0.96);
-  -webkit-backdrop-filter: blur(18px) saturate(0.96);
+  backdrop-filter: var(--panel-blur);
   font-size: 12px;
   line-height: 1.3;
   letter-spacing: -0.01em;
