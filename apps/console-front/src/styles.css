@@ -239,6 +239,10 @@ p {
   align-items: center;
   gap: 7px;
   min-width: 0;
+  /* The logos have fixed widths and will not shrink, so a narrow header lets
+     them spill past the lockup and cover the controls beside it — the theme
+     button was unclickable that way. */
+  overflow: hidden;
   color: var(--focus);
 }
 
@@ -2035,11 +2039,19 @@ tbody tr:last-child td {
 }
 
 .operations-panel-left {
+  display: flex;
+  flex-direction: column;
   bottom: 16px;
   max-height: none;
   height: calc(100dvh - 32px);
-  padding-bottom: 72px;
   overflow-y: auto;
+}
+
+/* Pushed to the bottom, and inset like every other block in the rail — each
+   one carries its own 16px rather than the panel padding them. */
+.rail-footer {
+  margin-top: auto;
+  padding: 12px 16px 16px;
 }
 
 .district-selector {
@@ -2087,26 +2099,37 @@ tbody tr:last-child td {
     color 160ms ease-out;
 }
 
-/* Top of the right rail: the address of the resident app, and the theme.
-   Both belong to the whole screen rather than to any one section, so they sit
-   above the district heading rather than inside it. */
+/* Top of the right rail. Full width because it is read across a room off a
+   projected screen, not clicked on this one. */
 .viewport-actions {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  display: block;
   margin-bottom: 14px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
 
-.viewport-action {
-  display: grid;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  place-items: center;
+.viewport-qr {
+  display: block;
+  color: var(--ink-secondary);
+  text-decoration: none;
+}
+
+.viewport-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Language and theme together: both are choices about how the screen is
+   displayed, and one of them used to be buried in a data panel. */
+/* Bottom of the left rail, pushed there by `margin-top: auto`. It is the last
+   thing in the panel because it is the least often used. */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--floating-control-weak);
@@ -2118,39 +2141,26 @@ tbody tr:last-child td {
     color 120ms ease-out;
 }
 
-.viewport-action:hover {
+.theme-toggle:hover {
   border-color: var(--line-strong);
   background: var(--floating-control-hover);
   color: var(--ink);
 }
 
-.viewport-action svg {
+.theme-toggle span {
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+.theme-toggle svg {
+  flex: none;
   width: 16px;
   height: 16px;
   fill: none;
   stroke: currentcolor;
   stroke-linecap: round;
   stroke-width: 1.6;
-}
-
-/* The one thing the audience is asked to act on, so it is a link as well as a
-   code — on a laptop there is no phone to scan with. */
-.viewport-qr {
-  display: block;
-  color: var(--ink-secondary);
-  text-decoration: none;
-  transition: color 120ms ease-out;
-}
-
-.viewport-qr:hover {
-  color: var(--ink);
-}
-
-.viewport-qr svg {
-  display: block;
-  flex: none;
-  width: 96px;
-  height: 96px;
 }
 
 .district-status-kicker,

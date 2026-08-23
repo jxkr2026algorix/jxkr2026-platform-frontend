@@ -125,7 +125,9 @@ export function DistrictStatusPanel({
       className="district-status-panel"
       aria-label={t("district.summary", { district: districtName })}
     >
-      <ViewportActions mobileUrl={mobileUrl} />
+      <div className="viewport-actions">
+        <ViewportActions mobileUrl={mobileUrl} />
+      </div>
       <p className="district-status-kicker">{t("district.status")}</p>
       <h2>{districtName}</h2>
       <section aria-label={t("district.weatherConditions")}>
