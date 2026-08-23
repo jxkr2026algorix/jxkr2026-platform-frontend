@@ -1,8 +1,12 @@
 :root {
   --color-ink: #171719;
   --color-ink-subtle: #5f6269;
-  --color-ink-muted: #96999f;
-  --color-primary: #2f6ff2;
+  /* Was #96999f — 2.86:1 on white, against a 4.5:1 requirement, and it
+     carried the shelter labels, the timestamp and the map attribution. */
+  --color-ink-muted: #74767a;
+  /* Was #2f6ff2 — white on it is 4.49:1, and the button label is 14px bold,
+     which WCAG does not count as large text. */
+  --color-primary: #2861e0;
   --color-primary-hover: #2957e8;
   --color-primary-soft: #edf3ff;
   --color-critical: #b91c1c;
@@ -46,9 +50,36 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-button:focus-visible {
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 3px;
+}
+
+/**
+ * Present for a screen reader, absent for everyone else. Not `display: none`
+ * and not `visibility: hidden` — both remove it from the accessibility tree,
+ * which is the one place this text has to exist.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A live region that is empty right now still has to be in the DOM, so it is
+   emptied rather than unmounted — and then it must not take up space. */
+.drill-strip:empty,
+.map-loading:empty,
+.live-spread:empty {
+  display: none;
 }
 
 .mobile-shell {
@@ -126,6 +157,11 @@ button:focus-visible {
 }
 
 .mobile-map-zoom {
+  /* A fieldset, because the role this needs is `group` and that is the
+     element that carries it natively. Its user-agent box has to be undone. */
+  margin: 0;
+  padding: 0;
+  min-width: 0;
   position: absolute;
   z-index: 2;
   top: max(14px, env(safe-area-inset-top));
@@ -224,6 +260,39 @@ button:focus-visible {
   transform: translateX(-50%);
 }
 
+/**
+ * The sentence that stops an exercise being mistaken for a fire.
+ *
+ * It had no rule whatsoever — it rendered as a default paragraph, at body
+ * size, indistinguishable from the guidance underneath it. It is the one
+ * thing on this screen that must not be missable, so it is loud on purpose,
+ * and it says so in words rather than in a colour: a red bar communicates
+ * nothing to a person who cannot see it, and the wrong thing to a person who
+ * reads red as danger.
+ */
+.drill-strip {
+  display: grid;
+  gap: 2px;
+  position: relative;
+  z-index: 4;
+  margin: 0;
+  padding: 10px var(--space-page);
+  background: #7a3d00;
+  color: #fff;
+  text-align: center;
+}
+
+.drill-strip strong {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.drill-strip span {
+  font-size: 13px;
+  opacity: 0.92;
+}
+
 .mobile-intro {
   align-items: flex-start;
   justify-content: space-between;
@@ -239,13 +308,39 @@ button:focus-visible {
   letter-spacing: -0.04em;
 }
 
-.mobile-intro > span {
+/**
+ * Whether this is real. It used to be 11px muted grey at 2.9:1, right-aligned
+ * against the headline — the least legible thing on the screen, carrying the
+ * most consequential word on it.
+ */
+.incident-mode {
+  display: grid;
   flex: 0 0 auto;
-  padding-top: 3px;
-  color: var(--color-ink-muted);
-  font-size: 11px;
-  line-height: 1.45;
+  gap: 1px;
+  margin: 0;
+  padding: 4px 9px;
+  border-radius: var(--radius-control);
+  background: var(--color-critical-soft);
+  color: var(--color-critical);
   text-align: right;
+}
+
+.incident-mode.is-training {
+  background: #fdf1e3;
+  color: #7a3d00;
+}
+
+.incident-mode strong {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.incident-mode time {
+  color: var(--color-ink-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .panel-heading {
@@ -310,15 +405,39 @@ button:focus-visible {
     display: block;
   }
 
-  .mobile-intro > span {
-    display: block;
-    padding-top: 7px;
+  .incident-mode {
+    justify-items: start;
+    margin-top: 8px;
     text-align: left;
   }
 
   .guidance-list > div {
     grid-template-columns: 92px minmax(0, 1fr);
   }
+}
+
+/* Which way the shelter is, for anyone who cannot read it off the map. */
+.route-directions {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-ink-subtle);
+  font-weight: 500;
+}
+
+/* The one failure path where the app has nothing left to offer but a number
+   to call, so that number is a tap target rather than a sentence. */
+.emergency-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 10px;
+  padding: 0 18px;
+  border-radius: var(--radius-control);
+  background: var(--color-critical);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
 }
 
 /* The routing service itself failed. Never replaced with an invented route:

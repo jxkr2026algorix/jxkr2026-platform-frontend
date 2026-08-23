@@ -1,4 +1,4 @@
-import { cameraForBbox } from "@salgil/map-webgpu-canvas/districts";
+import { cameraForBbox, districtAt } from "@salgil/map-webgpu-canvas/districts";
 import {
   DASHBOARD_SOURCE,
   type DashboardCommand,
@@ -14,6 +14,7 @@ import {
   demoOriginNear,
   openSituationStream,
   type PlatformEvent,
+  type RouteLeg,
   type RoutePlan,
   recommendedLeg,
   SCENARIO_TO_HAZARD,
@@ -116,6 +117,65 @@ function cameraForRoute(
   };
 }
 
+/**
+ * Which way the shelter is, in words.
+ *
+ * Everything else this screen says about the route — the line on the map, the
+ * risk zones it bends around, the closed roads — is pixels. Someone using a
+ * screen reader is handed a shelter name and a duration and told to walk. A
+ * bearing and a distance are the least that makes the instruction followable
+ * without seeing it.
+ */
+const COMPASS = [
+  "north",
+  "north-east",
+  "east",
+  "south-east",
+  "south",
+  "south-west",
+  "west",
+  "north-west",
+] as const;
+
+function bearingWord(
+  from: { lat: number; lon: number },
+  to: { lat: number; lon: number },
+): string {
+  const fromLat = (from.lat * Math.PI) / 180;
+  const toLat = (to.lat * Math.PI) / 180;
+  const deltaLon = ((to.lon - from.lon) * Math.PI) / 180;
+  const y = Math.sin(deltaLon) * Math.cos(toLat);
+  const x =
+    Math.cos(fromLat) * Math.sin(toLat) -
+    Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLon);
+  const degrees = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  return COMPASS[Math.round(degrees / 45) % 8] ?? "north";
+}
+
+function walkingDirections(
+  leg: RouteLeg | undefined,
+  from: { lat: number; lon: number },
+): string | null {
+  if (!leg?.found) return null;
+  const end = leg.geometry.at(-1);
+  const lon = end?.[0];
+  const lat = end?.[1];
+  const distance =
+    typeof leg.distance_m === "number"
+      ? leg.distance_m >= 1000
+        ? `${(leg.distance_m / 1000).toFixed(1)} km`
+        : `${Math.round(leg.distance_m / 10) * 10} m`
+      : null;
+  const heading =
+    typeof lat === "number" && typeof lon === "number"
+      ? bearingWord(from, { lat, lon })
+      : null;
+  if (!distance && !heading) return null;
+  if (distance && heading)
+    return `About ${distance} away, heading ${heading} from you.`;
+  return distance ? `About ${distance} away.` : `Heading ${heading} from you.`;
+}
+
 type PlatformRiskZone = NonNullable<PlatformEvent["zones"]>[number];
 
 /** A radius as a polygon ring, since the zone contract has no circle form. */
@@ -184,6 +244,16 @@ export function App() {
   const [routeError, setRouteError] = useState(false);
   const notifiedIncidentRef = useRef("");
   const blockedRouteRef = useRef("");
+  const headlineRef = useRef<HTMLHeadingElement>(null);
+
+  /**
+   * Where focus goes when the notification dialog closes. Without this it
+   * lands on `document.body` and a screen reader starts the document over —
+   * at the moment an alert may be arriving.
+   */
+  const focusHeadline = useCallback(() => {
+    headlineRef.current?.focus();
+  }, []);
 
   // The stream is what makes this a warning rather than a page someone has to
   // refresh. Polling still runs underneath as the fallback: a resident whose
@@ -244,6 +314,8 @@ export function App() {
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [mapLocation.origin]);
+
+  const declaredAt = streamedAt ?? event?.at ?? null;
 
   /**
    * Spawn near the incident rather than at one shared point. Every phone
@@ -327,9 +399,35 @@ export function App() {
   // as real teaches people to ignore the next one — and the real one after.
   const drill =
     streamDrill || event?.drill === true || event?.mode === "training";
-  const declaredAt = streamedAt ?? event?.at ?? null;
-
   const best = plan ? recommendedLeg(plan) : undefined;
+
+  /**
+   * What the assertive region says. Held in state rather than derived, so it
+   * changes exactly when the incident does: recomputing it every render made
+   * the region re-announce on unrelated updates, and an evacuation order
+   * repeating every few seconds is one people learn to tune out.
+   */
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    if (!event) {
+      setAnnouncement("");
+      return;
+    }
+    setAnnouncement(
+      `${drill ? "Training exercise, not a real emergency. " : ""}${event.headline}. ${event.instruction}`,
+    );
+  }, [event, drill]);
+
+  /**
+   * The tab and lock-screen title is the one string the OS shows without the
+   * app being open. "SALGIL Mobile" spends it on the product name.
+   */
+  useEffect(() => {
+    document.title = event
+      ? `${drill ? "[Training] " : ""}${event.headline} · SALGIL`
+      : "SALGIL — Evacuation guidance";
+  }, [event, drill]);
+
   const routeCamera = useMemo(
     () => (best ? cameraForRoute(best.geometry) : null),
     [best],
@@ -433,23 +531,48 @@ export function App() {
     });
 
     const eventVersion = event ? `${event.id}:${event.sequence}` : "";
+    // Real coordinates first, the normalized point only as a fallback. A
+    // normalized point is a position in the viewport that produced it — the
+    // console's wide desktop camera — and this phone renders it against a
+    // 58dvh frame with a different aspect, which is how the two screens ended
+    // up showing the same incident in two different places. An incident
+    // declared from the assistant has no normalized point at all, so on this
+    // path it used to raise nothing here whatsoever.
+    const ignitionAt = declaredAt ?? event?.location ?? null;
     if (
-      event?.location &&
+      ignitionAt &&
+      event &&
       isTriggerKind(event.type) &&
       lastTriggeredEventRef.current !== eventVersion
     ) {
       lastTriggeredEventRef.current = eventVersion;
       postMapCommand({
         type: "map:trigger",
-        payload: {
-          hazard: event.type,
-          x: event.location.x,
-          y: event.location.y,
-        },
+        payload: { hazard: event.type, ...ignitionAt },
       });
     }
+    // Follow the incident. The frame was pinned to district 47750 in the
+    // iframe URL and never moved, so an incident anywhere else was triggered
+    // at the right coordinate and drawn off the edge of the screen — which
+    // read, correctly, as "the phone always shows Cheongsong".
+    if (declaredAt) {
+      const district = districtAt(declaredAt.lat, declaredAt.lon);
+      if (district) {
+        postMapCommand({
+          type: "map:focus-district",
+          payload: { code: district },
+        });
+      }
+    }
+    // The route frames both ends, so it wins once there is one. Before that,
+    // the incident itself is the only thing worth looking at.
     if (routeCamera) {
       postMapCommand({ type: "map:set-camera", payload: routeCamera });
+    } else if (declaredAt) {
+      postMapCommand({
+        type: "map:set-camera",
+        payload: { center: declaredAt, distanceMeters: 24_000 },
+      });
     }
   }, [
     declaredAt,
@@ -502,9 +625,11 @@ export function App() {
     event?.instruction ??
     "Stay clear of hazard zones and follow official evacuation guidance.";
   const shelter = best?.shelter_name ?? "No reachable shelter yet";
+  // An em dash announces as nothing at all, and "nothing" is not the same
+  // answer as "we do not know yet".
   const travelTime =
     best?.duration_minutes === null || best?.duration_minutes === undefined
-      ? "—"
+      ? "Not known yet"
       : `${Math.round(best.duration_minutes)} min`;
   /**
    * Shelters the router could not reach. Only worth showing when there is no
@@ -515,21 +640,39 @@ export function App() {
   const unreachable = best
     ? []
     : (plan?.routes.filter((leg) => !leg.found) ?? []);
+  const directions = walkingDirections(best, origin);
 
   return (
     <main className="mobile-shell">
+      {/*
+        The one region that interrupts. It is in the DOM from first paint and
+        never unmounts, because a live region created at the same moment as its
+        text is a live region most screen readers never announce — and the text
+        it carries is the evacuation order. `alert` rather than `status`: this
+        has to cut across whatever is being read, not queue behind it.
+      */}
+      <div className="sr-only" role="alert" aria-atomic="true">
+        {announcement}
+      </div>
+
       <div
         className={`mobile-map${isSheetCollapsed ? " is-sheet-collapsed" : ""}`}
+        aria-busy={!mapReady}
       >
         <iframe
           ref={frameRef}
           src={mapLocation.src}
           title="SALGIL evacuation map"
-          tabIndex={-1}
           onLoad={() => setMapReady(false)}
         />
-        {!mapReady ? <span className="map-loading">Loading map</span> : null}
-        <nav className="mobile-map-zoom" aria-label="Map zoom controls">
+        {/* Persistent, for the same reason as the alert above. Empty is
+            hidden by CSS rather than by unmounting. */}
+        <p className="map-loading" role="status">
+          {mapReady ? "" : "Loading map"}
+        </p>
+        {/* Zoom is not navigation. As a nav it put a second landmark in the
+            rotor of an app that has three. */}
+        <fieldset className="mobile-map-zoom" aria-label="Map zoom">
           <button
             type="button"
             aria-label="Zoom in"
@@ -537,7 +680,7 @@ export function App() {
               postMapCommand({ type: "map:zoom", payload: { factor: 0.72 } })
             }
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M12 5v14M5 12h14" />
             </svg>
           </button>
@@ -548,62 +691,96 @@ export function App() {
               postMapCommand({ type: "map:zoom", payload: { factor: 1.38 } })
             }
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M5 12h14" />
             </svg>
           </button>
-        </nav>
+        </fieldset>
+        {/* aria-disabled, not disabled: a disabled button leaves the tab order
+            entirely, so the one user who cannot see that there is no route is
+            also the one never told why. */}
         <button
           className="fit-route-button"
           type="button"
-          disabled={!routeCamera}
-          onClick={fitRoute}
+          aria-disabled={!routeCamera}
+          aria-describedby={routeCamera ? undefined : "fit-route-reason"}
+          onClick={() => routeCamera && fitRoute()}
         >
           View full route
         </button>
+        {routeCamera ? null : (
+          <span id="fit-route-reason" className="sr-only">
+            No route to show yet
+          </span>
+        )}
       </div>
 
-      {drill ? (
-        <p className="drill-strip" role="status">
-          훈련 상황입니다 — 실제 재난이 아닙니다
-        </p>
-      ) : null}
+      {/*
+        Whether this is real. Both languages: the document is English, the
+        sentence that has to be believed is Korean, and a screen reader with an
+        English voice reads unmarked Hangul as noise.
+      */}
+      <p className="drill-strip" role="status">
+        {drill ? (
+          <>
+            <strong lang="ko">훈련 상황입니다 — 실제 재난이 아닙니다</strong>
+            <span>Training exercise — not a real emergency</span>
+          </>
+        ) : null}
+      </p>
 
       <section
         className={`mobile-sheet${isSheetCollapsed ? " is-collapsed" : ""}`}
-        aria-live="polite"
+        aria-labelledby="incident-headline"
       >
         <button
           className="sheet-toggle"
           type="button"
           aria-controls="mobile-sheet-content"
           aria-expanded={!isSheetCollapsed}
-          aria-label={
-            isSheetCollapsed
-              ? "Show evacuation guidance"
-              : "Hide evacuation guidance"
-          }
           onClick={handleSheetToggle}
         >
           <span className="sheet-handle" aria-hidden="true" />
-          {isSheetCollapsed ? <span>Show guidance</span> : null}
+          {/* Labelled in both states. The grab handle alone was a 34x4px bar
+              at 1.15:1 against the sheet — no name, and nothing to see. */}
+          <span>{isSheetCollapsed ? "Show guidance" : "Hide guidance"}</span>
         </button>
 
-        <div id="mobile-sheet-content" hidden={isSheetCollapsed}>
-          <div className="mobile-intro">
-            <div>
-              <h1>{event?.headline ?? "No active incident in your area"}</h1>
-            </div>
-            <span>
+        {/*
+          Outside the collapsible container on purpose. Everything used to be
+          inside it, so a collapsed sheet left the document with no heading, no
+          incident and no instruction — and the map behind it is an opaque
+          iframe. Collapsing a panel must not empty the page.
+        */}
+        <div className="mobile-intro">
+          <h1 id="incident-headline" ref={headlineRef} tabIndex={-1}>
+            {event?.headline ?? "No active incident in your area"}
+          </h1>
+          <p className={`incident-mode${drill ? " is-training" : ""}`}>
+            <strong>
               {event
-                ? `${event.mode === "training" ? "Training" : "Alert"} · ${timeFormatter.format(new Date(event.createdAt))}`
-                : "Monitoring official alerts"}
-            </span>
-          </div>
+                ? drill
+                  ? "Training exercise"
+                  : "Live alert"
+                : "Monitoring"}
+            </strong>
+            {event ? (
+              <time dateTime={event.createdAt}>
+                {timeFormatter.format(new Date(event.createdAt))}
+              </time>
+            ) : null}
+          </p>
+        </div>
 
+        <div id="mobile-sheet-content" hidden={isSheetCollapsed}>
           <div className="panel-heading">
             <h2>Evacuation</h2>
-            <strong>{travelTime}</strong>
+            <strong>
+              {/* The number alone reads as "12 min" next to "Evacuation",
+                  with nothing saying 12 minutes of what. */}
+              <span className="sr-only">Estimated walking time: </span>
+              {travelTime}
+            </strong>
           </div>
           <dl className="guidance-list">
             <div>
@@ -618,6 +795,9 @@ export function App() {
                 {best
                   ? "Suggested route, avoiding predicted risk"
                   : "Awaiting a reachable route"}
+                {directions ? (
+                  <span className="route-directions">{directions}</span>
+                ) : null}
               </dd>
             </div>
             <div>
@@ -634,19 +814,43 @@ export function App() {
           */}
           {plan && plan.shelter_guidance_available === false ? (
             <p className="route-unavailable" role="alert">
-              {plan.hazard_limitation ??
-                "이 재난은 갈 곳을 안내할 공개 데이터가 없습니다."}{" "}
-              안내 방송과 현장 지시를 따르세요.
+              {/* Marked, like the other Korean on this screen: the document is
+                  English, and an English voice reads unmarked Hangul as noise.
+                  This branch has even less to offer than the one below it —
+                  there is no route to be had at all — so it gets the number
+                  too. */}
+              <span lang="ko">
+                {plan.hazard_limitation ??
+                  "이 재난은 갈 곳을 안내할 공개 데이터가 없습니다."}{" "}
+                안내 방송과 현장 지시를 따르세요.
+              </span>
+              <a className="emergency-call" href="tel:119">
+                Call 119
+              </a>
             </p>
           ) : routeError ? (
             <p className="route-unavailable" role="alert">
-              대피 경로를 계산하지 못했습니다. 안내 방송과 현장 지시를 따르세요.
+              <span lang="ko">
+                대피 경로를 계산하지 못했습니다. 안내 방송과 현장 지시를
+                따르세요.
+              </span>
+              <span>
+                The evacuation route could not be calculated. Follow official
+                broadcasts and on-site instructions.
+              </span>
+              {/* The one failure path where the app has nothing left to give.
+                  It can still give a phone number. */}
+              <a className="emergency-call" href="tel:119">
+                Call 119
+              </a>
             </p>
           ) : null}
 
           {unreachable.length > 0 ? (
             <>
-              <p className="blocked-routes-title">도달할 수 없는 대피소</p>
+              <p className="blocked-routes-title" lang="ko">
+                도달할 수 없는 대피소
+              </p>
               <ul className="blocked-routes">
                 {unreachable.map((leg) => (
                   <li key={leg.shelter_id}>
@@ -658,11 +862,9 @@ export function App() {
             </>
           ) : null}
 
-          {liveHazard ? (
-            <p className="live-spread" role="status">
-              Live spread forecast for this area
-            </p>
-          ) : null}
+          <p className="live-spread" role="status">
+            {liveHazard ? "Live spread forecast for this area" : ""}
+          </p>
 
           {plan ? (
             <p className="route-notice">
@@ -673,7 +875,7 @@ export function App() {
         </div>
       </section>
 
-      <NotificationPermissionGate />
+      <NotificationPermissionGate onDismissed={focusHeadline} />
     </main>
   );
 }

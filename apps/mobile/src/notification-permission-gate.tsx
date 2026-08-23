@@ -6,7 +6,12 @@ import {
 } from "./notifications";
 import { subscribeToPush } from "./push";
 
-export function NotificationPermissionGate() {
+export function NotificationPermissionGate({
+  onDismissed,
+}: {
+  /** Called when the dialog closes, so focus is not dropped on the floor. */
+  readonly onDismissed?: () => void;
+}) {
   const [permission, setPermission] =
     useState<NotificationPermissionState>(notificationState);
   const [isRequesting, setIsRequesting] = useState(false);
@@ -63,6 +68,11 @@ export function NotificationPermissionGate() {
       setIsRequesting(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (isOpen) return;
+    onDismissed?.();
+  }, [isOpen, onDismissed]);
 
   if (!isOpen) return null;
 
