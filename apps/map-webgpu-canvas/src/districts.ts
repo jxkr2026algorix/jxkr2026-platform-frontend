@@ -126,6 +126,37 @@ export function districtByCode(code: string): District | undefined {
   return BY_CODE.get(code);
 }
 
+/**
+ * The 시/군 a coordinate falls in, by bounding box.
+ *
+ * Bounding boxes overlap — Pohang's reaches into Gyeongju's, and the eastern
+ * counties interleave along the coast — so a plain first-match picks whichever
+ * happens to be earlier in the dataset. Among the boxes that contain the point
+ * this takes the one whose centre is nearest, which is the answer a person
+ * would give. Shared rather than reimplemented per app: the console and the
+ * phone framing an incident on two different counties is the same class of bug
+ * as them drawing it at two different coordinates.
+ */
+export function districtAt(lat: number, lon: number): string | null {
+  let best: District | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const candidate of DISTRICTS) {
+    const [west, south, east, north] = candidate.bbox;
+    if (lon < west || lon > east || lat < south || lat > north) continue;
+    const [centerLon, centerLat] = candidate.center;
+    // Longitude is scaled by latitude so the comparison is in real distance
+    // rather than degrees, which are not the same size on both axes here.
+    const dx = (lon - centerLon) * Math.cos((lat * Math.PI) / 180);
+    const dy = lat - centerLat;
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  }
+  return best?.code ?? null;
+}
+
 /** Georeference of the loaded terrain, as reported in `map:ready`. */
 export interface GeoBounds {
   west: number;

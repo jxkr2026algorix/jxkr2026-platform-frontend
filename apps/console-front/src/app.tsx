@@ -1,3 +1,4 @@
+import { districtAt } from "@salgil/map-webgpu-canvas/districts";
 import type {
   DashboardCommand,
   TriggerKind,
@@ -15,7 +16,6 @@ import { AssistantDrawer } from "./components/AssistantDrawer";
 import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
 import { MapCanvas } from "./components/MapCanvas";
 import { useI18n } from "./i18n";
-import { districtAt } from "./pages/evacuation-map";
 import { SituationPage } from "./pages/situation-page";
 import { useSidebarTheme } from "./theme";
 import { useAssistantWidth } from "./use-assistant-width";
@@ -103,7 +103,10 @@ export function App() {
       case "tsunami":
       case "nuclear":
       case "chemical":
-        if (event.location) {
+        // Only when there is no real coordinate. An incident that knows where
+        // it is gets its trigger from the effect below, off lat/lon; running
+        // both put two ignition points on the map for one fire.
+        if (event.location && !event.at) {
           map.send({
             type: "map:trigger",
             payload: {
@@ -161,6 +164,13 @@ export function App() {
           y: selection.at.y,
           label: "Dashboard selected origin",
         },
+        // The real coordinate, whenever the map has a georeference for the
+        // click. `location` is a point in *this* viewport and means nothing
+        // outside it: the phone draws the same x/y against its own camera and
+        // its own aspect ratio, and put the fire somewhere else entirely.
+        ...(selection.lat !== undefined && selection.lon !== undefined
+          ? { at: { lat: selection.lat, lon: selection.lon } }
+          : {}),
       })
       .catch((error: unknown) => {
         if (!(error instanceof Error)) throw error;
