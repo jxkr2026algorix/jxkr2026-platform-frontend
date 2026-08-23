@@ -112,6 +112,20 @@ export type EventDraft = {
   readonly mode: IncidentMode;
   readonly location?: z.infer<typeof mapPointSchema>;
   readonly rainfallMmPerHour?: number;
+  /**
+   * The 시군구 the incident belongs to, when it is not the county this console
+   * was configured for. An incident raised from the assistant names its own
+   * place, and filing it under the console's home county puts it on the wrong
+   * side of the province.
+   */
+  readonly regionCode?: string;
+  /**
+   * Where it actually is. Without this the event reaches the map with no
+   * coordinates at all, and the demo fallback moves it to the sample site.
+   */
+  readonly at?: { readonly lat: number; readonly lon: number };
+  /** Headline naming the place, when the caller resolved one. */
+  readonly headline?: string;
 };
 
 export const DEMO_LOCATION = {

@@ -1,9 +1,24 @@
-import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
+import type { PlatformEvent } from "@salgil/platform-client";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  type IncidentIntent,
+  resolveTrainingIntent,
+} from "../../assistant-intent";
 import { useI18n } from "../../i18n";
 import { getPressTransition } from "../../motion";
+import {
+  ASSISTANT_MIN_WIDTH,
+  assistantMaxWidth,
+} from "../../use-assistant-width";
 import { AssistantIcon, CloseIcon, SendIcon, UpstageMark } from "./icons";
+import { Markdown } from "./markdown";
 import { AssistantMessage, type ChatMessage } from "./message";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
@@ -12,14 +27,21 @@ type AssistantDrawerProps = {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly onCreateTrainingEvent: (
-    type: DisasterType,
+    intent: IncidentIntent,
   ) => Promise<PlatformEvent>;
+  readonly width: number;
+  readonly onWidthChange: (width: number) => void;
 };
+
+/** One arrow press. Held down, the key repeat makes this a smooth drag. */
+const WIDTH_STEP = 24;
 
 export function AssistantDrawer({
   open,
   onOpenChange,
   onCreateTrainingEvent,
+  width,
+  onWidthChange,
 }: AssistantDrawerProps) {
   const { t } = useI18n();
   const reduceMotion = useReducedMotion();
@@ -31,6 +53,8 @@ export function AssistantDrawer({
   const [streamingText, setStreamingText] = useState("");
   /** Which upstream tool the model is running, so the wait is explained. */
   const [runningTool, setRunningTool] = useState<string | null>(null);
+  /** Marks the drag so the shell can stop the map fighting for the cursor. */
+  const [resizing, setResizing] = useState(false);
   const abortRef = useRef<(() => void) | null>(null);
   const connectionStartedRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -97,24 +121,11 @@ export function AssistantDrawer({
   const submitQuery = async (rawQuery: string) => {
     const query = rawQuery.trim();
     if (!query || sending) return;
-    const normalizedQuery = query.toLocaleLowerCase();
-    const trainingTypes = [
-      ["wildfire", ["wildfire", "forest fire", "산불"]],
-      ["rain", ["heavy rain", "rainstorm", "호우", "폭우"]],
-      ["flood", ["flood", "inundation", "홍수", "침수"]],
-      ["landslide", ["landslide", "산사태"]],
-      ["heatwave", ["heatwave", "heat wave", "폭염"]],
-      ["earthquake", ["earthquake", "지진"]],
-    ] satisfies readonly (readonly [DisasterType, readonly string[]])[];
-    const isTrainingRequest = ["training", "훈련", "연습"].some((term) =>
-      normalizedQuery.includes(term),
-    );
-    const requestedTrainingType = isTrainingRequest
-      ? trainingTypes.find(([, terms]) =>
-          terms.some((term) => normalizedQuery.includes(term)),
-        )?.[0]
-      : undefined;
-    if (!requestedTrainingType && connection !== "ready") return;
+    // The county in the sentence is read here, not dropped: a request to
+    // start a fire in Cheongsong that lands on the shared demo site is a
+    // wrong answer that looks like a right one.
+    const trainingIntent = resolveTrainingIntent(query);
+    if (!trainingIntent && connection !== "ready") return;
     setInput("");
     setSending(true);
     setMessages((current) => [
@@ -122,8 +133,8 @@ export function AssistantDrawer({
       { id: crypto.randomUUID(), role: "user", text: query },
     ]);
     try {
-      if (requestedTrainingType) {
-        const event = await onCreateTrainingEvent(requestedTrainingType);
+      if (trainingIntent) {
+        const event = await onCreateTrainingEvent(trainingIntent);
         setMessages((current) => [
           ...current,
           {
@@ -218,18 +229,72 @@ export function AssistantDrawer({
     abortRef.current = null;
   }, [open]);
 
+  /**
+   * The panel is pinned to the right edge, so dragging its left border left
+   * makes it wider — the pointer delta is subtracted, not added. The pointer
+   * is captured so the drag survives crossing the map iframe, which would
+   * otherwise swallow every move event the moment the cursor left the handle.
+   */
+  const startResize = (event: ReactPointerEvent<HTMLHRElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    const startX = event.clientX;
+    const startWidth = width;
+    handle.setPointerCapture(event.pointerId);
+    setResizing(true);
+    const handleMove = (move: PointerEvent) => {
+      onWidthChange(startWidth - (move.clientX - startX));
+    };
+    const handleUp = () => {
+      setResizing(false);
+      handle.releasePointerCapture(event.pointerId);
+      handle.removeEventListener("pointermove", handleMove);
+      handle.removeEventListener("pointerup", handleUp);
+      handle.removeEventListener("pointercancel", handleUp);
+    };
+    handle.addEventListener("pointermove", handleMove);
+    handle.addEventListener("pointerup", handleUp);
+    handle.addEventListener("pointercancel", handleUp);
+  };
+
+  const resizeByKey = (event: ReactKeyboardEvent<HTMLHRElement>) => {
+    const maxWidth = assistantMaxWidth(window.innerWidth);
+    if (event.key === "ArrowLeft") onWidthChange(width + WIDTH_STEP);
+    else if (event.key === "ArrowRight") onWidthChange(width - WIDTH_STEP);
+    else if (event.key === "Home") onWidthChange(ASSISTANT_MIN_WIDTH);
+    else if (event.key === "End") onWidthChange(maxWidth);
+    else return;
+    event.preventDefault();
+  };
+
   return (
     <>
       <AnimatePresence>
         {open && (
           <motion.aside
-            className="assistant-drawer"
+            className={`assistant-drawer${resizing ? " is-resizing" : ""}`}
             aria-label={t("assistant.label")}
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 18 }}
             animate={{ opacity: 1, x: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 18 }}
             transition={{ duration: reduceMotion ? 0 : 0.16, ease: "easeOut" }}
           >
+            {/* A separator rather than a button: it has a value, and the
+                screen-reader announcement for one is the width itself. */}
+            <hr
+              className="assistant-resize"
+              tabIndex={0}
+              aria-orientation="vertical"
+              aria-label={t("assistant.resize")}
+              aria-valuenow={width}
+              aria-valuemin={ASSISTANT_MIN_WIDTH}
+              aria-valuemax={assistantMaxWidth(window.innerWidth)}
+              onPointerDown={startResize}
+              onKeyDown={resizeByKey}
+              onDoubleClick={() => onWidthChange(ASSISTANT_MIN_WIDTH)}
+            />
+
             <header className="assistant-header">
               <h2>{t("assistant.title")}</h2>
               {/* Whose model is answering. It matters here in a way it does
@@ -273,13 +338,12 @@ export function AssistantDrawer({
               ))}
               {streamingText ? (
                 <div className="assistant-stream" aria-live="polite">
-                  {/* The gradient sweeps only over the last few characters,
-                      so it marks where the text is growing rather than
-                      animating the whole answer forever. */}
-                  <p>
-                    {streamingText.slice(0, -12)}
-                    <em>{streamingText.slice(-12)}</em>
-                  </p>
+                  {/* Formatted as it arrives, so the answer does not reflow
+                      out of raw asterisks the instant it settles. The sweep
+                      that used to ride the last few characters now rides a
+                      caret after them: slicing into the text broke every
+                      marker it happened to land inside. */}
+                  <Markdown text={streamingText} />
                 </div>
               ) : null}
               {sending && !streamingText ? (

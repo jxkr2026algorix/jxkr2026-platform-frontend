@@ -121,6 +121,8 @@ const english = {
   "assistant.loadError": "Public data could not be loaded. Try again shortly.",
   "assistant.trainingSync":
     "{headline} The training event is syncing to the dashboard and mobile app through the platform stream.",
+  "assistant.incidentHeadline": "{hazard} response under way in {region}",
+  "assistant.resize": "Resize the assistant panel",
   "assistant.suggestWildfire": "Start a wildfire training event in Cheongsong",
   "assistant.suggestHealth": "Show data health",
   "assistant.suggestRain": "Start a heavy rain training event",
@@ -251,6 +253,8 @@ const korean: Record<TranslationKey, string> = {
     "공공데이터를 불러오지 못했습니다. 잠시 후 다시 시도하세요.",
   "assistant.trainingSync":
     "{headline} 훈련 이벤트를 플랫폼 스트림을 통해 대시보드와 모바일 앱에 동기화하고 있습니다.",
+  "assistant.incidentHeadline": "{region} {hazard} 대응 상황",
+  "assistant.resize": "도우미 패널 너비 조절",
   "assistant.suggestWildfire": "청송 산불 훈련 이벤트 시작",
   "assistant.suggestHealth": "데이터 연결 상태 보여줘",
   "assistant.suggestRain": "호우 훈련 이벤트 시작",

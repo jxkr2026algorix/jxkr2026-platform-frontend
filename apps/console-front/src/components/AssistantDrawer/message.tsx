@@ -1,5 +1,6 @@
 import type { AssistantAnswer } from "../../assistant-query";
 import { useI18n } from "../../i18n";
+import { Markdown } from "./markdown";
 
 export type ChatMessage = {
   readonly id: string;
@@ -22,7 +23,14 @@ export function AssistantMessage({ message }: AssistantMessageProps) {
           ? t("assistant.role")
           : t("assistant.you")}
       </span>
-      <p>{message.text}</p>
+      {/* The operator's own words are literal — a resident's address with an
+          asterisk in it must not turn half the line bold. Only the model
+          writes Markdown, so only the model's turns are parsed as it. */}
+      {message.role === "assistant" ? (
+        <Markdown text={message.text} />
+      ) : (
+        <p>{message.text}</p>
+      )}
       {message.answer?.details.length ? (
         <ul>
           {message.answer.details.map((detail) => (

@@ -8,8 +8,9 @@ import {
   type PlatformEvent,
   SCENARIO_TO_HAZARD,
 } from "@salgil/platform-client";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
+import type { IncidentIntent } from "./assistant-intent";
 import { AssistantDrawer } from "./components/AssistantDrawer";
 import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
 import { MapCanvas } from "./components/MapCanvas";
@@ -17,6 +18,7 @@ import { useI18n } from "./i18n";
 import { districtAt } from "./pages/evacuation-map";
 import { SituationPage } from "./pages/situation-page";
 import { useSidebarTheme } from "./theme";
+import { useAssistantWidth } from "./use-assistant-width";
 import { useMapBridge } from "./use-map-bridge";
 import { usePlatformStream } from "./use-platform-stream";
 
@@ -32,9 +34,10 @@ const POINT_HAZARDS: readonly DisasterType[] = [
 ];
 
 export function App() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { sidebarTheme } = useSidebarTheme();
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const assistant = useAssistantWidth();
   const [placementArmed, setPlacementArmed] = useState(false);
   /**
    * What the next map click means. Rehearsing a scenario must not reach the
@@ -290,13 +293,40 @@ export function App() {
     });
   }, [map.send, platform.frame]);
 
-  const createTrainingEvent = (type: DisasterType): Promise<PlatformEvent> =>
-    platform.publish({ type });
+  /**
+   * An incident the assistant was asked for. The district it named rides along
+   * as a region code and real coordinates: without them the platform files the
+   * incident under this console's own county and the map, having nowhere to
+   * put it, falls back to the shared demo site — which is how a fire asked for
+   * in Pohang ended up burning next to Cheongsong.
+   */
+  const createTrainingEvent = ({
+    type,
+    district,
+  }: IncidentIntent): Promise<PlatformEvent> =>
+    platform.publish({
+      type,
+      ...(district
+        ? {
+            regionCode: district.code,
+            at: { lat: district.center[1], lon: district.center[0] },
+            headline: t("assistant.incidentHeadline", {
+              hazard: t(`event.${type}`),
+              region: locale === "ko" ? district.name : district.nameEn,
+            }),
+          }
+        : {}),
+    });
 
   return (
     <div
       className={`app-shell view-situation${assistantOpen ? " is-assistant-open" : ""}`}
       data-sidebar-theme={sidebarTheme}
+      // The timeline underneath sizes itself against the panel, so the width
+      // lives on the shell rather than only on the panel that owns the handle.
+      style={
+        { "--assistant-drawer-width": `${assistant.width}px` } as CSSProperties
+      }
     >
       <MapCanvas map={map} />
       <DashboardBrandHeader />
@@ -346,6 +376,8 @@ export function App() {
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
         onCreateTrainingEvent={createTrainingEvent}
+        width={assistant.width}
+        onWidthChange={assistant.setWidth}
       />
     </div>
   );

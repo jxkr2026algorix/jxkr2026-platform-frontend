@@ -140,8 +140,11 @@ export const HAZARD_TO_SCENARIO: Readonly<Record<string, DisasterType>> = {
 export function createIncidentPayload(draft: EventDraft, regionCode: string) {
   const copy = EVENT_COPY[draft.type];
   return {
-    title: copy.headline,
-    region_code: regionCode,
+    // A draft that named a place says so in the headline. The stock copy is
+    // written around the demo site, and it reads as a lie on an incident the
+    // operator asked for somewhere else.
+    title: draft.headline ?? copy.headline,
+    region_code: draft.regionCode ?? regionCode,
     hazard: SCENARIO_TO_HAZARD[draft.type],
     level: 1,
     summary: copy.instruction,
@@ -149,6 +152,9 @@ export function createIncidentPayload(draft: EventDraft, regionCode: string) {
       source: "salgil-frontend",
       mode: draft.mode,
       ...(draft.location ? { map_origin: draft.location } : {}),
+      // Real coordinates, so the map does not have to fall back to the sample
+      // site to have somewhere to put the incident.
+      ...(draft.at ? { lat: draft.at.lat, lon: draft.at.lon } : {}),
       ...(draft.rainfallMmPerHour === undefined
         ? {}
         : { rainfall_mm_per_hour: draft.rainfallMmPerHour }),

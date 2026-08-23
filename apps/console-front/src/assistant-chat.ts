@@ -49,6 +49,20 @@ export function streamChat(
 ): () => void {
   const controller = new AbortController();
 
+  /**
+   * The server sends its own `done` frame, and the stream then ends. Both used
+   * to be reported, so the caller committed the finished answer twice and
+   * every reply appeared in the transcript in duplicate. Every exit reports
+   * exactly one `done`: the caller waits on it to settle the turn, and a path
+   * that skips it leaves the composer disabled for good.
+   */
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    onEvent({ kind: "done" });
+  };
+
   void (async () => {
     try {
       const response = await fetch(`${API_URL}/assistant/chat`, {
@@ -62,6 +76,7 @@ export function streamChat(
           kind: "error",
           text: `assistant unavailable (${response.status})`,
         });
+        finish();
         return;
       }
       const reader = response.body.getReader();
@@ -79,19 +94,22 @@ export function streamChat(
           const line = frame.split("\n").find((l) => l.startsWith("data:"));
           if (!line) continue;
           try {
-            onEvent(JSON.parse(line.slice(5).trim()) as ChatStreamEvent);
+            const event = JSON.parse(line.slice(5).trim()) as ChatStreamEvent;
+            if (event.kind === "done") finish();
+            else onEvent(event);
           } catch {
             // One malformed frame should not end the answer.
           }
         }
       }
-      onEvent({ kind: "done" });
+      finish();
     } catch (error) {
       if (controller.signal.aborted) return;
       onEvent({
         kind: "error",
         text: error instanceof Error ? error.message : "assistant failed",
       });
+      finish();
     }
   })();
 
