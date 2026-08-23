@@ -35,7 +35,7 @@ export function ViewportActions({ mobileUrl }: { readonly mobileUrl: string }) {
             instead of the map. */}
         <QRCode
           value={mobileUrl}
-          size={52}
+          size={96}
           level="M"
           bgColor="transparent"
           fgColor={dark ? "#f5f7fa" : "#1d1d1f"}

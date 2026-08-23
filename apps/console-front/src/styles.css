@@ -2092,7 +2092,7 @@ tbody tr:last-child td {
    above the district heading rather than inside it. */
 .viewport-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 14px;
@@ -2149,8 +2149,8 @@ tbody tr:last-child td {
 .viewport-qr svg {
   display: block;
   flex: none;
-  width: 46px;
-  height: 46px;
+  width: 96px;
+  height: 96px;
 }
 
 .district-status-kicker,
