@@ -6,6 +6,7 @@
   --color-primary-hover: #2957e8;
   --color-primary-soft: #edf3ff;
   --color-critical: #b91c1c;
+  --color-critical-soft: #fef2f2;
   --color-line: #e8e9ec;
   --color-line-strong: #d1d5db;
   --color-surface: #ffffff;
@@ -320,10 +321,31 @@ button:focus-visible {
   }
 }
 
-/* Shelters the router could not reach, kept visible with their reason:
-   "none nearby" and "roads blocked" call for different actions. */
-.blocked-routes {
+/* The routing service itself failed. Never replaced with an invented route:
+   someone following a fabricated line during a real fire is worse off than
+   someone told to wait for the announcement. */
+.route-unavailable {
   margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--color-critical-soft);
+  color: var(--color-critical);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Shelters the router could not reach, shown only when there is no route at
+   all. Under a working route they read as "the roads are blocked" — which is
+   why this needs a heading saying what the list actually is. */
+.blocked-routes-title {
+  margin: 16px 0 0;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.blocked-routes {
+  margin: 4px 0 0;
   padding: 0;
   border-top: 1px solid var(--color-line);
   list-style: none;

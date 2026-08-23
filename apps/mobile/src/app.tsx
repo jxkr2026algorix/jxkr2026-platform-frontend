@@ -78,73 +78,6 @@ const ORIGIN = {
   label: "Demo location · Jinbo-myeon",
 } as const;
 
-const DEMO_SHELTER: Shelter = {
-  id: "demo-jinbo-shelter",
-  region_code: "47750",
-  name: "Jinbo Culture and Sports Center",
-  address: "Jinbo-myeon, Cheongsong",
-  lat: 36.4239,
-  lon: 129.0572,
-  capacity: null,
-  capacity_basis: null,
-  hazards: ["wildfire", "flood", "landslide", "earthquake"],
-  facility_type: "demo shelter",
-  distance_km: 1.1,
-  source_attribution: "SALGIL fixed demo scenario",
-  data_mode: "synthetic",
-};
-
-function createDemoRoutePlan(hazard: string): RoutePlan {
-  return {
-    origin: {
-      lat: ORIGIN.lat,
-      lon: ORIGIN.lon,
-      community_name: ORIGIN.label,
-    },
-    hazard,
-    mode: "foot",
-    mode_name: "Walking",
-    mode_note: "Fixed demo route",
-    routes: [
-      {
-        shelter_id: DEMO_SHELTER.id,
-        shelter_name: DEMO_SHELTER.name,
-        shelter_capacity: null,
-        capacity_basis: null,
-        found: true,
-        reason: null,
-        geometry: [
-          [ORIGIN.lon, ORIGIN.lat],
-          [129.0522, 36.4288],
-          [129.0541, 36.4272],
-          [129.0559, 36.4253],
-          [DEMO_SHELTER.lon ?? ORIGIN.lon, DEMO_SHELTER.lat ?? ORIGIN.lat],
-        ],
-        distance_m: 1_100,
-        duration_minutes: 14,
-        straight_line_km: 0.95,
-        max_risk: null,
-        mean_risk: null,
-        avoided_edges: 0,
-        blocked_by_reports: [],
-      },
-    ],
-    recommended: DEMO_SHELTER.id,
-    prediction_used: false,
-    prediction_model: null,
-    prediction_is_stub: true,
-    horizons_minutes: [],
-    field_reports_applied: 0,
-    road_network: "fixed-demo",
-    attribution: "SALGIL fixed demo scenario · illustrative geometry",
-    is_derived: true,
-    notice:
-      "Demo route only. Follow official alerts and on-site directions during a real emergency.",
-    warnings: ["This route does not use live GPS."],
-    generated_at: new Date().toISOString(),
-  };
-}
-
 function cameraForRoute(
   geometry: readonly (readonly number[])[],
 ): { center: { lat: number; lon: number }; distanceMeters: number } | null {
@@ -246,6 +179,8 @@ export function App() {
     lon: number;
   } | null>(null);
   const [streamDrill, setStreamDrill] = useState(false);
+  /** The routing service could not be reached. Said, never papered over. */
+  const [routeError, setRouteError] = useState(false);
   const notifiedIncidentRef = useRef("");
   const blockedRouteRef = useRef("");
 
@@ -310,12 +245,15 @@ export function App() {
   }, [mapLocation.origin]);
 
   useEffect(() => {
+    // Nothing has happened. Showing a route anyway meant this screen always
+    // had one, so the arrival of a real emergency changed nothing visible.
     if (!event) {
-      setPlan(createDemoRoutePlan("wildfire"));
-      setShelters([DEMO_SHELTER]);
+      setPlan(null);
+      setShelters([]);
       return;
     }
     let cancelled = false;
+    setRouteError(false);
     const hazard = SCENARIO_TO_HAZARD[event.type];
     void Promise.all([
       client.planEvacuation({
@@ -338,8 +276,12 @@ export function App() {
       })
       .catch(() => {
         if (cancelled) return;
-        setPlan(createDemoRoutePlan(hazard));
-        setShelters([DEMO_SHELTER]);
+        // No invented route. A resident who follows a fabricated line during a
+        // real fire is worse off than one who is told the route is unavailable
+        // and waits for the announcement.
+        setPlan(null);
+        setShelters([]);
+        setRouteError(true);
       });
     return () => {
       cancelled = true;
@@ -541,7 +483,15 @@ export function App() {
     best?.duration_minutes === null || best?.duration_minutes === undefined
       ? "—"
       : `${Math.round(best.duration_minutes)} min`;
-  const blocked = plan?.routes.filter((leg) => !leg.found) ?? [];
+  /**
+   * Shelters the router could not reach. Only worth showing when there is no
+   * route at all: with a route in hand, a list of places you cannot walk to
+   * reads as "the roads are blocked" and is the operator's problem, not the
+   * problem of the person holding the phone.
+   */
+  const unreachable = best
+    ? []
+    : (plan?.routes.filter((leg) => !leg.found) ?? []);
 
   return (
     <main className="mobile-shell">
@@ -653,15 +603,24 @@ export function App() {
             </div>
           </dl>
 
-          {blocked.length > 0 ? (
-            <ul className="blocked-routes">
-              {blocked.map((leg) => (
-                <li key={leg.shelter_id}>
-                  <strong>{leg.shelter_name}</strong>
-                  <span>{leg.reason ?? "Unreachable"}</span>
-                </li>
-              ))}
-            </ul>
+          {routeError ? (
+            <p className="route-unavailable" role="alert">
+              대피 경로를 계산하지 못했습니다. 안내 방송과 현장 지시를 따르세요.
+            </p>
+          ) : null}
+
+          {unreachable.length > 0 ? (
+            <>
+              <p className="blocked-routes-title">도달할 수 없는 대피소</p>
+              <ul className="blocked-routes">
+                {unreachable.map((leg) => (
+                  <li key={leg.shelter_id}>
+                    <strong>{leg.shelter_name}</strong>
+                    <span>{leg.reason ?? "Unreachable"}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : null}
 
           {liveHazard ? (

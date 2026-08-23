@@ -8,7 +8,7 @@ import {
   type PlatformEvent,
   SCENARIO_TO_HAZARD,
 } from "@salgil/platform-client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { AssistantDrawer } from "./components/AssistantDrawer";
 import { DashboardBrandHeader } from "./components/DashboardBrandHeader";
@@ -45,14 +45,14 @@ export function App() {
   );
   const map = useMapBridge();
   const platform = usePlatformStream();
-  const mobileUrl = useMemo(
-    () =>
-      new URL(
-        import.meta.env.VITE_MOBILE_URL ?? "/mobile/",
-        window.location.href,
-      ).toString(),
-    [],
-  );
+  /**
+   * The address the QR encodes. Deliberately the deployed one and not
+   * `VITE_MOBILE_URL`: that points at this machine, and a phone in the room
+   * cannot reach localhost. A QR nobody can open is worse than no QR.
+   */
+  const mobileUrl =
+    import.meta.env.VITE_MOBILE_PUBLIC_URL ??
+    "https://mobile.salgil.gyeongbuk.kr";
   const handleMapCommand = (command: DashboardCommand) => map.send(command);
 
   useEffect(() => {
@@ -299,7 +299,7 @@ export function App() {
       data-sidebar-theme={sidebarTheme}
     >
       <MapCanvas map={map} />
-      <DashboardBrandHeader mobileUrl={mobileUrl} />
+      <DashboardBrandHeader />
       {/* Across the top of the screen, not tucked into a panel: if the whole
           view does not say this is an exercise, someone will act on it. */}
       {platform.drill ? (
@@ -327,6 +327,7 @@ export function App() {
                   publishing={platform.publishing}
                   errorMessage={platform.errorMessage}
                   latestEvent={platform.event}
+                  mobileUrl={mobileUrl}
                   onMapCommand={handleMapCommand}
                   onEventSelect={handleEventSelect}
                   eventMode={placementMode}

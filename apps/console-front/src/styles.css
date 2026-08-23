@@ -1277,9 +1277,31 @@ textarea {
 
 .assistant-header h2 {
   margin: 3px 0;
+  margin-right: auto;
   font-size: 18px;
   font-weight: 625;
   letter-spacing: -0.025em;
+}
+
+/* Whose model is answering, next to the panel's own name. Quiet by default —
+   it is an attribution, not a badge — and it takes the ink colour so it reads
+   in both themes. */
+.assistant-model {
+  display: flex;
+  align-items: center;
+  margin-top: 7px;
+  color: var(--ink-tertiary);
+  transition: color 120ms ease-out;
+}
+
+.assistant-model:hover {
+  color: var(--ink-secondary);
+}
+
+.upstage-mark {
+  display: block;
+  width: 74px;
+  height: auto;
 }
 
 .assistant-icon-button {
@@ -2065,11 +2087,22 @@ tbody tr:last-child td {
     color 160ms ease-out;
 }
 
-.sidebar-theme-toggle {
-  position: absolute;
-  top: 14px;
-  right: 14px;
+/* Top of the right rail: the address of the resident app, and the theme.
+   Both belong to the whole screen rather than to any one section, so they sit
+   above the district heading rather than inside it. */
+.viewport-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.viewport-action {
   display: grid;
+  flex: none;
   width: 32px;
   height: 32px;
   padding: 0;
@@ -2085,20 +2118,39 @@ tbody tr:last-child td {
     color 120ms ease-out;
 }
 
-.sidebar-theme-toggle:hover {
+.viewport-action:hover {
   border-color: var(--line-strong);
   background: var(--floating-control-hover);
   color: var(--ink);
 }
 
-.sidebar-theme-toggle svg {
+.viewport-action svg {
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.7;
+  stroke-width: 1.6;
+}
+
+/* The one thing the audience is asked to act on, so it is a link as well as a
+   code — on a laptop there is no phone to scan with. */
+.viewport-qr {
+  display: block;
+  color: var(--ink-secondary);
+  text-decoration: none;
+  transition: color 120ms ease-out;
+}
+
+.viewport-qr:hover {
+  color: var(--ink);
+}
+
+.viewport-qr svg {
+  display: block;
+  flex: none;
+  width: 46px;
+  height: 46px;
 }
 
 .district-status-kicker,
@@ -2210,19 +2262,6 @@ tbody tr:last-child td {
     bottom: 78px;
     width: min(288px, calc(100vw - 32px));
   }
-}
-
-.mobile-qr {
-  position: fixed;
-  z-index: 31;
-  bottom: 32px;
-  left: 32px;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  overflow: hidden;
-  place-items: center;
-  background: var(--floating-field);
 }
 
 .assistant-launcher {

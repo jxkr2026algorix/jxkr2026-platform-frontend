@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n";
 import { getPressTransition } from "../../motion";
-import { AssistantIcon, CloseIcon, SendIcon } from "./icons";
+import { AssistantIcon, CloseIcon, SendIcon, UpstageMark } from "./icons";
 import { AssistantMessage, type ChatMessage } from "./message";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
@@ -232,6 +232,19 @@ export function AssistantDrawer({
           >
             <header className="assistant-header">
               <h2>{t("assistant.title")}</h2>
+              {/* Whose model is answering. It matters here in a way it does
+                  not on a marketing page: the operator is deciding how far to
+                  trust what the panel says. */}
+              <a
+                className="assistant-model"
+                href="https://upstage.ai"
+                target="_blank"
+                rel="noreferrer"
+                aria-label={t("assistant.poweredBy")}
+                title={t("assistant.poweredBy")}
+              >
+                <UpstageMark />
+              </a>
               <motion.button
                 className="assistant-icon-button"
                 type="button"

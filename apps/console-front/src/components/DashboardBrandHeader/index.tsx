@@ -1,4 +1,3 @@
-import QRCode from "react-qr-code";
 import { NavLink } from "react-router";
 import { type Locale, useI18n } from "../../i18n";
 
@@ -8,11 +7,7 @@ const salgilLogoByLocale: Readonly<Record<Locale, string>> = {
   en: "/brand/salgil-en.svg",
 };
 
-export function DashboardBrandHeader({
-  mobileUrl,
-}: {
-  readonly mobileUrl: string;
-}) {
+export function DashboardBrandHeader() {
   const { locale, setLocale, t } = useI18n();
 
   return (
@@ -49,9 +44,6 @@ export function DashboardBrandHeader({
           ))}
         </fieldset>
       </header>
-      <span className="mobile-qr" role="img" aria-label={t("qr.mobile")}>
-        <QRCode value={mobileUrl} size={42} level="M" />
-      </span>
     </aside>
   );
 }

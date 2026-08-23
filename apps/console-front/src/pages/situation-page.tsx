@@ -8,7 +8,6 @@ import { MapZoom } from "../components/MapZoom";
 import { useI18n } from "../i18n";
 import type { useMapBridge } from "../use-map-bridge";
 import { DistrictStatusPanel } from "./district-status-panel";
-import { EvacuationPanel } from "./evacuation-panel";
 import { SituationControls } from "./situation-controls";
 
 type MapBridge = ReturnType<typeof useMapBridge>;
@@ -21,6 +20,7 @@ interface SituationPageProps {
   readonly publishing: boolean;
   readonly errorMessage: string;
   readonly latestEvent: PlatformEvent | null;
+  readonly mobileUrl: string;
   readonly onMapCommand: (command: DashboardCommand) => void;
   readonly onEventSelect: (type: DisasterType | null) => void;
   readonly eventMode: "simulate" | "declare";
@@ -40,6 +40,7 @@ export function SituationPage({
   publishing,
   errorMessage,
   latestEvent,
+  mobileUrl,
   onMapCommand,
   onEventSelect,
   eventMode,
@@ -71,14 +72,8 @@ export function SituationPage({
           districtCode={map.status.controls.districtCode}
           loading={map.status.controls.districtLoading}
           event={latestEvent}
-        >
-          <EvacuationPanel
-            client={client}
-            hazardType={latestEvent?.type ?? selectedType ?? "landslide"}
-            districtCode={map.status.controls.districtCode}
-            onMapCommand={onMapCommand}
-          />
-        </DistrictStatusPanel>
+          mobileUrl={mobileUrl}
+        />
       </section>
     </section>
   );
