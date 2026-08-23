@@ -35,6 +35,7 @@ export {
   type PlatformEvent,
   type PlatformMessage,
 } from "./contracts";
+export { type DemoOrigin, demoOriginNear } from "./demo-location";
 export { HAZARD_TO_SCENARIO, SCENARIO_TO_HAZARD } from "./incidents";
 export {
   type RouteLeg,

@@ -11,6 +11,7 @@ import {
 import {
   createPlatformClient,
   type DisasterType,
+  demoOriginNear,
   openSituationStream,
   type PlatformEvent,
   type RoutePlan,
@@ -69,10 +70,10 @@ function getMapLocation(): { src: string; origin: string } {
 }
 
 /**
- * Where the resident is. The device has no fix in the prototype, so this is
- * the shared demo site; a real build reads geolocation.
+ * Fallback position, used only when the incident carries no coordinates.
+ * The device has no fix in the prototype; a real build reads geolocation.
  */
-const ORIGIN = {
+const FALLBACK_ORIGIN = {
   lat: 36.43,
   lon: 129.05,
   label: "Demo location · Jinbo-myeon",
@@ -244,6 +245,26 @@ export function App() {
     return () => window.removeEventListener("message", handleMessage);
   }, [mapLocation.origin]);
 
+  /**
+   * Spawn near the incident rather than at one shared point. Every phone
+   * reporting the same coordinate made the demo look like one person, which is
+   * not the case an evacuation order is about.
+   *
+   * Keyed on the incident, and taken from the declared position rather than the
+   * live stream, so the position holds still. One that moved between frames
+   * would drag the route and the map marker with it, and the plan would appear
+   * to change for no reason.
+   */
+  const origin = useMemo(
+    () =>
+      demoOriginNear(
+        event?.at,
+        event?.id ?? event?.createdAt ?? "no-incident",
+        FALLBACK_ORIGIN,
+      ),
+    [event?.at, event?.id, event?.createdAt],
+  );
+
   useEffect(() => {
     // Nothing has happened. Showing a route anyway meant this screen always
     // had one, so the arrival of a real emergency changed nothing visible.
@@ -258,7 +279,8 @@ export function App() {
     void Promise.all([
       client.planEvacuation({
         hazard,
-        ...ORIGIN,
+        lat: origin.lat,
+        lon: origin.lon,
         mode: "foot",
         // The inference server is in stub mode, whose synthetic risk is not on
         // the model's scale: at the default threshold it marks every road
@@ -266,7 +288,7 @@ export function App() {
         blockThreshold: 0.8,
       }),
       client
-        .findShelters({ hazard, lat: ORIGIN.lat, lon: ORIGIN.lon, limit: 6 })
+        .findShelters({ hazard, lat: origin.lat, lon: origin.lon, limit: 6 })
         .catch(() => [] as Shelter[]),
     ])
       .then(([nextPlan, nextShelters]) => {
@@ -286,7 +308,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [client, event]);
+  }, [client, event, origin]);
 
   const postMapCommand = useCallback(
     (command: DashboardCommand) => {
@@ -342,8 +364,8 @@ export function App() {
         markers: [
           {
             id: "current-location",
-            at: { lat: ORIGIN.lat, lon: ORIGIN.lon },
-            label: ORIGIN.label,
+            at: { lat: origin.lat, lon: origin.lon },
+            label: origin.label,
             kind: "community" as const,
             selected: true,
           },
@@ -361,7 +383,7 @@ export function App() {
             ? [
                 {
                   id: `incident-${event?.id ?? "declared"}`,
-                  at: declaredAt ?? event?.location ?? ORIGIN,
+                  at: declaredAt ?? event?.location ?? origin,
                   ...(event?.headline ? { label: event.headline } : {}),
                   kind: "incident" as const,
                   selected: true,
@@ -433,6 +455,7 @@ export function App() {
     declaredAt,
     event,
     mapReady,
+    origin,
     plan,
     postMapCommand,
     routeCamera,
