@@ -79,6 +79,13 @@ export const routePlanSchema = z.object({
   /** Ordered by arrival time; unreachable shelters stay in with a reason. */
   routes: z.array(routeLegSchema),
   recommended: z.string().nullish(),
+  /**
+   * Whether this hazard can be given a destination at all. Earthquakes are
+   * detected but the public data does not say which shelter to send people to,
+   * and that limit is not the same as a failed calculation.
+   */
+  shelter_guidance_available: z.boolean().default(true),
+  hazard_limitation: z.string().nullish(),
   prediction_used: z.boolean().default(false),
   prediction_model: z.string().nullish(),
   /** True when the model is a stub — the route is illustrative, not predictive. */

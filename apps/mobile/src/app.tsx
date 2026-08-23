@@ -603,7 +603,19 @@ export function App() {
             </div>
           </dl>
 
-          {routeError ? (
+          {/*
+            Two different things, said differently. A hazard the public data
+            cannot route for is a known limit, and telling the resident the
+            calculation failed sends them looking for a route that was never
+            going to exist.
+          */}
+          {plan && plan.shelter_guidance_available === false ? (
+            <p className="route-unavailable" role="alert">
+              {plan.hazard_limitation ??
+                "이 재난은 갈 곳을 안내할 공개 데이터가 없습니다."}{" "}
+              안내 방송과 현장 지시를 따르세요.
+            </p>
+          ) : routeError ? (
             <p className="route-unavailable" role="alert">
               대피 경로를 계산하지 못했습니다. 안내 방송과 현장 지시를 따르세요.
             </p>
