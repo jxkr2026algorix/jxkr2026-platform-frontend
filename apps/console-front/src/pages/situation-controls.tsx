@@ -165,8 +165,8 @@ export function SituationControls({
       </div>
 
       {/* Bottom of the rail: how the screen looks, not what it is doing.
-          Beside the language switch it crowded the brand lockup out of the
-          header, and the logos do not shrink. */}
+          Icon only — a sun and a moon need no caption, and nothing else in
+          this rail labels its own control. */}
       <div className="rail-footer">
         <button
           className="theme-toggle"
@@ -185,7 +185,6 @@ export function SituationControls({
               <path d="M19.5 15.2A7.5 7.5 0 0 1 8.8 4.5 7.8 7.8 0 1 0 19.5 15.2Z" />
             </svg>
           )}
-          <span>{themeLabel}</span>
         </button>
       </div>
     </aside>

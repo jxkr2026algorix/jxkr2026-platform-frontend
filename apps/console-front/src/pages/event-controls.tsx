@@ -1,3 +1,4 @@
+import { GLYPHS, type GlyphName } from "@salgil/map-webgpu-canvas/glyphs";
 import type { DisasterType, PlatformEvent } from "@salgil/platform-client";
 import { motion } from "motion/react";
 import { SegmentIndicator } from "../components/SegmentIndicator";
@@ -11,13 +12,14 @@ import type { TranslationKey } from "../i18n/messages";
 const eventOptions: readonly {
   readonly type: DisasterType;
   readonly labelKey: TranslationKey;
+  readonly glyph: GlyphName;
 }[] = [
-  { type: "rain", labelKey: "event.rain" },
-  { type: "flood", labelKey: "event.flood" },
-  { type: "landslide", labelKey: "event.landslide" },
-  { type: "wildfire", labelKey: "event.wildfire" },
-  { type: "earthquake", labelKey: "event.earthquake" },
-  { type: "heatwave", labelKey: "event.heatwave" },
+  { type: "rain", labelKey: "event.rain", glyph: "rain" },
+  { type: "flood", labelKey: "event.flood", glyph: "flood" },
+  { type: "landslide", labelKey: "event.landslide", glyph: "landslide" },
+  { type: "wildfire", labelKey: "event.wildfire", glyph: "wildfire" },
+  { type: "earthquake", labelKey: "event.earthquake", glyph: "earthquake" },
+  { type: "heatwave", labelKey: "event.heatwave", glyph: "heatwave" },
 ];
 
 type EventControlsProps = {
@@ -106,6 +108,12 @@ export function EventControls({
                 : onDeclare(option.type, mode)
             }
           >
+            {/* The same marks the map draws for these hazards. Two sets
+                would drift, and the rail is where an operator learns what the
+                badge on the map means. */}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d={GLYPHS[option.glyph]} />
+            </svg>
             <span>{t(option.labelKey)}</span>
           </button>
         ))}

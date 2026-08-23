@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     "./protocol": "./src/protocol.ts",
-    "./districts": "./src/districts.ts"
+    "./districts": "./src/districts.ts",
+    "./glyphs": "./src/glyphs.ts"
   },
   "scripts": {
     "dev": "vite",
