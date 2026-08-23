@@ -57,9 +57,16 @@ mobile.salgil.gyeongbuk.kr {
 	# 공개 오리진이므로 백엔드로 나갈 수 있는 경로를 세 개로 못 박는다.
 	# 키 자체는 operator 등급이다 — 경로 계산이 그 등급을 요구하고 field 로는
 	# 403 이 난다. 그래서 도달 가능한 경로를 여기서 제한하는 것이 실제 방어선이다.
+	# 읽기 전용 경로. 추가할 때마다 여기 적어야 한다 — 목록에 없으면 404 다.
+	#
+	#   incidents          현재 상황
+	#   stream             SSE
+	#   shelters           대피소 목록 (지도 마커)
+	#   situation/weather  현재 기상
+	#   push/key           푸시 공개키 — 없으면 알림 구독이 시작조차 못 한다
 	@mobile_read {
 		method GET
-		path /api/platform/incidents /api/platform/stream
+		path /api/platform/incidents /api/platform/stream /api/platform/shelters /api/platform/situation/weather /api/platform/push/key
 	}
 	handle @mobile_read {
 		# route 로 감싸야 적힌 순서대로 실행된다. 없으면 Caddy 의 기본 지시어
@@ -75,9 +82,13 @@ mobile.salgil.gyeongbuk.kr {
 		}
 	}
 
+	# 쓰기는 둘뿐이다. 상황 선언·계획 승인은 이 오리진에서 닿지 않는다.
+	#
+	#   routing/evacuation  경로 계산
+	#   push/subscribe      알림 구독 등록
 	@mobile_route {
 		method POST
-		path /api/platform/routing/evacuation
+		path /api/platform/routing/evacuation /api/platform/push/subscribe
 	}
 	handle @mobile_route {
 		# route 로 감싸야 적힌 순서대로 실행된다. 없으면 Caddy 의 기본 지시어

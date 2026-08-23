@@ -36,9 +36,16 @@ mobile.salgil.gyeongbuk.kr {
 	import browser_security
 	header X-Frame-Options "DENY"
 
+	# 읽기 전용 경로. 추가할 때마다 여기 적어야 한다 — 목록에 없으면 404 다.
+	#
+	#   incidents          현재 상황
+	#   stream             SSE
+	#   shelters           대피소 목록 (지도 마커)
+	#   situation/weather  현재 기상
+	#   push/key           푸시 공개키 — 없으면 알림 구독이 시작조차 못 한다
 	@mobile_read {
 		method GET
-		path /api/platform/incidents /api/platform/stream
+		path /api/platform/incidents /api/platform/stream /api/platform/shelters /api/platform/situation/weather /api/platform/push/key
 	}
 	handle @mobile_read {
 		uri strip_prefix /api/platform
@@ -48,9 +55,13 @@ mobile.salgil.gyeongbuk.kr {
 		}
 	}
 
+	# 쓰기는 둘뿐이다. 상황 선언·계획 승인은 이 오리진에서 닿지 않는다.
+	#
+	#   routing/evacuation  경로 계산
+	#   push/subscribe      알림 구독 등록
 	@mobile_route {
 		method POST
-		path /api/platform/routing/evacuation
+		path /api/platform/routing/evacuation /api/platform/push/subscribe
 	}
 	handle @mobile_route {
 		uri strip_prefix /api/platform

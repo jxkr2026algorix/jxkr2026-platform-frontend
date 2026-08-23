@@ -2,11 +2,11 @@ import {
   districtByCode,
   PROVINCE_CODE,
 } from "@salgil/map-webgpu-canvas/districts";
-import type { PlatformEvent } from "@salgil/platform-client";
+import { formatWind, type PlatformEvent } from "@salgil/platform-client";
 import type { ReactNode } from "react";
 import { ViewportActions } from "../components/ViewportActions";
 import { useI18n } from "../i18n";
-import type { TranslationKey } from "../i18n/messages";
+import { useWeather } from "../use-weather";
 
 interface DistrictStatusPanelProps {
   readonly districtCode: string | null;
@@ -18,82 +18,11 @@ interface DistrictStatusPanelProps {
   readonly children?: ReactNode;
 }
 
-type WeatherSnapshot = {
-  readonly conditionKey: TranslationKey;
-  readonly temperature: string;
-  readonly humidity: string;
-  readonly wind: string;
-};
-
-const weatherByDistrict: Record<string, WeatherSnapshot> = {
-  "47110": {
-    conditionKey: "district.clear",
-    temperature: "27°C",
-    humidity: "58%",
-    wind: "E 2.4m/s",
-  },
-  "47130": {
-    conditionKey: "district.partlyCloudy",
-    temperature: "25°C",
-    humidity: "62%",
-    wind: "SE 1.8m/s",
-  },
-  "47150": {
-    conditionKey: "district.clear",
-    temperature: "26°C",
-    humidity: "55%",
-    wind: "NE 1.5m/s",
-  },
-  "47170": {
-    conditionKey: "district.cloudy",
-    temperature: "24°C",
-    humidity: "67%",
-    wind: "E 2.1m/s",
-  },
-  "47190": {
-    conditionKey: "district.clear",
-    temperature: "28°C",
-    humidity: "53%",
-    wind: "S 2.8m/s",
-  },
-  "47210": {
-    conditionKey: "district.partlyCloudy",
-    temperature: "24°C",
-    humidity: "61%",
-    wind: "NE 1.7m/s",
-  },
-  "47230": {
-    conditionKey: "district.clear",
-    temperature: "26°C",
-    humidity: "56%",
-    wind: "S 2.0m/s",
-  },
-  "47250": {
-    conditionKey: "district.partlyCloudy",
-    temperature: "25°C",
-    humidity: "59%",
-    wind: "W 1.6m/s",
-  },
-  "47280": {
-    conditionKey: "district.cloudy",
-    temperature: "23°C",
-    humidity: "69%",
-    wind: "NE 2.5m/s",
-  },
-  "47290": {
-    conditionKey: "district.clear",
-    temperature: "27°C",
-    humidity: "54%",
-    wind: "SE 2.2m/s",
-  },
-};
-
-const defaultWeather: WeatherSnapshot = {
-  conditionKey: "district.partlyCloudy",
-  temperature: "24°C",
-  humidity: "63%",
-  wind: "NE 1.9m/s",
-};
+/** Observation time, so a reading is never shown without when it was taken. */
+const timeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
 
 const recentEvents = [
   { time: "14:10", labelKey: "district.recentWildfire" },
@@ -109,9 +38,15 @@ export function DistrictStatusPanel({
   children,
 }: DistrictStatusPanelProps) {
   const { locale, t } = useI18n();
-  const weather = districtCode
-    ? (weatherByDistrict[districtCode] ?? defaultWeather)
-    : defaultWeather;
+  const weather = useWeather(districtCode);
+  const snapshot = weather.status === "ready" ? weather.snapshot : null;
+
+  /**
+   * A reading the backend did not send stays a dash. Filling it in would put a
+   * number on screen that no instrument produced, and nothing downstream could
+   * tell it apart from an observation.
+   */
+  const show = (value: string | null | undefined) => value ?? "—";
   const district = districtCode ? districtByCode(districtCode) : undefined;
   let districtName = t("district.selected");
   if (districtCode === null || districtCode === PROVINCE_CODE) {
@@ -133,23 +68,74 @@ export function DistrictStatusPanel({
       <section aria-label={t("district.weatherConditions")}>
         <div className="district-status-heading">
           <strong>{t("district.weather")}</strong>
-          <span>{t(weather.conditionKey)}</span>
+          <span>
+            {weather.status === "loading"
+              ? t("district.weatherLoading")
+              : snapshot?.observed_at
+                ? timeFormatter.format(new Date(snapshot.observed_at))
+                : ""}
+          </span>
         </div>
         <dl className="weather-metrics">
           <div>
             <dt>{t("district.temperature")}</dt>
-            <dd>{weather.temperature}</dd>
+            <dd>
+              {show(
+                snapshot?.temperature_c != null
+                  ? `${snapshot.temperature_c.toFixed(1)}°C`
+                  : null,
+              )}
+            </dd>
           </div>
           <div>
             <dt>{t("district.humidity")}</dt>
-            <dd>{weather.humidity}</dd>
+            <dd>
+              {show(
+                snapshot?.humidity_pct != null
+                  ? `${Math.round(snapshot.humidity_pct)}%`
+                  : null,
+              )}
+            </dd>
           </div>
           <div>
             <dt>{t("district.wind")}</dt>
-            <dd>{weather.wind}</dd>
+            <dd>
+              {show(
+                formatWind(
+                  snapshot?.wind_speed_ms ?? null,
+                  snapshot?.wind_direction_deg ?? null,
+                ),
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>{t("district.rainfall")}</dt>
+            <dd>
+              {show(
+                snapshot?.rainfall_1h_mm != null
+                  ? `${snapshot.rainfall_1h_mm.toFixed(1)}mm`
+                  : null,
+              )}
+            </dd>
           </div>
         </dl>
-        <p className="district-data-note">{t("district.demoWeather")}</p>
+        {/*
+          A reading that could not be fetched must not read as clear weather,
+          and one past its refresh cycle must carry its time. Both are stated
+          rather than left to the blank dashes above.
+        */}
+        {weather.status === "unavailable" ||
+        snapshot?.state === "UNVERIFIED" ? (
+          <p className="district-data-note district-data-warning" role="status">
+            {t("district.weatherUnavailable")}
+          </p>
+        ) : snapshot?.stale ? (
+          <p className="district-data-note district-data-warning">
+            {t("district.weatherStale")}
+          </p>
+        ) : snapshot?.attribution ? (
+          <p className="district-data-note">{snapshot.attribution}</p>
+        ) : null}
       </section>
       <section
         className="district-event-summary"

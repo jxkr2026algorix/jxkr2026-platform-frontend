@@ -23,6 +23,7 @@ import {
   shelterSchema,
   toRouteRequestBody,
 } from "./routing";
+import { type WeatherSnapshot, weatherSnapshotSchema } from "./weather";
 
 export {
   DEMO_LOCATION,
@@ -52,6 +53,12 @@ export {
   type SharedRenderState,
   type StreamEvent,
 } from "./stream";
+export {
+  compassPoint,
+  formatWind,
+  type WeatherReading,
+  type WeatherSnapshot,
+} from "./weather";
 
 export type PlatformConnection = "connecting" | "live" | "unavailable";
 
@@ -194,6 +201,26 @@ export class PlatformClient {
       .get(`${this.baseUrl}/shelters?${search}`, { retry: 0, timeout: 8_000 })
       .json<unknown>();
     return z.array(shelterSchema).parse(response);
+  }
+
+  /**
+   * Current weather for one district. `region` takes either the 5-digit code
+   * or the Korean name; the backend resolves both.
+   *
+   * Deliberately not cached here: a stale reading presented as current is the
+   * failure this endpoint exists to remove.
+   */
+  async getWeather(region: string): Promise<WeatherSnapshot> {
+    const response = await ky
+      .get(
+        `${this.baseUrl}/situation/weather?region=${encodeURIComponent(region)}`,
+        {
+          retry: 0,
+          timeout: 15_000,
+        },
+      )
+      .json<unknown>();
+    return weatherSnapshotSchema.parse(response);
   }
 
   /**

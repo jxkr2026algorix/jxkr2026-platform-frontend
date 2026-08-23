@@ -63,7 +63,12 @@ const english = {
   "district.temperature": "Temperature",
   "district.humidity": "Humidity",
   "district.wind": "Wind",
-  "district.demoWeather": "Demo weather snapshot · Live weather API pending",
+  "district.rainfall": "Rainfall (1h)",
+  "district.weatherLoading": "Loading…",
+  "district.weatherStale":
+    "Past its refresh cycle — check the observation time before acting on it.",
+  "district.weatherUnavailable":
+    "Weather could not be read. This is not a report of clear conditions.",
   "district.platformAlert": "Platform alert",
   "district.syncing": "Syncing map data.",
   "district.noAlerts": "No active platform alerts.",
@@ -188,7 +193,12 @@ const korean: Record<TranslationKey, string> = {
   "district.temperature": "기온",
   "district.humidity": "습도",
   "district.wind": "바람",
-  "district.demoWeather": "데모 기상 정보 · 실시간 기상 API 연동 예정",
+  "district.rainfall": "1시간 강수",
+  "district.weatherLoading": "불러오는 중…",
+  "district.weatherStale":
+    "갱신주기를 넘긴 값입니다 — 관측 시각을 확인하고 쓰세요.",
+  "district.weatherUnavailable":
+    "기상 정보를 읽지 못했습니다. 날씨가 맑다는 뜻이 아닙니다.",
   "district.platformAlert": "플랫폼 경보",
   "district.syncing": "지도 데이터를 동기화하고 있습니다.",
   "district.noAlerts": "활성화된 플랫폼 경보가 없습니다.",

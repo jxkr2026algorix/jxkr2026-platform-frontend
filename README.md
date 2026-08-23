@@ -101,6 +101,15 @@ Dashboard brand assets live in `apps/console-front/public/brand/`. Keep the
 Korean and English SALGIL SVGs aligned to the same visual height when replacing
 them so the collaboration lockup does not shift between languages.
 
+## 백엔드에서 오는 것
+
+콘솔의 기상 정보는 백엔드의 `GET /situation/weather` 에서 온다 — 기상청 실황·단기예보다.
+값이 없으면 대시(`—`)로 두고 채우지 않는다. 지어낸 숫자는 화면에서 관측과 구분되지 않는다.
+
+- `state=UNVERIFIED` → "읽지 못했습니다. 날씨가 맑다는 뜻이 아닙니다"
+- `stale=true` → 관측 시각과 함께 경고
+- `attribution` → KOGL 출처 표기, 지우면 안 된다
+
 ## Deployment
 
 For the three production domains on one Lightsail instance, follow
